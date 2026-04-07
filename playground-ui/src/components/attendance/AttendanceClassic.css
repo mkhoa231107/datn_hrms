@@ -1,0 +1,210 @@
+/* AttendanceClassic.css */
+
+.ac-container {
+    font-family: Arial, Helvetica, sans-serif;
+    color: #333;
+    background-color: #fff;
+    font-size: 13px;
+    margin: 0;
+    width: 100%;
+    padding: 10px;
+}
+
+/* ── Top Navigation (New) ── */
+.ac-top-nav {
+    display: flex;
+    border: 1px solid #dee2e6;
+    border-bottom: 2px solid #dee2e6;
+    background-color: #f8f9fa;
+    margin-bottom: 15px;
+}
+.ac-nav-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    font-weight: normal;
+    color: #555;
+    border-right: 1px solid #dee2e6;
+}
+.ac-nav-item.active {
+    background-color: #e6f2ff; /* Light blue highlight */
+    color: #1a73e8;
+    font-weight: bold;
+    border-bottom: 2px solid #1a73e8;
+    margin-bottom: -2px; /* Pull down over the border-bottom */
+}
+.ac-nav-item:hover:not(.active) {
+    background-color: #e2e6ea;
+}
+
+/* ── Toolbar / Filter ── */
+.ac-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    gap: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+}
+.ac-select {
+    border: 1px solid #ccc;
+    padding: 6px 10px;
+    font-size: 13px;
+    outline: none;
+    background-color: #fff;
+    min-width: 150px;
+}
+
+/* ── Tabs ── */
+.ac-tabs {
+    display: flex;
+    border: 1px solid #dee2e6;
+    border-bottom: 2px solid #dee2e6;
+    background-color: #f8f9fa;
+}
+.ac-tab {
+    padding: 8px 20px;
+    border-right: 1px solid #dee2e6;
+    cursor: pointer;
+    background-color: transparent;
+    color: #555;
+}
+.ac-tab.active {
+    font-weight: bold;
+    color: #1a73e8;
+    background-color: #fff;
+    border-bottom: 2px solid #1a73e8;
+    margin-bottom: -2px; /* Overlap the container border */
+}
+.ac-tab:hover:not(.active) {
+    background-color: #e2e6ea;
+}
+
+/* ── Table ── */
+.ac-table-wrapper {
+    overflow-x: auto;
+}
+.ac-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    table-layout: fixed; /* For even distribution */
+}
+.ac-table th {
+    background-color: #f4f6f8;
+    border: 1px solid #dee2e6;
+    padding: 10px 8px;
+    text-align: left;
+    font-weight: bold;
+    color: #333;
+}
+.ac-table th.center { text-align: center; }
+.ac-table td {
+    border: 1px solid #dee2e6;
+    padding: 8px;
+    color: #333;
+    vertical-align: middle;
+}
+.ac-table td.center { text-align: center; }
+.ac-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Date block styling */
+.ac-date-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+.ac-day-badge {
+    padding: 2px 6px;
+    font-weight: bold;
+    color: white;
+    font-size: 11px;
+}
+.ac-day-badge.blue {
+    background-color: #1a73e8;
+}
+.ac-day-badge.gray {
+    background-color: #6c757d;
+}
+
+/* Action / Status text */
+.text-late { color: #dc3545; }
+.text-missing { color: #ff7f00; font-style: italic; }
+.text-ok { color: #333; }
+
+/* ── Pagination ── */
+.ac-pagination-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    background-color: #f8f9fa;
+}
+.ac-page-info {
+    font-size: 13px;
+    color: #555;
+}
+.ac-page-numbers {
+    display: flex;
+    gap: 2px;
+}
+.ac-page-btn {
+    border: 1px solid #dee2e6;
+    background-color: #fff;
+    padding: 3px 8px;
+    cursor: pointer;
+    color: #333;
+}
+.ac-page-btn.active {
+    background-color: #1a73e8;
+    color: #fff;
+    border-color: #1a73e8;
+}
+
+/* ── Check-in/out Buttons Area ── */
+.ac-action-area {
+    padding: 15px;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    display: flex;
+    gap: 15px;
+    background-color: #fff;
+}
+.ac-btn-checkin {
+    border: 1px solid #28a745;
+    background-color: #e8f5e9;
+    color: #28a745;
+    padding: 8px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.ac-btn-checkin:hover {
+    background-color: #d4edda;
+}
+.ac-btn-checkout {
+    border: 1px solid #000;
+    background-color: #000;
+    color: #fff;
+    padding: 8px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.ac-btn-checkout:hover {
+    background-color: #333;
+}
+.ac-btn-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

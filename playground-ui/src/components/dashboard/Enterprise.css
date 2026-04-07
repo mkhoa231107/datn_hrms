@@ -1,0 +1,296 @@
+/* ── Enterprise Standard — Modern Flat Design ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+* { box-sizing: border-box; }
+
+.ep-root {
+    width: 100%;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    color: #1e293b;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 120px);
+    background: #f8fafc;
+    padding: 24px;
+    gap: 0;
+}
+
+/* ── Sub Navigation (Tabs) ── */
+.ep-subnav {
+    display: flex;
+    background: #fff;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 0;
+    border-radius: 12px 12px 0 0;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.ep-subnav-btn {
+    padding: 14px 24px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    color: #64748b;
+    cursor: pointer;
+    border: none;
+    border-right: 1px solid #f1f5f9;
+    background: transparent;
+    transition: background 0.15s, color 0.15s;
+    letter-spacing: 0.01em;
+}
+.ep-subnav-btn:hover { background: #f8fafc; color: #334155; }
+.ep-subnav-on {
+    color: #0f172a;
+    font-weight: 700;
+    background: #fff;
+    border-bottom: 2px solid #0f172a;
+    margin-bottom: -2px;
+}
+
+/* ── Status tabs / inner tabs ── */
+.ep-stab-container {
+    display: flex;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 20px;
+    gap: 4px;
+}
+.ep-stab {
+    padding: 8px 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.ep-stab-on {
+    background: #fff;
+    color: #0f172a;
+    font-weight: 700;
+    border-color: #e2e8f0;
+    position: relative;
+}
+.ep-stab-on::after {
+    content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #fff;
+}
+
+/* ── Overview stats style ── */
+.ep-stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+.ep-stat-card {
+    flex: 1;
+    min-width: 160px;
+    padding: 20px 24px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s;
+}
+.ep-stat-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.ep-stat-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    margin-bottom: 10px;
+}
+.ep-stat-num {
+    font-size: 32px;
+    font-weight: 800;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 6px;
+}
+.ep-stat-sub { font-size: 12px; color: #94a3b8; }
+.ep-stat-sub b { color: #475569; }
+
+/* ── Container wrapping Grid & Filter ── */
+.ep-content {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-top: 0;
+    padding-bottom: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+/* ── Simple filters inline ── */
+.ep-filter {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    gap: 12px;
+    background: #fafafa;
+    flex-wrap: wrap;
+}
+.ep-filter label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.ep-select {
+    padding: 7px 14px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #334155;
+    font-weight: 500;
+    transition: border-color 0.15s;
+    outline: none;
+}
+.ep-select:focus { border-color: #94a3b8; }
+
+/* ── Data Grid ── */
+.ep-grid-wrap { overflow-x: auto; }
+.ep-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+}
+.ep-grid th {
+    padding: 11px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    white-space: nowrap;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.ep-grid td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #334155;
+    vertical-align: middle;
+}
+.ep-grid tbody tr:last-child td { border-bottom: none; }
+.ep-grid tbody tr:hover td { background: #fafafa; }
+.ep-tr-active td { background: #fefce8 !important; }
+
+/* ── Footer ── */
+.ep-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid #f1f5f9;
+    background: #fafafa;
+    font-size: 12px;
+    border-radius: 0 0 12px 12px;
+}
+.ep-foot-info { color: #94a3b8; }
+
+.ep-action-btn {
+    padding: 9px 18px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border: 1.5px solid #0f172a;
+    background: #0f172a;
+    color: #fff;
+    cursor: pointer;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.1s;
+}
+.ep-action-btn:hover { background: #1e293b; transform: translateY(-1px); }
+.ep-action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* Modal */
+.ep-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,0.5);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+.ep-modal {
+    background: #fff;
+    width: 480px;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+.ep-modal-head {
+    background: #0f172a;
+    color: #fff;
+    padding: 16px 20px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    letter-spacing: 0.02em;
+}
+.ep-modal-head button { color: #94a3b8; background: transparent; border: none; cursor: pointer; display: flex; border-radius: 6px; padding: 4px; transition: color 0.15s; }
+.ep-modal-head button:hover { color: #fff; }
+.ep-modal-body { padding: 24px; font-size: 14px; color: #334155; }
+.ep-modal-foot {
+    padding: 16px 20px;
+    border-top: 1px solid #f1f5f9;
+    background: #f8fafc;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-radius: 0 0 16px 16px;
+}
+.ep-btn-cancel {
+    padding: 9px 18px;
+    border: 1.5px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+.ep-btn-cancel:hover { background: #f1f5f9; }
+.ep-btn-ok {
+    padding: 9px 18px;
+    border: 1.5px solid #15803d;
+    background: #16a34a;
+    color: #fff;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+.ep-btn-ok:hover { background: #15803d; }

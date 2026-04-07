@@ -1,0 +1,174 @@
+/* Leave.css — Flat enterprise grid style */
+@reference "../index.css";
+
+.lv-root {
+    width: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* ── Sub navigation ── */
+.lv-subnav {
+    display: flex; background: #fff;
+    border: 1px solid #d0d0d0; border-bottom: none;
+}
+.lv-subnav-btn {
+    padding: 12px 20px; font-size: 14px; font-family: Arial, Helvetica, sans-serif;
+    border: none; border-right: 1px solid #d0d0d0; cursor: pointer;
+    background: transparent; color: #444; white-space: nowrap;
+}
+.lv-subnav-btn:hover { background: #f5f5f5; }
+.lv-subnav-on { background: #dbeafe; color: #1d4ed8; font-weight: bold; }
+
+/* ── Flash ── */
+.lv-flash {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px; border: 1px solid;
+    font-size: 12px; font-weight: 600; margin-bottom: 8px;
+}
+.lv-flash-ok  { background: #f0fdf4; color: #15803d; border-color: #86efac; }
+.lv-flash-err { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+.lv-flash-x { margin-left: auto; cursor: pointer; opacity: .6; display: flex; }
+.lv-flash-x:hover { opacity: 1; }
+
+/* ── Filter & Status tabs ── */
+.lv-filter-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: #f5f5f5;
+    border: 1px solid #d0d0d0; border-bottom: none;
+    margin-top: 8px;
+}
+.lv-select {
+    padding: 5px 8px; border: 1px solid #c0c0c0; background: #fff;
+    font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #333;
+    cursor: pointer; min-width: 140px;
+}
+.lv-status-tabs {
+    display: flex; gap: 0; background: #f5f5f5;
+    border: 1px solid #d0d0d0; border-top: none; border-bottom: none;
+    padding: 8px 12px 0;
+}
+.lv-stab {
+    padding: 8px 18px; font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px; color: #555; background: #e8e8e8;
+    border: 1px solid #c8c8c8; border-bottom: none;
+    cursor: pointer; margin-right: 3px;
+}
+.lv-stab:hover { background: #ddd; }
+.lv-stab-on { background: #fff; color: #1d4ed8; font-weight: bold; border-color: #d0d0d0; }
+
+/* ── Data Grid ── */
+.lv-grid-wrap { border: 1px solid #d0d0d0; background: #fff; overflow-x: auto; }
+.lv-grid { width: 100%; border-collapse: collapse; font-family: Arial, Helvetica, sans-serif; font-size: 13px; }
+.lv-grid th {
+    padding: 10px 14px; background: #f0f0f0; border: 1px solid #d0d0d0;
+    text-align: left; font-size: 12px; font-weight: bold; color: #444; white-space: nowrap;
+}
+.lv-grid td { padding: 10px 14px; border: 1px solid #e0e0e0; color: #333; vertical-align: middle; }
+.lv-grid tbody tr:hover td { background: #f5f9ff; }
+
+.lv-tdnum { color: #888; text-align: center; }
+.lv-tdname { font-weight: bold; color: #222; }
+.lv-td-note { color: #777; font-style: italic; font-size: 11px; }
+
+/* ── Status Text ── */
+.st-pend { color: #b45309; font-weight: bold; }
+.st-appr { color: #15803d; font-weight: bold; }
+.st-rej  { color: #b91c1c; font-weight: bold; }
+.st-canc { color: #888; text-decoration: line-through; }
+
+/* ── Actions in Grid ── */
+.lv-action-btn {
+    padding: 3px 6px; background: #fff; border: 1px solid #c0c0c0;
+    cursor: pointer; color: #555; display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: bold; transition: background .1s;
+}
+.lv-action-btn:hover { background: #f0f0f0; border-color: #999; }
+.lv-action-ok { color: #15803d; }
+.lv-action-ok:hover { background: #f0fdf4; border-color: #86efac; }
+.lv-action-err { color: #b91c1c; }
+.lv-action-err:hover { background: #fef2f2; border-color: #fca5a5; }
+
+.lv-empty { padding: 32px; text-align: center; color: #999; font-style: italic; border: 1px solid #e0e0e0; }
+
+/* ── Footer ── */
+.lv-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; border: 1px solid #d0d0d0; border-top: none;
+    background: #f5f5f5; font-size: 13px;
+}
+.lv-foot-info { color: #555; }
+.lv-foot-left { display: flex; align-items: center; gap: 24px; }
+.lv-create-btn {
+    padding: 10px 22px; font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px; font-weight: bold; border: 1px solid #14532d;
+    background: #15803d; color: #fff; cursor: pointer; display: inline-flex; justify-content: center;
+}
+.lv-create-btn:hover { background: #166534; }
+
+.lv-pages { display: flex; align-items: center; gap: 3px; }
+.lv-pgbtn {
+    min-width: 32px; height: 32px; padding: 0 8px; border: 1px solid #c0c0c0;
+    background: #fff; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.lv-pgbtn:hover:not(:disabled) { background: #e8e8e8; }
+.lv-pgbtn:disabled { opacity: .4; cursor: not-allowed; }
+.lv-pgbtn-on { background: #1d4ed8 !important; color: #fff !important; border-color: #1a44bb !important; }
+
+/* ── Modal (Create & Approve) ── */
+.lv-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9999;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.lv-modal-box {
+    background: #fff; width: 100%; max-width: 400px;
+    border: 1px solid #888; box-shadow: 0 4px 24px rgba(0,0,0,.3);
+    font-family: Arial, Helvetica, sans-serif;
+}
+.lv-modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: #f0f0f0; border-bottom: 1px solid #ccc;
+}
+.lv-modal-title { font-size: 13px; font-weight: bold; color: #222; }
+.lv-modal-close { padding: 2px; cursor: pointer; color: #666; display: flex; border: none; background: transparent; }
+.lv-modal-close:hover { color: #111; }
+
+.lv-modal-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+.lv-form-group { display: flex; flex-direction: column; gap: 4px; }
+.lv-label { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+.lv-input, .lv-select-input, .lv-textarea {
+    width: 100%; padding: 7px 10px; border: 1px solid #c0c0c0;
+    font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #333; outline: none;
+}
+.lv-input:focus, .lv-select-input:focus, .lv-textarea:focus { border-color: #1d4ed8; }
+.lv-textarea { resize: vertical; min-height: 60px; }
+
+.lv-modal-foot {
+    display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid #e0e0e0; background: #f9f9f9; justify-content: flex-end;
+}
+.lv-btn-cancel {
+    padding: 7px 16px; background: #f0f0f0; border: 1px solid #c0c0c0;
+    font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: bold; cursor: pointer;
+}
+.lv-btn-cancel:hover { background: #e0e0e0; }
+.lv-btn-submit {
+    padding: 7px 16px; border: 1px solid #1a44bb; background: #1d4ed8; color: #fff;
+    font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: bold; cursor: pointer;
+}
+.lv-btn-submit:hover:not(:disabled) { background: #16389f; }
+.lv-btn-submit:disabled { background: #99b0f0; border-color: #88a1e8; cursor: not-allowed; }
+
+/* ── Overview stats style ── */
+.lv-stats-row { display: flex; gap: 0; border: 1px solid #d0d0d0; background: #fff; margin-top: 8px; }
+.lv-stat-card { flex: 1; padding: 24px 28px; border-right: 1px solid #d0d0d0; }
+.lv-stat-card:last-child { border-right: none; }
+.lv-stat-label { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; color: #888; margin-bottom: 8px; }
+.lv-stat-num { font-size: 34px; font-weight: bold; color: #111; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1; margin-bottom: 4px; }
+.lv-stat-sub { font-size: 12px; color: #888; }
+.lv-stat-sub b { color: #111; }

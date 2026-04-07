@@ -1,0 +1,432 @@
+/* Attendance.css — Classic Flat Grid (matches attendance-employee-preview.html) */
+
+/* ── Reset ── */
+.att-wrap *, .att-wrap *::before, .att-wrap *::after { box-sizing: border-box; }
+
+/* ── Root wrapper ── */
+.att-wrap {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+    color: #333;
+    background: #fff;
+    width: 100%;
+}
+
+/* ══ TAB BAR (flat rectangular) ══ */
+.att-tab-bar {
+    display: flex;
+    align-items: flex-end;
+    padding: 10px 0 0;
+    border-bottom: 2px solid #ccc;
+    background: #f5f5f5;
+    margin: 0 0 0;
+}
+.att-tab {
+    padding: 7px 20px;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: #555;
+    background: #ebebeb;
+    margin-right: 3px;
+    white-space: nowrap;
+    user-select: none;
+    transition: background .1s;
+    position: relative;
+    bottom: -2px;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.att-tab:hover:not(.att-tab-on) { background: #ddd; color: #333; }
+.att-tab.att-tab-on {
+    background: #fff;
+    color: #1a56db;
+    font-weight: bold;
+    border-color: #ccc;
+    border-bottom: 2px solid #fff;
+    z-index: 1;
+}
+
+/* ══ SECTION TITLE ══ */
+.att-section-title {
+    font-size: 13px;
+    font-weight: bold;
+    color: #333;
+    padding: 12px 0 10px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 14px;
+}
+
+/* ══ TODAY PANEL ══ */
+.att-today-panel {
+    padding: 14px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+/* Info key-value table */
+.att-info-table {
+    width: 100%;
+    max-width: 480px;
+    border-collapse: collapse;
+    border: 1px solid #ccc;
+    margin-bottom: 0;
+}
+.att-info-table th {
+    background: #f4f4f4;
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    font-weight: bold;
+    font-size: 13px;
+    color: #444;
+    text-align: left;
+    width: 36%;
+    white-space: nowrap;
+}
+.att-info-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #333;
+}
+.att-clock-val {
+    font-weight: bold;
+    color: #1a56db;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+.att-time-na { color: #bbb; }
+
+/* Action buttons */
+.att-action-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-top: 1px solid #e0e0e0;
+    margin-top: 12px;
+}
+.att-btn-in {
+    background: #e8f5e9;
+    border: 1px solid #28a745;
+    color: #1b5e20;
+    padding: 7px 22px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: Arial, Helvetica, sans-serif;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.att-btn-in:hover:not(:disabled) { background: #c8e6c9; }
+.att-btn-in:disabled,
+.att-btn-in.done {
+    background: #f0fdf4;
+    color: #15803d;
+    border-color: #86efac;
+    cursor: default;
+}
+.att-btn-out {
+    background: #222;
+    border: 1px solid #000;
+    color: #fff;
+    padding: 7px 22px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+    font-family: Arial, Helvetica, sans-serif;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.att-btn-out:hover:not(:disabled) { background: #444; }
+.att-btn-out:disabled {
+    background: #f0f0f0;
+    color: #bbb;
+    border-color: #ddd;
+    cursor: not-allowed;
+}
+
+/* Monthly summary stats */
+.att-month-stats {
+    display: flex;
+    border: 1px solid #ccc;
+    margin-top: 14px;
+    background: #fafafa;
+}
+.att-ms-item {
+    flex: 1;
+    padding: 10px 16px;
+    text-align: center;
+    border-right: 1px solid #ddd;
+    font-size: 12px;
+    color: #555;
+}
+.att-ms-item:last-child { border-right: none; }
+.att-ms-num {
+    display: block;
+    font-size: 20px;
+    font-weight: bold;
+    line-height: 1.2;
+    color: #333;
+}
+.att-ms-num.ok    { color: #27ae60; }
+.att-ms-num.late  { color: #c0392b; }
+.att-ms-num.early { color: #d35400; }
+.att-ms-num.gray  { color: #7f8c8d; }
+.att-ms-num.blue  { color: #1a56db; }
+.att-ms-num.orange { color: #f97316; }
+.att-ms-label { font-size: 11px; color: #888; margin-top: 2px; display: block; }
+
+/* Flash / loading */
+.att-flash {
+    border: 1px solid;
+    padding: 9px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+.att-flash.ok  { background: #f0fdf4; color: #15803d; border-color: #86efac; }
+.att-flash.err { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+.att-loading   {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    padding: 8px 14px;
+    color: #92400e;
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+/* ══ HISTORY PANEL ══ */
+.att-hist-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 8px;
+    border-bottom: 1px solid #e0e0e0;
+    flex-wrap: wrap;
+}
+.att-filter-label { font-size: 12px; color: #777; white-space: nowrap; }
+.att-filter-select {
+    border: 1px solid #c8c8c8;
+    padding: 5px 8px;
+    height: 30px;
+    font-size: 13px;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    min-width: 150px;
+    outline: none;
+    font-family: Arial, Helvetica, sans-serif;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 24px;
+}
+.att-filter-select:focus { border-color: #1a56db; }
+ 
+/* Summary bar in history */
+.att-sum-bar {
+    display: flex;
+    gap: 15px;
+    margin-left: auto;
+    padding: 4px 12px;
+    background: #f9fafb;
+    border: 1px solid #ddd;
+    align-items: center;
+}
+.att-sum-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.att-sum-lbl {
+    font-size: 11px;
+    color: #666;
+    font-weight: normal;
+}
+.att-sum-val {
+    font-size: 15px;
+    font-weight: bold;
+    color: #333;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Status filter chips */
+.att-chip-bar { display: flex; gap: 4px; }
+.att-chip {
+    padding: 4px 14px;
+    border: 1px solid #ccc;
+    background: #ebebeb;
+    color: #555;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background .1s;
+    user-select: none;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.att-chip:hover:not(.att-chip-on) { background: #ddd; }
+.att-chip.att-chip-on {
+    background: #1a56db;
+    border-color: #1a56db;
+    color: #fff;
+    font-weight: bold;
+}
+
+/* History sub-tabs (flat, like admin page) */
+.att-subtabs {
+    display: flex;
+    align-items: flex-end;
+    background: #f5f5f5;
+    border-bottom: 2px solid #ccc;
+    padding: 8px 0 0;
+    gap: 0;
+}
+.att-subtab {
+    padding: 6px 16px;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    cursor: pointer;
+    background: #ebebeb;
+    color: #555;
+    margin-right: 3px;
+    font-size: 12.5px;
+    white-space: nowrap;
+    user-select: none;
+    position: relative;
+    bottom: -2px;
+    font-family: Arial, Helvetica, sans-serif;
+    transition: background .1s;
+}
+.att-subtab:hover:not(.att-subtab-on) { background: #ddd; }
+.att-subtab.att-subtab-on {
+    background: #fff;
+    color: #1a56db;
+    font-weight: bold;
+    border-color: #ccc;
+    border-bottom: 2px solid #fff;
+    z-index: 1;
+}
+
+/* Data table */
+.att-table-wrap { overflow-x: auto; }
+.att-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #ccc;
+    background: #fff;
+    border-top: none;
+    min-width: 550px;
+}
+.att-table thead tr { background: #f4f4f4; }
+.att-table th {
+    border: 1px solid #ccc;
+    padding: 9px 8px;
+    text-align: left;
+    font-weight: bold;
+    font-size: 12.5px;
+    color: #333;
+    white-space: nowrap;
+}
+.att-table th.c { text-align: center; }
+.att-table td {
+    border: 1px solid #ddd;
+    padding: 7px 8px;
+    font-size: 13px;
+    color: #333;
+    vertical-align: middle;
+}
+.att-table td.c { text-align: center; }
+.att-table tbody tr:hover { background: #f5f5f5; }
+.att-table tbody tr:nth-child(even) { background: #fafafa; }
+.att-table tbody tr:nth-child(even):hover { background: #f5f5f5; }
+
+/* Day chip badge */
+.att-day-chip {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-weight: bold;
+    background: #eee;
+    border: 1px solid #ccc;
+    color: #555;
+    margin-right: 4px;
+}
+.att-day-chip.weekend { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+.att-day-chip.today   { background: #1a56db; color: #fff; border-color: #1a56db; }
+
+/* Status text */
+.st-ok    { color: #222; }
+.st-late  { color: #c0392b; font-weight: bold; }
+.st-early { color: #d35400; }
+.st-miss  { color: #7f8c8d; font-style: italic; }
+.st-wip   { color: #d97706; font-weight: bold; }
+.st-na    { color: #bbb; }
+.att-tn   { color: #bbb; }
+.att-ne   { color: #ccc; font-style: italic; }
+
+/* Empty state */
+.att-empty {
+    text-align: center;
+    padding: 28px;
+    color: #aaa;
+    font-style: italic;
+    border: 1px solid #ddd;
+    border-top: none;
+}
+
+/* ══ PAGINATION ══ */
+.att-pag-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-top: none;
+    background: #fafafa;
+    font-size: 13px;
+    color: #555;
+}
+.att-pag-right { display: flex; align-items: center; gap: 8px; }
+.att-pag-range { font-size: 12px; color: #666; border-right: 1px solid #ddd; padding-right: 8px; }
+.att-pag-nums { display: flex; gap: 2px; }
+.att-pgbtn {
+    border: 1px solid #ccc;
+    background: #fff;
+    color: #1a56db;
+    padding: 3px 9px;
+    cursor: pointer;
+    font-size: 13px;
+    min-width: 28px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .1s;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.att-pgbtn:hover:not(.att-pgbtn-on):not(:disabled) { background: #e8f0fe; }
+.att-pgbtn.att-pgbtn-on {
+    background: #1a56db;
+    color: #fff;
+    border-color: #1a56db;
+    font-weight: bold;
+}
+.att-pgbtn:disabled { color: #bbb; border-color: #e0e0e0; cursor: not-allowed; }
+.att-per-page {
+    border: 1px solid #ccc;
+    padding: 3px 6px;
+    font-size: 12px;
+    color: #555;
+    background: #fff;
+    cursor: pointer;
+    outline: none;
+    font-family: Arial, Helvetica, sans-serif;
+}

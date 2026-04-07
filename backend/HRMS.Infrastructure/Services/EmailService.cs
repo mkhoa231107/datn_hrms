@@ -1,0 +1,80 @@
+using HRMS.Application.Interfaces;
+using Microsoft.Extensions.Configuration;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
+using System.Threading.Tasks;
+using System;
+
+namespace HRMS.Infrastructure.Services
+{
+    public class EmailService : IEmailService
+    {
+        private readonly IConfiguration _configuration;
+
+        public EmailService(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
+        public async Task SendEmailAsync(string to, string subject, string body)
+        {
+            var emailSettings = _configuration.GetSection("EmailSettings");
+            
+            // Check if email sending is enabled
+            var enableEmailStr = emailSettings["EnableEmail"];
+            bool.TryParse(enableEmailStr, out bool isEmailEnabled);
+
+            if (!isEmailEnabled)
+            {
+                // Logic giả lập: In ra console nếu không bật gửi email thật
+                Console.WriteLine("================================================");
+                Console.WriteLine($"[SIMULATED EMAIL] To: {to}");
+                Console.WriteLine($"Subject: {subject}");
+                Console.WriteLine($"Body: {body}");
+                Console.WriteLine("================================================");
+                return;
+            }
+
+            var senderName = emailSettings["SenderName"] ?? "HRMS System";
+            var senderEmail = emailSettings["SenderEmail"];
+
+            if (string.IsNullOrEmpty(senderEmail) || senderEmail == "your-email@gmail.com")
+            {
+                throw new InvalidOperationException("Email chưa được cấu hình. Vui lòng cập nhật SenderEmail và SenderPassword trong appsettings.json bằng thông tin Gmail thật của bạn.");
+            }
+
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(senderName, senderEmail));
+            message.To.Add(new MailboxAddress("", to));
+            message.Subject = subject;
+
+            message.Body = new TextPart("html")
+            {
+                Text = body
+            };
+
+            using var client = new SmtpClient();
+            try
+            {
+                // Accept all SSL certificates (for troubleshooting)
+                client.ServerCertificateValidationCallback = (s, c, h, e) => true;
+
+                await client.ConnectAsync(
+                    emailSettings["SmtpServer"], 
+                    int.Parse(emailSettings["SmtpPort"] ?? "587"), 
+                    SecureSocketOptions.Auto);
+
+                await client.AuthenticateAsync(emailSettings["SenderEmail"], emailSettings["SenderPassword"]);
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't crash the whole process for now
+                Console.WriteLine($"Email sending failed: {ex.Message}");
+                throw;
+            }
+        }
+    }
+}
