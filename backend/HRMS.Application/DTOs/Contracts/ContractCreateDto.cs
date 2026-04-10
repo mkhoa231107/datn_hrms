@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace HRMS.Application.DTOs.Contract
 {
@@ -15,5 +15,13 @@ namespace HRMS.Application.DTOs.Contract
         public string SignedBy { get; set; } = string.Empty;
         public DateTime? SignedDate { get; set; }
         public string? Notes { get; set; }
+        /// <summary>Ca làm việc cố định ghi vào hợp đồng</summary>
+        public int? ShiftId { get; set; }
+
+        /// <summary>Dự kiến gán Nhân viên vào Phòng ban này</summary>
+        public int? DepartmentId { get; set; }
+        
+        /// <summary>Dự kiến gán Nhân viên vào Chức vụ này</summary>
+        public int? PositionId { get; set; }
     }
 }

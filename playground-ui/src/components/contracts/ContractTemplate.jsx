@@ -1,221 +1,485 @@
 import React from 'react';
-import { ShieldCheck, MapPin, Calendar, User, Briefcase, FileText } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
+/* ── helpers ── */
+const fmtDate = (d) => {
+  if (!d) return '.....................';
+  return new Date(d).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+const fmtMoney = (n) => {
+  const num = Number(n);
+  if (!num || isNaN(num)) return '.....................';
+  return num.toLocaleString('vi-VN') + ' đồng';
+};
+
+/* A simple underlined fill-in */
+const Fill = ({ children, width = 'auto', bold = false }) => (
+  <span style={{
+    display: 'inline-block',
+    borderBottom: '1px solid #000',
+    minWidth: width,
+    fontWeight: bold ? '700' : 'inherit',
+    paddingBottom: '1px',
+  }}>
+    {children || '\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0'}
+  </span>
+);
+
+/* ── Main component ── */
 export default function ContractTemplate({ contract }) {
   if (!contract) return null;
 
-  const formatDate = (date) => {
-    if (!date) return '...';
-    return new Date(date).toLocaleDateString('vi-VN', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
+  const signDate  = contract.startDate ? new Date(contract.startDate) : new Date();
+  const signDay   = signDate.getDate().toString().padStart(2, '0');
+  const signMonth = (signDate.getMonth() + 1).toString().padStart(2, '0');
+  const signYear  = signDate.getFullYear();
 
-  const getContractTypeName = (type) => {
-    const types = {
-      'Probation': 'THỬ VIỆC',
-      'FixedTerm': 'XÁC ĐỊNH THỜI HẠN',
-      'Indefinite': 'KHÔNG XÁC ĐỊNH THỜI HẠN',
-      'Seasonal': 'THỜI VỤ',
-      'PartTime': 'BÁN THỜI GIAN'
-    };
-    return types[type] || type.toUpperCase();
-  };
-
-  const numberToVietnameseText = (number) => {
-    const units = ['', ' nghìn', ' triệu', ' tỷ'];
-    const digits = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
-
-    if (number === 0) return 'không đồng';
-    
-    let res = "";
-    let count = 0;
-    let n = Math.abs(number);
-
-    const readThreeDigits = (num, isFull) => {
-      let temp = "";
-      const hundred = Math.floor(num / 100);
-      const ten = Math.floor((num % 100) / 10);
-      const unit = num % 10;
-
-      if (hundred > 0 || isFull) {
-        temp = digits[hundred] + " trăm ";
-      }
-
-      if (ten > 1) {
-        temp += digits[ten] + " mươi ";
-        if (unit === 1) temp += "mốt";
-        else if (unit === 5) temp += "lăm";
-        else if (unit > 0) temp += digits[unit];
-      } else if (ten === 1) {
-        temp += "mười ";
-        if (unit === 5) temp += "lăm";
-        else if (unit > 0) temp += digits[unit];
-      } else if (hundred > 0 && unit > 0) {
-        temp += "linh " + digits[unit];
-      } else if (unit > 0) {
-        temp += digits[unit];
-      }
-      return temp;
-    };
-
-    let groupCount = 0;
-    while (n > 0) {
-      const group = n % 1000;
-      if (group > 0) {
-        const groupText = readThreeDigits(group, n > 999);
-        res = groupText + units[groupCount] + " " + res;
-      }
-      n = Math.floor(n / 1000);
-      groupCount++;
-    }
-
-    res = res.trim();
-    return res.charAt(0).toUpperCase() + res.slice(1) + " đồng chẵn";
+  const p = { // shorthand
+    name:       contract.employeeName           || '.....................',
+    position:   contract.positionName           || '.....................',
+    dept:       contract.departmentName         || '.....................',
+    dob:        fmtDate(contract.dateOfBirth),
+    address:    contract.address                || '.....................',
+    tmpAddress: contract.currentAddress || contract.address || '.....................',
+    cccd:       contract.identityNumber         || '.....................',
+    cccdDate:   fmtDate(contract.identityDate   || '2015-01-01'),
+    cccdPlace:  contract.identityPlace          || 'Cục CSQLHC về TTXH',
+    placeOfOrigin: contract.placeOfOrigin       || '.....................',
+    placeOfBirth:  contract.placeOfBirth        || '.....................',
+    contractNo: contract.contractNumber         || '...',
+    type:       contract.contractType           || 'Xác định thời hạn',
+    startDate:  fmtDate(contract.startDate),
+    endDate:    contract.endDate ? fmtDate(contract.endDate) : null,
+    location:   contract.workLocation           || 'Văn phòng công ty',
+    salary:     fmtMoney(contract.basicSalary),
+    meal:       fmtMoney(contract.mealAllowance    || 730000),
+    phone:      fmtMoney(contract.phoneAllowance   || 300000),
+    petrol:     fmtMoney(contract.petrolAllowance  || 600000),
+    housing:    fmtMoney(contract.housingAllowance || 700000),
+    signedBy:   contract.signedBy              || 'Phùng Thành',
+    shiftName:  contract.shiftName             || 'Hành chính',
+    shiftTime:  contract.shiftTime             || '08:30 – 17:30',
+    notes:      contract.notes                 || null,
+    empSig:     contract.employeeSignature     || null,
   };
 
   return (
-    <div className="bg-slate-200 p-8 min-h-screen flex justify-center overflow-auto animate-fade-in py-12">
-      {/* Official A4 Paper Container with enhanced shadow and border */}
-      <div 
-        className="bg-white w-full max-w-[850px] shadow-[0_20px_50px_rgba(0,0,0,0.15)] p-12 md:p-24 text-slate-900 leading-[1.7] relative overflow-hidden border border-slate-300"
-        style={{ fontFamily: '"Times New Roman", Times, serif', textRendering: 'optimizeLegibility' }}
-      >
-        
-        {/* Subtle Paper Texture Overlay */}
-        <div className="absolute inset-0 pointer-events-none opacity-[0.02] bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')]"></div>
-
-        {/* National Header - More formal and tight */}
-        <div className="text-center mb-12">
-          <h2 className="font-bold text-lg uppercase mb-1">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
-          <h3 className="font-bold text-md mb-2">Độc lập - Tự do - Hạnh phúc</h3>
-          <div className="flex justify-center items-center mb-10">
-            <div className="h-[1.5px] w-48 bg-slate-900"></div>
-          </div>
+    <div
+      style={{
+        fontFamily: '"Times New Roman", Times, serif',
+        fontSize: '12pt',
+        lineHeight: '1.65',
+        color: '#000',
+        background: '#fff',
+        padding: '48px 64px 64px',
+        maxWidth: '900px',
+        margin: '0 auto',
+      }}
+    >
+      {/* ── National header ── */}
+      <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <div style={{ fontWeight: '700', fontSize: '13pt', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Cộng hòa xã hội chủ nghĩa Việt Nam
         </div>
-
-        {/* Contract Title - Elegant and bold */}
-        <div className="text-center mb-16">
-          <h1 className="text-3xl font-black uppercase mb-3">HỢP ĐỒNG LAO ĐỘNG</h1>
-          <div className="flex justify-center items-center gap-3 mb-4">
-            <span className="h-px w-8 bg-slate-300"></span>
-            <p className="font-bold text-slate-600 text-sm uppercase italic">Số: {contract.contractNumber}</p>
-            <span className="h-px w-8 bg-slate-300"></span>
-          </div>
+        <div style={{ fontWeight: '700', fontSize: '12pt' }}>
+          Độc lập – Tự do – Hạnh phúc
         </div>
-
-        {/* Parties Information - Legalistic styling */}
-        <div className="space-y-10 text-base">
-          <section className="text-justify">
-            <p className="mb-6">Hôm nay, ngày {formatDate(new Date())}, tại trụ sở Công ty Cổ phần Công nghệ TechVN, chúng tôi gồm có:</p>
-            
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-bold text-md mb-3 flex items-center gap-2">BÊN SỬ DỤNG LAO ĐỘNG (BÊN A):</h4>
-                <div className="grid grid-cols-1 gap-1.5 pl-6 border-l-2 border-slate-100">
-                  <p><span className="font-semibold underline underline-offset-2">Tên tổ chức:</span> <strong>CÔNG TY CỔ PHẦN CÔNG NGHỆ TECHVN</strong></p>
-                  <p><span className="font-semibold underline underline-offset-2">Địa chỉ:</span> 123 Đường Láng, Phường Láng Thượng, Quận Đống Đa, TP. Hà Nội</p>
-                  <p><span className="font-semibold underline underline-offset-2">Đại diện bởi Ông/Bà:</span> <span className="font-bold">{contract.signedBy || 'Phùng Thành'}</span></p>
-                  <p><span className="font-semibold underline underline-offset-2">Chức vụ:</span> Giám đốc điều hành</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-bold text-md mb-3 flex items-center gap-2">BÊN NGƯỜI LAO ĐỘNG (BÊN B):</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-3 pl-6 border-l-2 border-slate-100">
-                  <p><span className="font-semibold underline underline-offset-2">Họ và tên:</span> <span className="font-bold">{contract.employeeName}</span></p>
-                  <p><span className="font-semibold underline underline-offset-2">Mã nhân viên:</span> {contract.employeeCode}</p>
-                  <p><span className="font-semibold underline underline-offset-2">Số CCCD:</span> {contract.identityNumber || '001099023456'}</p>
-                  <p><span className="font-semibold underline underline-offset-2">Phòng ban:</span> {contract.departmentName || 'Phòng Kỹ thuật'}</p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <section className="text-justify">
-            <h4 className="font-bold text-md mb-4 uppercase text-blue-900 flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[10px] border border-blue-200">01</div>
-              ĐIỀU KHOẢN VỀ CÔNG VIỆC VÀ THỜI HẠN
-            </h4>
-            <div className="pl-9 space-y-2">
-              <p>1. <span className="font-bold">Chức danh chuyên môn:</span> {contract.jobDescription || 'Chuyên viên Phát triển phần mềm'}</p>
-              <p>2. <span className="font-bold">Địa điểm làm việc:</span> {contract.workLocation || 'Tại trụ sở chính của Bên A hoặc theo sự điều động công tác'}</p>
-              <p>3. <span className="font-bold">Loại hợp đồng:</span> {getContractTypeName(contract.contractType)}</p>
-              <p>4. <span className="font-bold">Thời hạn hợp đồng:</span> Từ ngày {formatDate(contract.startDate)} {contract.endDate ? `đến ngày ${formatDate(contract.endDate)}` : '(Hợp đồng vô thời hạn)'}.</p>
-            </div>
-          </section>
-
-          <section className="text-justify">
-             <h4 className="font-bold text-md mb-4 uppercase text-blue-900 flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-[10px] border border-blue-200">02</div>
-              CHẾ ĐỘ LƯƠNG VÀ ĐÃI NGỘ
-            </h4>
-            <div className="pl-9 space-y-2">
-              <p>1. <span className="font-bold">Lương cơ bản:</span> <span className="text-blue-700 font-black">{Number(contract.basicSalary).toLocaleString('vi-VN')} VNĐ</span> (Bằng chữ: {numberToVietnameseText(contract.basicSalary)}).</p>
-              <p>2. <span className="font-bold">Hình thức trả lương:</span> Chuyển khoản qua tài khoản ngân hàng liên kết vào ngày 05 hàng tháng.</p>
-              <p>3. <span className="font-bold">Thời gian làm việc:</span> 08 giờ/ngày, từ thứ Hai đến thứ Sáu hàng tuần.</p>
-            </div>
-          </section>
-
-          {/* Legal Stamp/Signature Footer - More authentic layout */}
-          <div className="mt-24 grid grid-cols-2 gap-12">
-            <div className="text-center">
-              <p className="font-bold uppercase mb-24">ĐẠI DIỆN BÊN A</p>
-              <div className="relative inline-block">
-                <div className="absolute -top-16 -left-12 w-36 h-36 border-[3px] border-red-500/40 rounded-full flex flex-col items-center justify-center -rotate-12 select-none group pointer-events-none">
-                   <div className="border border-red-500/40 w-full h-px mb-2"></div>
-                   <span className="text-red-600/50 text-[9px] uppercase font-black text-center leading-tight px-4">
-                     CÔNG TY CP TECHVN<br/>ĐÃ XÁC THỰC SỐ
-                   </span>
-                   <div className="border border-red-500/40 w-full h-px mt-2"></div>
-                </div>
-                <div className="h-20 flex items-center justify-center italic text-blue-900 font-serif text-3xl opacity-90" style={{ fontFamily: '"Brush Script MT", cursive' }}>
-                  {contract.signedBy || 'Thanh Phung'}
-                </div>
-                <p className="font-bold text-slate-800 mt-2 uppercase">{contract.signedBy || 'Phùng Thành'}</p>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <p className="font-bold uppercase mb-2">BÊN NGƯỜI LAO ĐỘNG</p>
-              <p className="text-[10px] text-slate-400 italic mb-10">(Ký và ghi rõ họ tên)</p>
-              
-              <div className="min-h-[160px] flex flex-col items-center justify-center">
-                {contract.employeeSignature ? (
-                  <div className="relative group">
-                    <img src={contract.employeeSignature} alt="Digital Signature" className="max-h-32 mb-4 mix-blend-multiply transition-transform hover:scale-110" />
-                    <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg border border-blue-200/50 flex items-center justify-center pointer-events-none">
-                       <ShieldCheck className="w-20 h-20 text-blue-500/10" />
-                    </div>
-                    <p className="font-bold text-slate-800 uppercase leading-none">{contract.employeeName}</p>
-                    <p className="text-[8px] text-slate-400 mt-1 uppercase font-mono">Verified ID: {contract.employeeCode}</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-3 py-10 grayscale opacity-40">
-                    <div className="w-16 h-1 bg-slate-200"></div>
-                    <p className="text-xs font-bold uppercase text-slate-400">Chưa xác thực</p>
-                    <div className="w-16 h-1 bg-slate-200"></div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-        {/* Enhanced Watermark */}
-        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-[0.04] rotate-[-35deg] select-none">
-          <span className="text-[140px] font-black italic">CONFIDENTIAL</span>
-        </div>
-
-        {/* Legal Footer Note */}
-        <div className="mt-20 pt-8 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 uppercase font-bold">
-           <span>HRMS Net - Digital Contract System</span>
-           <span>Trang 01 / 01</span>
+        <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0 0' }}>
+          <div style={{ borderBottom: '1px solid #000', width: '160px' }} />
         </div>
       </div>
+
+      {/* ── Contract title ── */}
+      <div style={{ textAlign: 'center', margin: '22px 0 18px' }}>
+        <div style={{ fontWeight: '700', fontSize: '16pt', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Hợp đồng lao động
+        </div>
+        <div style={{ fontSize: '10pt', color: '#555', marginTop: '4px' }}>
+          Số: <Fill width="120px">{p.contractNo}</Fill>
+        </div>
+      </div>
+
+      {/* ── Legal bases ── */}
+      <p style={{ marginBottom: '4px' }}>- Căn cứ Bộ luật lao động ngày 20 tháng 11 năm 2019;</p>
+      <p style={{ marginBottom: '4px' }}>- Căn cứ vào nhu cầu của các Bên</p>
+      <p style={{ marginBottom: '16px' }}>
+        Hôm nay, ngày <Fill width="28px">{signDay}</Fill> tháng <Fill width="28px">{signMonth}</Fill> năm{' '}
+        <Fill width="48px">{signYear}</Fill>, tại Công ty Cổ phần Công nghệ TECHVN, chúng tôi gồm:
+      </p>
+
+      {/* ── Bên A ── */}
+      <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>
+        Bên A: Người sử dụng lao động
+      </p>
+      <div style={{ paddingLeft: '20px', marginBottom: '16px' }}>
+        <p>Công ty: <strong>CÔNG TY CỔ PHẦN CÔNG NGHỆ TECHVN</strong></p>
+        <p>Địa chỉ: 123 Đường Láng, Phường Láng Thượng, Quận Đống Đa, TP. Hà Nội</p>
+        <p>Điện thoại: (024) 3766 88XX</p>
+        <p>
+          Đại diện: <strong style={{ textTransform: 'uppercase' }}>{p.signedBy}</strong>
+          &emsp;&emsp;Chức vụ: Giám đốc điều hành&emsp;&emsp;Quốc tịch: Việt Nam
+        </p>
+      </div>
+
+      {/* ── Bên B ── */}
+      <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>
+        Bên B: Người lao động
+      </p>
+      <div style={{ paddingLeft: '20px', marginBottom: '16px' }}>
+        <p>Ông/bà: <strong style={{ textTransform: 'uppercase', fontSize: '13pt' }}>{p.name}</strong></p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
+          <p>Quốc tịch: <Fill width="120px">Việt Nam</Fill></p>
+          <p>Ngày sinh: <Fill width="120px">{p.dob}</Fill></p>
+        </div>
+        <p>Nơi sinh: <Fill width="300px">{p.placeOfBirth}</Fill></p>
+        <p>Quê quán: <Fill width="300px">{p.placeOfOrigin}</Fill></p>
+        <p>Địa chỉ thường trú: <Fill width="300px">{p.address}</Fill></p>
+        <p>Địa chỉ tạm trú: <Fill width="300px">{p.tmpAddress}</Fill></p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px 16px' }}>
+          <p style={{ gridColumn: '1 / 2' }}>Số CMND/CCCD: <Fill width="100px">{p.cccd}</Fill></p>
+          <p style={{ gridColumn: '2 / 3' }}>Cấp ngày: <Fill width="80px">{p.cccdDate}</Fill></p>
+          <p style={{ gridColumn: '3 / 4' }}>Tại: <Fill width="100px">{p.cccdPlace}</Fill></p>
+        </div>
+      </div>
+
+      <p style={{ marginBottom: '18px', textAlign: 'justify' }}>
+        Cùng thoả thuận ký kết Hợp đồng lao động (HĐLĐ) và cam kết làm đúng những điều khoản sau đây:
+      </p>
+
+      <Hr />
+
+      {/* ══════════════════════════════════════════════
+          ĐIỀU 1
+      ══════════════════════════════════════════════ */}
+      <Section title="Điều 1: Công việc, địa điểm làm việc và thời hạn của Hợp đồng">
+        <p>
+          - Loại hợp đồng: <Fill width="180px">{p.type}</Fill> – Ký lần thứ{' '}
+          <Fill width="40px">01</Fill>
+        </p>
+        <p>
+          - Từ ngày: <Fill width="100px">{p.startDate}</Fill>&emsp;
+          Đến ngày: <Fill width="100px">{p.endDate || '(Vô thời hạn)'}</Fill>
+        </p>
+        <p>- Địa điểm làm việc: <Fill width="260px">{p.location}</Fill></p>
+        <p>- Bộ phận công tác:</p>
+        <p style={{ paddingLeft: '24px' }}>
+          + Phòng: <Fill width="260px">{p.dept}</Fill>
+        </p>
+        <p style={{ paddingLeft: '24px' }}>
+          + Chức danh chuyên môn (vị trí công tác):{' '}
+          <Fill width="200px">{p.position}</Fill>
+        </p>
+        <p style={{ marginTop: '6px' }}>- Nhiệm vụ công việc như sau:</p>
+        <ul style={{ paddingLeft: '32px', marginTop: '4px', listStyleType: 'disc' }}>
+          <li style={{ marginBottom: '4px', textAlign: 'justify' }}>
+            Thực hiện công việc theo đúng chức danh chuyên môn của mình dưới sự quản lý, điều hành
+            của Ban Giám đốc (và các cá nhân được bổ nhiệm hoặc ủy quyền phụ trách).
+          </li>
+          <li style={{ marginBottom: '4px', textAlign: 'justify' }}>
+            Phối hợp cùng với các bộ phận, phòng ban khác trong Người sử dụng lao động để phát huy
+            tối đa hiệu quả công việc.
+          </li>
+          <li style={{ textAlign: 'justify' }}>
+            Hoàn thành những công việc khác tùy thuộc theo yêu cầu kinh doanh của Người sử dụng lao
+            động và theo quyết định của Ban Giám đốc (và các cá nhân được bổ nhiệm hoặc ủy quyền
+            phụ trách).
+          </li>
+        </ul>
+      </Section>
+
+      <Hr />
+
+      {/* ══════════════════════════════════════════════
+          ĐIỀU 2
+      ══════════════════════════════════════════════ */}
+      <Section title="Điều 2: Lương, phụ cấp, các khoản bổ sung khác">
+        <p>
+          - Lương căn bản: <Fill width="200px" bold>{p.salary}</Fill>
+        </p>
+        <p>- Phụ cấp (tổng cộng các khoản):</p>
+        <ul style={{ paddingLeft: '32px', marginTop: '4px', listStyleType: 'disc' }}>
+          <li style={{ marginBottom: '2px' }}>Phụ cấp ăn ca: <Fill width="100px">{p.meal}</Fill> VNĐ/tháng</li>
+          <li style={{ marginBottom: '2px' }}>Phụ cấp điện thoại: <Fill width="100px">{p.phone}</Fill> VNĐ/tháng</li>
+          <li style={{ marginBottom: '2px' }}>Phụ cấp xăng xe: <Fill width="100px">{p.petrol}</Fill> VNĐ/tháng</li>
+          <li style={{ marginBottom: '2px' }}>Phụ cấp nhà ở: <Fill width="100px">{p.housing}</Fill> VNĐ/tháng</li>
+        </ul>
+        <p style={{ marginTop: '6px' }}>- Các khoản bổ sung khác: tùy quy định cụ thể của Công ty.</p>
+        <p>- Hình thức trả lương: Tiền mặt hoặc chuyển khoản.</p>
+        <p>
+          - Thời hạn trả lương: Được trả lương vào ngày{' '}
+          <Fill width="30px">05</Fill> của tháng.
+        </p>
+        <p style={{ textAlign: 'justify' }}>
+          - Chế độ nâng bậc, nâng lương: Người lao động được xét nâng bậc, nâng lương theo kết quả
+          làm việc và theo quy định của Người sử dụng lao động.
+        </p>
+      </Section>
+
+      <Hr />
+
+      {/* ══════════════════════════════════════════════
+          ĐIỀU 3
+      ══════════════════════════════════════════════ */}
+      <Section title="Điều 3: Thời giờ làm việc, nghỉ ngơi, bảo hộ lao động, BHXH, BHYT, BHTN">
+        <p>
+          - Thời giờ làm việc: <Fill width="40px">08</Fill> giờ/ngày,{' '}
+          <Fill width="40px">44</Fill> giờ/tuần. Nghỉ hàng tuần: ngày{' '}
+          <Fill width="80px">Chủ Nhật</Fill>
+        </p>
+        <p>- Từ ngày Thứ <Fill width="40px">Hai</Fill> đến ngày Thứ <Fill width="60px">Bảy</Fill> hàng tuần:</p>
+        <p style={{ paddingLeft: '24px' }}>
+          + Ca làm việc hiện tại: <strong>{p.shiftName}</strong> ({p.shiftTime})
+        </p>
+        <p style={{ marginTop: '6px', textAlign: 'justify' }}>
+          - Chế độ nghỉ ngơi các ngày lễ, tết, phép năm:
+        </p>
+        <ul style={{ paddingLeft: '32px', marginTop: '4px', listStyleType: 'disc' }}>
+          <li style={{ marginBottom: '4px', textAlign: 'justify' }}>
+            Người lao động được nghỉ lễ, tết theo luật định; các ngày nghỉ lễ nếu trùng với ngày
+            nghỉ thì sẽ được nghỉ bù vào ngày trước hoặc ngày kế tiếp tùy theo tình hình cụ thể mà
+            Ban lãnh đạo Công ty sẽ chỉ đạo trực tiếp.
+          </li>
+          <li style={{ textAlign: 'justify' }}>
+            Người lao động đã ký HĐLĐ chính thức và có thâm niên công tác 12 tháng thì sẽ được nghỉ
+            phép năm có hưởng lương (01 ngày phép/01 tháng, 12 ngày phép/01 năm); trường hợp có thâm
+            niên làm việc dưới 12 tháng thì thời gian nghỉ hằng năm được tính theo tỷ lệ tương ứng
+            với số thời gian làm việc.
+          </li>
+        </ul>
+        <p style={{ marginTop: '6px' }}>
+          - Thiết bị và công cụ làm việc sẽ được Công ty cấp phát tùy theo nhu cầu của công việc.
+        </p>
+        <p>
+          - Điều kiện an toàn và vệ sinh lao động tại nơi làm việc theo quy định của pháp luật hiện
+          hành.
+        </p>
+        <p>
+          - Bảo hiểm xã hội, bảo hiểm y tế và bảo hiểm thất nghiệp: Theo quy định của pháp luật.
+        </p>
+      </Section>
+
+      <Hr />
+
+      {/* ══════════════════════════════════════════════
+          ĐIỀU 4
+      ══════════════════════════════════════════════ */}
+      <Section title="Điều 4: Đào tạo, bồi dưỡng, các quyền lợi và nghĩa vụ liên quan của người lao động">
+        <p style={{ textAlign: 'justify' }}>
+          - Đào tạo, bồi dưỡng: Người lao động được đào tạo, bồi dưỡng, huấn luyện tại nơi làm
+          việc hoặc được gửi đi đào tạo theo quy định của Công ty và yêu cầu công việc.
+        </p>
+        <p style={{ textAlign: 'justify' }}>
+          - Khen thưởng: Người lao động được khuyến khích bằng vật chất và tinh thần khi có thành
+          tích trong công tác hoặc theo quy định của Công ty.
+        </p>
+        <p style={{ textAlign: 'justify' }}>
+          - Các khoản thỏa thuận khác gồm: tiền cơm trưa, thưởng mặc định, hỗ trợ xăng xe, điện
+          thoại, nhà ở, trang phục…, theo quy định của Công ty.
+        </p>
+        <p style={{ marginTop: '6px' }}>- Nghĩa vụ liên quan của người lao động:</p>
+        <ul style={{ paddingLeft: '32px', marginTop: '4px', listStyleType: 'disc' }}>
+          <li style={{ marginBottom: '3px' }}>Tuân thủ hợp đồng lao động.</li>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Thực hiện công việc với sự tận tâm, tận lực và mẫn cán, đảm bảo hoàn thành công việc
+            với hiệu quả cao nhất theo sự phân công, điều hành (bằng văn bản hoặc bằng miệng) của
+            Ban Giám đốc (và các cá nhân được Ban Giám đốc bổ nhiệm hoặc ủy quyền phụ trách).
+          </li>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Hoàn thành công việc được giao và sẵn sàng chấp nhận mọi sự điều động khi có yêu cầu.
+          </li>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Nắm rõ và chấp hành nghiêm túc kỷ luật lao động, an toàn lao động, vệ sinh lao động,
+            phòng cháy chữa cháy, văn hóa Công ty, nội quy lao động và các chủ trương, chính sách
+            của Công ty.
+          </li>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Trong trường hợp được cử đi đào tạo thì nhân viên phải hoàn thành khoá học đúng thời
+            hạn, phải cam kết sẽ phục vụ lâu dài cho Công ty sau khi kết thúc khoá học và được
+            hưởng nguyên lương, các quyền lợi khác được hưởng như người đi làm.
+            <br />
+            Nếu sau khi kết thúc khóa đào tạo mà nhân viên không tiếp tục hợp tác với Công ty thì
+            nhân viên phải hoàn trả lại 100% phí đào tạo và các khoản chế độ đã được nhận trong
+            thời gian đào tạo.
+          </li>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Bồi thường vi phạm vật chất: Theo quy định nội bộ của Công ty và quy định của pháp luật
+            hiện hành.
+          </li>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Có trách nhiệm đề xuất các giải pháp nâng cao hiệu quả công việc, giảm thiểu các rủi
+            ro. Khuyến khích các đóng góp này được thực hiện bằng văn bản.
+          </li>
+          <li style={{ textAlign: 'justify' }}>
+            Thuế TNCN, nếu có: do người lao động đóng. Công ty sẽ tạm khấu trừ trước khi chi trả
+            cho người lao động theo quy định.
+          </li>
+        </ul>
+      </Section>
+
+      <Hr />
+
+      {/* ══════════════════════════════════════════════
+          ĐIỀU 5
+      ══════════════════════════════════════════════ */}
+      <Section title="Điều 5: Nghĩa vụ và quyền lợi của Người sử dụng lao động">
+        <p style={{ fontWeight: '600', marginBottom: '4px' }}>1. Nghĩa vụ:</p>
+        <ul style={{ paddingLeft: '32px', marginBottom: '8px', listStyleType: 'disc' }}>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Thực hiện đầy đủ những điều kiện cần thiết đã cam kết trong HĐLĐ để Người lao động đạt
+            hiệu quả công việc cao. Bảo đảm việc làm cho Người lao động theo HĐLĐ đã ký.
+          </li>
+          <li style={{ textAlign: 'justify' }}>
+            Thanh toán đầy đủ, đúng hạn các chế độ và quyền lợi cho người lao động theo hợp đồng
+            lao động, thỏa ước lao động tập thể (nếu có).
+          </li>
+        </ul>
+        <p style={{ fontWeight: '600', marginBottom: '4px' }}>2. Quyền lợi:</p>
+        <ul style={{ paddingLeft: '32px', listStyleType: 'disc' }}>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Điều hành Người lao động hoàn thành công việc theo HĐLĐ (bố trí, điều chuyển công việc
+            cho Người lao động theo đúng chức năng chuyên môn).
+          </li>
+          <li style={{ marginBottom: '3px', textAlign: 'justify' }}>
+            Có quyền chuyển tạm thời lao động, ngừng việc, thay đổi, tạm hoãn, chấm dứt HĐLĐ và
+            áp dụng các biện pháp kỷ luật theo quy định của Pháp luật hiện hành và theo nội quy của
+            Công ty trong thời gian HĐLĐ còn giá trị.
+          </li>
+          <li style={{ textAlign: 'justify' }}>
+            Có quyền đòi bồi thường, khiếu nại với cơ quan liên đới để bảo vệ quyền lợi của mình
+            nếu Người lao động vi phạm Pháp luật hay các điều khoản của HĐLĐ.
+          </li>
+        </ul>
+      </Section>
+
+      <Hr />
+
+      {/* ══════════════════════════════════════════════
+          ĐIỀU 6
+      ══════════════════════════════════════════════ */}
+      <Section title="Điều 6: Những thỏa thuận khác">
+        {p.notes ? (
+          <p style={{ textAlign: 'justify', fontStyle: 'italic' }}>{p.notes}</p>
+        ) : (
+          <>
+            <p style={{ borderBottom: '1px solid #aaa', marginBottom: '12px', minHeight: '22px' }} />
+            <p style={{ borderBottom: '1px solid #aaa', marginBottom: '12px', minHeight: '22px' }} />
+            <p style={{ borderBottom: '1px solid #aaa', marginBottom: '4px',  minHeight: '22px' }} />
+          </>
+        )}
+      </Section>
+
+      <Hr />
+
+      {/* ══════════════════════════════════════════════
+          ĐIỀU 7
+      ══════════════════════════════════════════════ */}
+      <Section title="Điều 7: Điều khoản thi hành">
+        <p style={{ textAlign: 'justify' }}>
+          - Những vấn đề về lao động không ghi trong hợp đồng lao động này thì áp dụng quy định
+          của thỏa ước tập thể, trường hợp chưa có thỏa ước thì áp dụng quy định của pháp luật
+          lao động.
+        </p>
+        <p style={{ textAlign: 'justify' }}>
+          - Hợp đồng này được lập thành 2 bản có giá trị pháp lý như nhau, mỗi bên giữ 1 bản và
+          có hiệu lực kể từ ngày ký.
+        </p>
+        <p style={{ textAlign: 'justify' }}>
+          - Khi ký kết các phụ lục hợp đồng lao động thì nội dung của phụ lục cũng có giá trị như
+          các nội dung của bản hợp đồng này.
+        </p>
+      </Section>
+
+      {/* ══════════════════════════════════════════════
+          SIGNATURES
+      ══════════════════════════════════════════════ */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '48px' }}>
+        {/* Employee side */}
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>
+            Người lao động
+          </p>
+          <p style={{ fontSize: '10pt', fontStyle: 'italic', marginBottom: '80px' }}>
+            (Ký, ghi rõ họ tên)
+          </p>
+          {p.empSig ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <img src={p.empSig} alt="Chữ ký người lao động" style={{ maxHeight: '70px', mixBlendMode: 'multiply', marginBottom: '4px' }} />
+              <p style={{ fontWeight: '700', textTransform: 'uppercase', fontSize: '11pt' }}>{p.name}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '8pt', color: '#065f46', fontWeight: '700', marginTop: '4px', border: '1px solid #a7f3d0', background: '#ecfdf5', padding: '2px 8px', borderRadius: '12px' }}>
+                <CheckCircle2 size={10} /> Đã xác thực điện tử
+              </div>
+            </div>
+          ) : (
+            <p style={{ color: '#ccc', fontStyle: 'italic', fontSize: '10pt' }}>(Chưa ký tên)</p>
+          )}
+        </div>
+
+        {/* Employer side */}
+        <div style={{ textAlign: 'center', borderLeft: '1px solid #e5e7eb', paddingLeft: '16px' }}>
+          <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>
+            Người sử dụng lao động
+          </p>
+          <p style={{ fontSize: '10pt', fontStyle: 'italic', marginBottom: '80px' }}>
+            (Ký tên và đóng dấu)
+          </p>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            {/* Decorative stamp ring */}
+            <div style={{
+              position: 'absolute',
+              top: '-72px',
+              left: '-56px',
+              width: '140px',
+              height: '140px',
+              border: '3px solid rgba(185,28,28,0.35)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: 'rotate(-12deg)',
+              pointerEvents: 'none',
+            }}>
+              <span style={{ color: 'rgba(185,28,28,0.5)', fontSize: '7pt', fontWeight: '900', textAlign: 'center', textTransform: 'uppercase', lineHeight: 1.3, padding: '0 12px' }}>
+                CÔNG TY CP TECHVN<br />ĐÃ XÁC THỰC
+              </span>
+            </div>
+            <p style={{ fontWeight: '700', fontSize: '14pt', fontStyle: 'italic', fontFamily: 'Georgia, serif', color: '#1e3a8a', textTransform: 'uppercase' }}>
+              {p.signedBy}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Footer metadata ── */}
+      <div style={{
+        marginTop: '48px',
+        paddingTop: '10px',
+        borderTop: '1px solid #e5e7eb',
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: '8pt',
+        color: '#94a3b8',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+      }}>
+        <span>HRMS – Hợp đồng số {p.contractNo}</span>
+        <span>Trang 01 / 01</span>
+      </div>
     </div>
+  );
+}
+
+/* ── Small layout helpers ── */
+function Hr() {
+  return <div style={{ borderTop: '1px dashed #d1d5db', margin: '14px 0' }} />;
+}
+
+function Section({ title, children }) {
+  return (
+    <section style={{ marginBottom: '14px' }}>
+      <p style={{ fontWeight: '700', marginBottom: '8px' }}>{title}</p>
+      <div style={{ paddingLeft: '8px' }}>{children}</div>
+    </section>
   );
 }

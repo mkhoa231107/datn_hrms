@@ -58,6 +58,9 @@ namespace HRMS.Infrastructure.Services
                              employeesQuery = employeesQuery.Where(e => e.User.Username != username);
                          }
                     }
+
+                    // Block DepartmentHead from seeing DepartmentManager (Trưởng phòng) schedules
+                    employeesQuery = employeesQuery.Where(e => e.User == null || !e.User.UserRoles.Any(ur => ur.Role.RoleName == "DepartmentManager"));
                 }
                 else return new List<WorkScheduleMatrixDto>();
             }

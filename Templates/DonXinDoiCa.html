@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Đơn Xin Đổi Ca</title>
+    <style>
+        body { font-family: 'Times New Roman', Times, serif; background: #e0e0e0; display: flex; justify-content: center; }
+        .page { background: white; width: 210mm; min-height: 297mm; padding: 20mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-top: 20px; box-sizing: border-box; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h3 { margin: 0; font-size: 16pt; font-weight: bold; }
+        .header h4 { margin: 5px 0 0 0; font-size: 14pt; font-weight: bold; text-decoration: underline; }
+        .title { text-align: center; margin: 30px 0; font-size: 18pt; font-weight: bold; }
+        .content { font-size: 14pt; line-height: 1.5; }
+        .content p { margin: 10px 0; }
+        .signature-section { display: flex; justify-content: space-between; margin-top: 50px; text-align: center; }
+        .signature-box { width: 33%; }
+        .italic { font-style: italic; }
+        .bold { font-weight: bold; }
+        @media print {
+            body { background: white; margin: 0; padding: 0; }
+            .page { box-shadow: none; margin: 0; width: auto; height: auto; padding: 0; }
+            .no-print { display: none; }
+        }
+        .btn-print { position: fixed; top: 20px; right: 20px; padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <button class="btn-print no-print" onclick="window.print()">🖨️ Lưu thành PDF / In</button>
+    <div class="page">
+        <div class="header">
+            <h3>CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</h3>
+            <h4>Độc lập – Tự do – Hạnh phúc</h4>
+        </div>
+        
+        <div class="title">ĐƠN XIN ĐỔI CA LÀM VIỆC</div>
+
+        <div class="content">
+            <p><span class="bold">Kính gửi:</span><br>
+            - Trưởng Phòng Nhân sự<br>
+            - Trưởng bộ phận: ....................................................................................</p>
+
+            <p>Tôi tên là: ..................................................................................................................</p>
+            <p>Mã nhân viên: ...........................................................................................................</p>
+            <p>Chức vụ: ........................................................... Bộ phận: .........................................</p>
+
+            <p>Theo lịch làm việc hiện tại / hợp đồng lao động, tôi đang làm việc ở ca: ........................</p>
+            <p>Nay tôi làm đơn này kính xin Trưởng bộ phận và Phòng Nhân sự cho phép tôi được đổi ca làm việc như sau:</p>
+
+            <p>Từ ca hiện tại: ................................................. (Thời gian: ......................)</p>
+            <p>Sang ca mới: ................................................... (Thời gian: ......................)</p>
+
+            <p>Thời gian áp dụng việc đổi ca:</p>
+            <p>Từ ngày ..../..../20.... đến ngày ..../..../20.... (Hoặc áp dụng lâu dài từ ngày ..../..../20....)</p>
+
+            <p><span class="bold">Lý do xin đổi ca:</span></p>
+            <p>....................................................................................................................................</p>
+            <p>....................................................................................................................................</p>
+
+            <p>Tôi xin cam kết việc đổi ca sẽ không làm ảnh hưởng đến tiến độ và chất lượng công việc được giao của bộ phận.</p>
+
+            <p>Kính mong Trưởng bộ phận và Phòng Nhân sự xem xét và chấp thuận.</p>
+            
+            <p>Tôi xin chân thành cảm ơn!</p>
+            
+            <p style="text-align: right; margin-right: 50px;" class="italic">Ngày ..... tháng ..... năm 20....</p>
+
+            <div class="signature-section">
+                <div class="signature-box">
+                    <p class="bold">Ý kiến Trưởng bộ phận</p>
+                    <p class="italic">(Ký và ghi rõ họ tên)</p>
+                </div>
+                <div class="signature-box">
+                    <p class="bold">Phòng Nhân sự</p>
+                    <p class="italic">(Ký và ghi rõ họ tên)</p>
+                </div>
+                <div class="signature-box">
+                    <p class="bold">Người làm đơn</p>
+                    <p class="italic">(Ký và ghi rõ họ tên)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

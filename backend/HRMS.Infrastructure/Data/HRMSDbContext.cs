@@ -38,6 +38,7 @@ namespace HRMS.Infrastructure.Data
         public DbSet<DepartmentDefaultShift> DepartmentDefaultShifts { get; set; }
         public DbSet<ShiftTemplate> ShiftTemplates { get; set; }
         public DbSet<ShiftTemplateDetail> ShiftTemplateDetails { get; set; }
+        public DbSet<ShiftChangeRequest> ShiftChangeRequests { get; set; }
         
         // Timekeeping Module
         public DbSet<TimeAttendanceRecord> TimeAttendanceRecords { get; set; }
@@ -140,7 +141,22 @@ namespace HRMS.Infrastructure.Data
             modelBuilder.Entity<Position>()
                 .HasIndex(p => new { p.DepartmentId, p.PositionCode })
                 .IsUnique();
-            
+
+            // Position: DefaultShift relationship
+            modelBuilder.Entity<Position>()
+                .HasOne(p => p.DefaultShift)
+                .WithMany()
+                .HasForeignKey(p => p.DefaultShiftId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<Position>()
+                .Property(p => p.BaseSalaryMin)
+                .HasColumnType("decimal(18,2)");
+
+            modelBuilder.Entity<Position>()
+                .Property(p => p.BaseSalaryMax)
+                .HasColumnType("decimal(18,2)");
+                
             // Employee: Organization relationship
             modelBuilder.Entity<Employee>()
                 .HasOne(e => e.Organization)
@@ -199,6 +215,41 @@ namespace HRMS.Infrastructure.Data
             modelBuilder.Entity<EmployeeContract>()
                 .Property(ec => ec.BasicSalary)
                 .HasColumnType("decimal(18,2)");
+
+            // EmployeeContract: WorkShift (ca cố định từ hợp đồng)
+            modelBuilder.Entity<EmployeeContract>()
+                .HasOne(ec => ec.Shift)
+                .WithMany()
+                .HasForeignKey(ec => ec.ShiftId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // ============================================
+            // SHIFT CHANGE REQUEST CONFIGURATIONS
+            // ============================================
+
+            modelBuilder.Entity<ShiftChangeRequest>()
+                .HasOne(scr => scr.Employee)
+                .WithMany()
+                .HasForeignKey(scr => scr.EmployeeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ShiftChangeRequest>()
+                .HasOne(scr => scr.RequestedShift)
+                .WithMany()
+                .HasForeignKey(scr => scr.RequestedShiftId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ShiftChangeRequest>()
+                .HasOne(scr => scr.CurrentShift)
+                .WithMany()
+                .HasForeignKey(scr => scr.CurrentShiftId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ShiftChangeRequest>()
+                .HasOne(scr => scr.Approver)
+                .WithMany()
+                .HasForeignKey(scr => scr.ApproverId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<AttendanceSummary>()
                 .Property(asum => asum.TotalWorkingHours)

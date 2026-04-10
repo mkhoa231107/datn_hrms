@@ -41,12 +41,74 @@ namespace HRMS.Infrastructure.Seeders
                 Console.WriteLine("✅ No Role Data Fix needed.");
             }
         }
-        /* DISABLED: This was creating redundant 'FIXED' employee records that we now consider junk.
+
         public static async Task FixAdminEmployeeLinkageAsync(HRMSDbContext context)
         {
-            // Logic moved/removed to maintain clean employee list
+            await SyncAllUserEmployeeLinkagesAsync(context);
         }
-        */
+
+        public static async Task SyncAllUserEmployeeLinkagesAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Đồng bộ liên kết User-Employee bằng SQL Raw...");
+
+            try 
+            {
+                // 1. Gán UserId cho các Employee dựa trên mã nhân viên linh hoạt
+                // Hỗ trợ: prd_ass_XX, prd-ass-XXX, prd-ass-XX
+                var sqlSync = @"
+                    -- Bước A: Đồng bộ dữ liệu dựa trên các quy tắc đặt tên (Ưu tiên định dạng prd_ass_XX)
+                    -- Nhóm 1: Ưu tiên prd_ass_2 (Gạch dưới, không bắt buộc đệm số 0)
+                    UPDATE e
+                    SET e.UserId = u.Id
+                    FROM Employees e
+                    INNER JOIN Users u ON (u.Username LIKE 'prd_ass_%' AND e.EmployeeCode = 'PRD-ASS-' + RIGHT('000' + CAST(REPLACE(u.Username, 'prd_ass_', '') AS INT), 3))
+                    WHERE e.UserId IS NULL OR e.UserId <> u.Id;
+
+                    -- Nhóm 2: Nếu sau bước 1 vẫn chưa có UserId, thử với prd-ass-002 (Gạch ngang)
+                    UPDATE e
+                    SET e.UserId = u.Id
+                    FROM Employees e
+                    INNER JOIN Users u ON (u.Username LIKE 'prd-ass-%' AND e.EmployeeCode = UPPER(u.Username))
+                    WHERE e.UserId IS NULL;
+
+                    -- Nhóm 3: Các trường hợp còn lại (admin, email)
+                    UPDATE e
+                    SET e.UserId = u.Id
+                    FROM Employees e
+                    INNER JOIN Users u ON (
+                        (u.Username = 'admin' AND e.EmployeeCode = 'ADMIN_01')
+                        OR (u.Email = e.Email AND u.Email IS NOT NULL AND u.Email <> '')
+                    )
+                    WHERE e.UserId IS NULL;
+
+                    -- Bước B: Dọn dẹp tài khoản trùng lặp (Nếu prd_ass_02 đã chiếm Employee, thì prd-ass-002 là tài khoản thừa)
+                    -- Chỉ xóa nếu tài khoản thừa không có dữ liệu quan trọng (hoặc đơn giản là gán lại để tránh tranh chấp)
+                    -- Ở đây chúng ta sẽ đảm bảo UserId trong Employees luôn trỏ về đúng tài khoản người dùng đang dùng.
+
+                    -- Bước B: Đảm bảo Admin luôn có hồ sơ
+                    IF NOT EXISTS (SELECT 1 FROM Employees WHERE EmployeeCode = 'ADMIN_01')
+                    BEGIN
+                        DECLARE @AdminUserId INT = (SELECT TOP 1 Id FROM Users WHERE Username = 'admin');
+                        DECLARE @OrgId INT = (SELECT TOP 1 Id FROM Organizations);
+                        DECLARE @DeptId INT = (SELECT TOP 1 Id FROM Departments WHERE DepartmentCode = 'ADM');
+                        DECLARE @PosId INT = (SELECT TOP 1 Id FROM Positions WHERE PositionCode = 'ADM-SYS');
+
+                        IF @AdminUserId IS NOT NULL AND @OrgId IS NOT NULL AND @DeptId IS NOT NULL AND @PosId IS NOT NULL
+                        BEGIN
+                            INSERT INTO Employees (EmployeeCode, FullName, Email, Phone, Address, JoinDate, DateOfBirth, Gender, [Status], IsActive, OrganizationId, DepartmentId, PositionId, UserId, CreatedAt)
+                            VALUES ('ADMIN_01', 'System Administrator', 'admin@hrms.local', '0000000000', 'System', GETUTCDATE(), '1990-01-01', 'Other', 2, 1, @OrgId, @DeptId, @PosId, @AdminUserId, GETUTCDATE());
+                        END
+                    END
+                ";
+
+                await context.Database.ExecuteSqlRawAsync(sqlSync);
+                Console.WriteLine("✅ Đã hoàn tất đồng bộ hóa liên kết bằng SQL Raw.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Lỗi khi đồng bộ SQL Raw: {ex.Message}");
+            }
+        }
 
         public static async Task EnsureAllManagersHaveEmployeesAsync(HRMSDbContext context)
         {
@@ -115,16 +177,22 @@ namespace HRMS.Infrastructure.Seeders
 
             // C. Chèn vào bảng Employees (ID 19) - Gán DepartmentId = 7 (Tổ Lương Thưởng)
             await context.Database.ExecuteSqlRawAsync($@"
-                DECLARE @OrgId INT; SELECT @OrgId = Id FROM Organizations WHERE OrganizationCode = 'TECHVN' OR Id = 1;
-                DECLARE @PosId INT; SELECT @PosId = Id FROM Positions WHERE PositionCode = 'HR-CB-HEAD' OR PositionCode = 'HR_MGR' OR Id = 1;
+                DECLARE @OrgId INT; SELECT TOP 1 @OrgId = Id FROM Organizations WHERE OrganizationCode = 'TECHVN' OR Id = 1;
+
+                DECLARE @PosId INT; SELECT TOP 1 @PosId = Id FROM Positions WHERE PositionCode = 'HR-CB-LEAD' OR PositionCode = 'HR-MGR';
+                IF @PosId IS NULL SELECT TOP 1 @PosId = Id FROM Positions;
+
+                DECLARE @DeptId INT; SELECT TOP 1 @DeptId = Id FROM Departments WHERE DepartmentCode = 'HR-CB' OR Id = 7;
+                IF @DeptId IS NULL SELECT TOP 1 @DeptId = Id FROM Departments;
+
                 SET IDENTITY_INSERT Employees ON;
                 INSERT INTO Employees (Id, EmployeeCode, FullName, DateOfBirth, Gender, IdentityNumber, IdentityDate, IdentityPlace, Email, PersonalEmail, Phone, Address, JoinDate, [Status], OrganizationId, DepartmentId, PositionId, UserId, CreatedAt)
-                VALUES (19, 'HR-CB-01', N'Lê Thị Thảo', '1990-05-12', N'Nữ', '001090012345', '2015-05-12', N'Cục Cảnh sát QLHC về TTXH', 'hr_cb_01@techvn.com', 'thaolt@techvn.com', '0912345678', N'Hà Nội', GETUTCDATE(), 2, ISNULL(@OrgId, 1), 7, ISNULL(@PosId, 1), 19, GETUTCDATE());
+                VALUES (19, 'HR-CB-01', N'Lê Thị Thảo', '1990-05-12', N'Nữ', '001090012345', '2015-05-12', N'Cục Cảnh sát QLHC về TTXH', 'hr_cb_01@techvn.com', 'thaolt@techvn.com', '0912345678', N'Hà Nội', GETUTCDATE(), 2, @OrgId, @DeptId, @PosId, 19, GETUTCDATE());
                 SET IDENTITY_INSERT Employees OFF;");
 
             // D. Gán Quyền và Trưởng phòng
             await context.Database.ExecuteSqlRawAsync($"INSERT INTO UserRoles (UserId, RoleId, AssignedAt, CreatedAt) VALUES (19, {dhRoleId}, GETUTCDATE(), GETUTCDATE())");
-            await context.Database.ExecuteSqlRawAsync("UPDATE Departments SET ManagerId = 19 WHERE Id = 7");
+            await context.Database.ExecuteSqlRawAsync("DECLARE @DeptId INT; SELECT TOP 1 @DeptId = Id FROM Departments WHERE DepartmentCode = 'HR-CB'; IF @DeptId IS NULL SELECT TOP 1 @DeptId = Id FROM Departments; UPDATE Departments SET ManagerId = 19 WHERE Id = @DeptId;");
             
             // Đảm bảo trạng thái Đang làm việc (Active = 2, IsActive = 1)
             await context.Database.ExecuteSqlRawAsync("UPDATE Employees SET Status = 2, IsActive = 1 WHERE EmployeeCode = 'HR-CB-01'");
@@ -228,8 +296,8 @@ namespace HRMS.Infrastructure.Seeders
 
                 // Seed 6 regular employees across these teams
                 int recId = recTeam.Id;
-                int cbId = (cbTeam?.Id) ?? 7;
-                var posId = (await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "HR_SPEC"))?.Id ?? 1;
+                int cbId = (cbTeam?.Id) ?? hrDept.Id;
+                var posId = (await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "HR-REC-SPEC" || p.PositionCode == "HR-CB-SPEC"))?.Id ?? (await context.Positions.FirstOrDefaultAsync())?.Id ?? 1;
 
                 var newEmployees = new[] {
                     (Code: "EMP-HR-01", Name: "Nguyễn Văn An", Dept: recId),

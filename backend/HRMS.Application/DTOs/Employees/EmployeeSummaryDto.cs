@@ -6,6 +6,7 @@ namespace HRMS.Application.DTOs.Employees
         public string EmployeeCode { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public string PositionName { get; set; } = string.Empty;
+        public int? PositionId { get; set; }
         public string DepartmentName { get; set; } = string.Empty;
         public int? DepartmentId { get; set; }
         public string Email { get; set; } = string.Empty;

@@ -65,13 +65,23 @@ namespace HRMS.Infrastructure.Services
                 ["ContractNumber"] = contract.ContractNumber,
                 ["SignedBy"] = contract.SignedBy ?? "...",
                 ["FullName"] = contract.Employee.FullName,
+                ["DateOfBirth"] = contract.Employee.DateOfBirth.ToString("dd/MM/yyyy"),
+                ["PlaceOfOrigin"] = contract.Employee.PlaceOfOrigin ?? "...",
+                ["PlaceOfBirth"] = contract.Employee.PlaceOfBirth ?? "...",
                 ["IdentityNumber"] = contract.Employee.IdentityNumber ?? "...",
+                ["IdentityDate"] = contract.Employee.IdentityDate?.ToString("dd/MM/yyyy") ?? "...",
+                ["IdentityPlace"] = contract.Employee.IdentityPlace ?? "...",
                 ["Address"] = contract.Employee.Address ?? "...",
+                ["CurrentAddress"] = contract.Employee.CurrentAddress ?? contract.Employee.Address ?? "...",
                 ["JobDescription"] = contract.JobDescription ?? "...",
                 ["WorkLocation"] = contract.WorkLocation ?? "...",
                 ["StartDate"] = contract.StartDate.ToString("dd/MM/yyyy"),
                 ["EndDate"] = contract.EndDate?.ToString("dd/MM/yyyy") ?? "Vô thời hạn",
                 ["BasicSalary"] = contract.BasicSalary.ToString("N0") + " VNĐ",
+                ["MealAllowance"] = contract.MealAllowance.ToString("N0") + " VNĐ",
+                ["PhoneAllowance"] = contract.PhoneAllowance.ToString("N0") + " VNĐ",
+                ["PetrolAllowance"] = contract.PetrolAllowance.ToString("N0") + " VNĐ",
+                ["HousingAllowance"] = contract.HousingAllowance.ToString("N0") + " VNĐ",
                 ["Notes"] = contract.Notes ?? "Không có"
             };
 
@@ -169,6 +179,26 @@ namespace HRMS.Infrastructure.Services
 
             await _context.SaveChangesAsync();
 
+            // Cập nhật thông tin Phòng ban & Chức danh mới cho nhân viên
+            if (contract.TargetDepartmentId.HasValue || contract.TargetPositionId.HasValue)
+            {
+                var employee = await _context.Employees.FindAsync(contract.EmployeeId);
+                if (employee != null)
+                {
+                    if (contract.TargetDepartmentId.HasValue) 
+                        employee.DepartmentId = contract.TargetDepartmentId.Value;
+                    if (contract.TargetPositionId.HasValue) 
+                        employee.PositionId = contract.TargetPositionId.Value;
+                    
+                    // Sync Shift and Salary
+                    employee.BasicSalary = contract.BasicSalary;
+                    if (contract.ShiftId.HasValue)
+                        employee.ShiftId = contract.ShiftId.Value;
+
+                    await _context.SaveChangesAsync();
+                }
+            }
+
             // Tự động đăng ký bảo hiểm bắt buộc
             try
             {
@@ -229,6 +259,29 @@ namespace HRMS.Infrastructure.Services
             
             // Reusing EmployeeContractDto for query result, or we can create a specific ContractDto
             return _mapper.Map<IEnumerable<HRMS.Application.DTOs.Employees.EmployeeContractDto>>(contracts);
+        }
+
+        public async Task UpdateContractAsync(int id, ContractCreateDto dto)
+        {
+            var existing = await _context.EmployeeContracts.FindAsync(id);
+            if (existing == null) throw new KeyNotFoundException("Không tìm thấy hợp đồng.");
+
+            // Update fields
+            existing.ContractType = (ContractType)dto.ContractTypeId;
+            existing.StartDate = dto.StartDate;
+            existing.EndDate = dto.EndDate;
+            existing.BasicSalary = dto.BasicSalary;
+            existing.JobDescription = dto.JobDescription;
+            existing.WorkLocation = dto.WorkLocation;
+            existing.SignedBy = dto.SignedBy;
+            existing.SignedDate = dto.SignedDate;
+            existing.Notes = dto.Notes;
+            existing.ShiftId = dto.ShiftId;
+            existing.TargetDepartmentId = dto.DepartmentId;
+            existing.TargetPositionId = dto.PositionId;
+            
+            existing.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
         }
 
         private string GetContractTypeName(HRMS.Domain.Enums.ContractType type)
@@ -375,6 +428,66 @@ namespace HRMS.Infrastructure.Services
                 .ToListAsync();
 
             return _mapper.Map<IEnumerable<ContractBatchDto>>(batches);
+        }
+
+        public async Task<int> RenewAllContractsAsync(int creatorId)
+        {
+            var nextYear = DateTime.Now.Year + 1;
+            var batch = new ContractBatch
+            {
+                BatchName = $"Đợt gia hạn Hợp đồng lao động năm {nextYear}",
+                Month = 1,
+                Year = nextYear,
+                CreatedById = creatorId,
+                CreatedAt = DateTime.UtcNow,
+                Status = ContractBatchStatus.Draft
+            };
+
+            _context.ContractBatches.Add(batch);
+            await _context.SaveChangesAsync();
+
+            // Find all employees with an ACTIVE contract
+            var activeContracts = await _context.EmployeeContracts
+                .Include(c => c.Employee)
+                .Where(c => c.Status == ContractStatus.Active)
+                .ToListAsync();
+
+            var newContracts = new List<EmployeeContract>();
+            foreach (var oldContract in activeContracts)
+            {
+                var startDate = oldContract.EndDate?.AddDays(1) ?? new DateTime(nextYear, 1, 1);
+                var endDate = oldContract.ContractType == ContractType.FixedTerm 
+                    ? startDate.AddYears(1).AddDays(-1) 
+                    : (DateTime?)null;
+
+                var newContract = new EmployeeContract
+                {
+                    EmployeeId = oldContract.EmployeeId,
+                    ContractBatchId = batch.Id,
+                    ContractType = oldContract.ContractType,
+                    ContractNumber = $"HĐ-{oldContract.Employee.EmployeeCode}-{nextYear}",
+                    StartDate = startDate,
+                    EndDate = endDate,
+                    BasicSalary = oldContract.BasicSalary,
+                    JobDescription = oldContract.JobDescription,
+                    WorkLocation = oldContract.WorkLocation,
+                    SignedBy = oldContract.SignedBy,
+                    Status = ContractStatus.Draft,
+                    ShiftId = oldContract.ShiftId,
+                    TargetDepartmentId = oldContract.Employee.DepartmentId,
+                    TargetPositionId = oldContract.Employee.PositionId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                newContracts.Add(newContract);
+            }
+
+            if (newContracts.Any())
+            {
+                _context.EmployeeContracts.AddRange(newContracts);
+                await _context.SaveChangesAsync();
+            }
+
+            return batch.Id;
         }
     }
 }

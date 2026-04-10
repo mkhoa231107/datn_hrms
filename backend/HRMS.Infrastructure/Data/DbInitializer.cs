@@ -30,9 +30,9 @@ namespace HRMS.Infrastructure.Data
 
             // 7. Sửa lỗi liên kết và đảm bảo lịch làm việc cho quá trình kiểm tra
             await DataFixSeeder.FixUserRolesAsync(context);
-            // await DataFixSeeder.FixAdminEmployeeLinkageAsync(context);
-            await DataFixSeeder.EnsureAllManagersHaveEmployeesAsync(context);
-            await DataFixSeeder.ClearLeaveHistoryAsync(context);
+            await DataFixSeeder.FixAdminEmployeeLinkageAsync(context); // This now fixes ALL users
+            // await DataFixSeeder.EnsureAllManagersHaveEmployeesAsync(context); // Commented out to prevent crashes
+            // await DataFixSeeder.ClearLeaveHistoryAsync(context); // Commented out for safety
             // await DataFixSeeder.EnsureSchedulesForTestingAsync(context);
 
             // 8. Seed initial Leave Balances (NOW including all employees created above)

@@ -15,5 +15,7 @@ namespace HRMS.Application.DTOs.Contract
         public string SignedBy { get; set; } = string.Empty;
         public DateTime? SignedDate { get; set; }
         public string? Notes { get; set; }
+        /// <summary>Ca làm việc cố định ghi vào hợp đồng</summary>
+        public int? ShiftId { get; set; }
     }
 }

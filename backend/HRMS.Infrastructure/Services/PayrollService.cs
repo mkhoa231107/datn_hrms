@@ -79,7 +79,6 @@ namespace HRMS.Infrastructure.Services
             var query = _context.Employees
                 .Include(e => e.Department)
                 .Include(e => e.Position)
-                .Include(e => e.Contracts)
                 .Where(e => e.IsActive && !e.Position.PositionName.Contains("Trưởng"))
                 .AsQueryable();
 
@@ -92,7 +91,6 @@ namespace HRMS.Infrastructure.Services
             var employees = await query.ToListAsync();
 
             return employees.Select(e => {
-                var activeContract = e.Contracts.FirstOrDefault(c => c.IsActive);
                 return new EmployeePayrollProfileDto {
                     EmployeeId = e.Id,
                     FullName = e.FullName,
@@ -103,7 +101,7 @@ namespace HRMS.Infrastructure.Services
                     WorkingStatus = e.Status == EmployeeStatus.Active ? "Đang làm việc" : 
                                     e.Status == EmployeeStatus.Probation ? "Thử việc" : "Nghỉ việc",
                     Email = e.Email,
-                    BasicSalary = activeContract?.BasicSalary ?? 0,
+                    BasicSalary = e.BasicSalary,
                     InsuranceSalary = e.InsuranceSalary,
                     NumberOfDependents = e.NumberOfDependents
                 };
@@ -184,8 +182,6 @@ namespace HRMS.Infrastructure.Services
             var summaries = await _context.AttendanceSummaries
                 .Include(asum => asum.Employee)
                     .ThenInclude(e => e.Position)
-                .Include(asum => asum.Employee)
-                    .ThenInclude(e => e.Contracts)
                 .Where(asum => asum.PeriodId == period.SchedulePeriodId 
                     && asum.Status == TimesheetStatus.Approved
                     && !asum.Employee.Position.PositionName.Contains("Trưởng"))
@@ -207,13 +203,10 @@ namespace HRMS.Infrastructure.Services
             foreach (var asum in summaries)
             {
                 var emp = asum.Employee;
-                var activeContract = emp.Contracts.FirstOrDefault(c => c.IsActive);
-                if (activeContract == null) continue;
-
                 var record = new PayrollRecord {
                     PayrollPeriodId = periodId,
                     EmployeeId = emp.Id,
-                    BasicSalary = activeContract.BasicSalary,
+                    BasicSalary = emp.BasicSalary,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -403,19 +396,15 @@ namespace HRMS.Infrastructure.Services
             if (!newIds.Any()) return;
 
             var employees = await _context.Employees
-                .Include(e => e.Contracts)
                 .Where(e => newIds.Contains(e.Id))
                 .ToListAsync();
 
             foreach (var emp in employees)
             {
-                var activeContract = emp.Contracts.FirstOrDefault(c => c.IsActive);
-                if (activeContract == null) continue;
-
                 var record = new PayrollRecord {
                     PayrollPeriodId = periodId,
                     EmployeeId = emp.Id,
-                    BasicSalary = activeContract.BasicSalary,
+                    BasicSalary = emp.BasicSalary,
                     PositionAllowance = 0,
                     PetrolAllowance = 0,
                     PhoneAllowance = 0,
@@ -471,13 +460,6 @@ namespace HRMS.Infrastructure.Services
 
             foreach (var record in records)
             {
-                // Ensure BasicSalary is synced from Active Contract in case it changed or was 0
-                var activeContract = await _context.EmployeeContracts.FirstOrDefaultAsync(c => c.EmployeeId == record.EmployeeId && c.IsActive);
-                if (activeContract != null)
-                {
-                    record.BasicSalary = activeContract.BasicSalary;
-                }
-
                 var asum = await _context.AttendanceSummaries
                     .FirstOrDefaultAsync(a => a.PeriodId == period.SchedulePeriodId && a.EmployeeId == record.EmployeeId && a.Status == TimesheetStatus.Approved);
 
@@ -545,7 +527,6 @@ namespace HRMS.Infrastructure.Services
             var employees = await _context.Employees
                 .Include(e => e.Department)
                 .Include(e => e.Position)
-                .Include(e => e.Contracts)
                 .Where(e => deptIds.Contains(e.DepartmentId) && e.IsActive && !e.Position.PositionName.Contains("Trưởng"))
                 .ToListAsync();
 
@@ -557,7 +538,6 @@ namespace HRMS.Infrastructure.Services
             var summaryMap = summaries.ToDictionary(s => s.EmployeeId);
 
             return employees.Select(e => {
-                var activeContract = e.Contracts.FirstOrDefault(c => c.IsActive);
                 summaryMap.TryGetValue(e.Id, out var asum);
                 return new EmployeePayrollProfileDto {
                     EmployeeId = e.Id,
@@ -569,7 +549,7 @@ namespace HRMS.Infrastructure.Services
                     WorkingStatus = e.Status == EmployeeStatus.Active ? "Đang làm việc" :
                                     e.Status == EmployeeStatus.Probation ? "Thử việc" : "Nghỉ việc",
                     Email = e.Email,
-                    BasicSalary = activeContract?.BasicSalary ?? 0,
+                    BasicSalary = e.BasicSalary,
                     InsuranceSalary = e.InsuranceSalary,
                     NumberOfDependents = e.NumberOfDependents,
                     ActualWorkingDays = asum?.AdjustedWorkingDays ?? asum?.TotalWorkingDays ?? 0,
@@ -609,21 +589,17 @@ namespace HRMS.Infrastructure.Services
 
             var employees = await _context.Employees
                 .Include(e => e.Position)
-                .Include(e => e.Contracts)
                 .Where(e => employeeIds.Contains(e.Id) && !e.Position.PositionName.Contains("Trưởng"))
                 .ToListAsync();
 
             foreach (var emp in employees)
             {
-                var activeContract = emp.Contracts.FirstOrDefault(c => c.IsActive);
-                if (activeContract == null) continue;
-
                 // Get approved attendance summary
                 var asum = await _context.AttendanceSummaries
                     .FirstOrDefaultAsync(s => s.PeriodId == schedulePeriod.Id && s.EmployeeId == emp.Id
                         && s.Status == TimesheetStatus.Approved);
 
-                decimal basicSalary = activeContract.BasicSalary;
+                decimal basicSalary = emp.BasicSalary;
                 decimal adjustedWorkingDays = 0;
                 decimal otHours = 0;
 

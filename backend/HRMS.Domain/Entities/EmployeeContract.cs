@@ -20,6 +20,10 @@ namespace HRMS.Domain.Entities
         public DateTime? EndDate { get; set; }      // Ngày kết thúc (null nếu vô thời hạn)
         
         public decimal BasicSalary { get; set; }    // Lương cơ bản
+        public decimal MealAllowance { get; set; }  // Phụ cấp ăn ca
+        public decimal PhoneAllowance { get; set; } // Phụ cấp điện thoại
+        public decimal PetrolAllowance { get; set; } // Phụ cấp xăng xe
+        public decimal HousingAllowance { get; set; } // Phụ cấp nhà ở
         public string JobDescription { get; set; }  // Mô tả công việc
         public string WorkLocation { get; set; }    // Địa điểm làm việc
         
@@ -50,6 +54,16 @@ namespace HRMS.Domain.Entities
         public ContractBatch? ContractBatch { get; set; }
 
         public string? Notes { get; set; }
+
+        // Ca làm việc cố định ghi trong hợp đồng
+        public int? ShiftId { get; set; }
+        public WorkShift? Shift { get; set; }
+
+        public int? TargetDepartmentId { get; set; }
+        public Department? TargetDepartment { get; set; }
+        
+        public int? TargetPositionId { get; set; }
+        public Position? TargetPosition { get; set; }
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }

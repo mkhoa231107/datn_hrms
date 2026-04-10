@@ -98,6 +98,13 @@ export const departmentService = {
   }
 };
 
+export const positionService = {
+  getAll: async () => {
+    const res = await api.get('/positions');
+    return res.data;
+  }
+};
+
 export const hrRecruitmentService = {
   acceptApplication: async (id) => {
     const res = await api.post(`/HRRecruitment/applications/${id}/accept`);
@@ -249,6 +256,21 @@ export const attendanceService = {
 export const auditLogService = {
   getDepartmentActivities: async () => {
     const res = await api.get('/auditlogs/department');
+    return res.data;
+  }
+};
+
+export const usersService = {
+  getAllUsers: async (search = '') => {
+    const res = await api.get(`/users${search ? `?search=${search}` : ''}`);
+    return res.data;
+  },
+  getRoles: async () => {
+    const res = await api.get('/users/roles');
+    return res.data;
+  },
+  updateRoles: async (id, roleIds) => {
+    const res = await api.put(`/users/${id}/roles`, { roleIds });
     return res.data;
   }
 };

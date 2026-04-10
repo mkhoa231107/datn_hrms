@@ -32,6 +32,15 @@ namespace HRMS.Application.DTOs.Employees
         public int DepartmentId { get; set; }
         public string? DepartmentName { get; set; }
         public string? PositionName { get; set; }
+
+        public decimal BasicSalary { get; set; }
+        public int? ShiftId { get; set; }
+        public string? ShiftName { get; set; }
+        
+        // Cấu hình từ chức vụ
+        public decimal? PositionBaseSalaryMin { get; set; }
+        public decimal? PositionBaseSalaryMax { get; set; }
+        public int? PositionDefaultShiftId { get; set; }
         
         // Dữ liệu liên quan
         public EmployeeContractDto? CurrentContract { get; set; }

@@ -169,6 +169,7 @@ namespace HRMS.Infrastructure.Services
                     EmployeeCode = e.EmployeeCode,
                     FullName = e.FullName,
                     PositionName = e.Position != null ? e.Position.PositionName : string.Empty,
+                    PositionId = e.PositionId,
                     DepartmentName = e.Department != null ? e.Department.DepartmentName : string.Empty,
                     DepartmentId = e.DepartmentId,
                     Email = e.Email,

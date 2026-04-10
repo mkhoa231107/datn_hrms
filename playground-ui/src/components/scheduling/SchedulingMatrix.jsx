@@ -186,6 +186,7 @@ export default function SchedulingMatrix({ user, onBack }) {
         if (e.target.checked) {
             const visibleEmployees = matrixData
                 .filter(row => row.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
+                .filter(row => !isDepartmentHead || !(row.positionName && row.positionName.toLowerCase().includes('trưởng phòng')))
                 .map(e => e.employeeId);
             setSelectedEmployees(visibleEmployees);
         } else {
@@ -441,7 +442,7 @@ export default function SchedulingMatrix({ user, onBack }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <div className="ef-toolbar-title">
                         <Calendar size={16} style={{ color: '#1a56db' }} />
-                        <strong>MA TRẬN LỊCH TRÌNH</strong>
+                        <strong>LỊCH LÀM VIỆC TỔNG HỢP</strong>
                     </div>
                     
                     <div style={{ display: 'flex', gap: '5px' }}>
@@ -470,7 +471,7 @@ export default function SchedulingMatrix({ user, onBack }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => setShowAutoPanel(!showAutoPanel)} className="ef-btn">⚡ XẾP CA TỰ ĐỘNG</button>
+                    {/* <button onClick={() => setShowAutoPanel(!showAutoPanel)} className="ef-btn">⚡ XẾP CA TỰ ĐỘNG</button> */}
                     {onBack && <button onClick={onBack} className="ef-btn">Đóng</button>}
                 </div>
             </div>
@@ -531,24 +532,9 @@ export default function SchedulingMatrix({ user, onBack }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap', width: '100%' }}>
                     <input type="text" placeholder="Tìm tên hoặc mã nhân viên..." className="ef-input" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: '220px' }} />
                     
-                    <div style={{ borderLeft: '1px solid #d0d0d0', height: '24px', margin: '0 5px' }}></div>
-                    
-                    <select className="ef-select" value={bulkShiftId} onChange={e => setBulkShiftId(e.target.value)}>
-                        <option value="">- Chọn ca áp dụng chung -</option>
-                        <option value="null">OFF - Nghỉ</option>
-                        {shifts.map(s => <option key={s.id} value={s.id}>{s.shiftCode} ({s.shiftName})</option>)}
-                    </select>
-
-                    <button onClick={handleBulkAssignQuick} className="ef-btn" style={{ fontWeight: 'bold' }}>XẾP NHANH (CẢ THÁNG)</button>
-                    <button onClick={handleReset} className="ef-btn" style={{ color: '#d9534f' }}>XÓA LỊCH</button>
-                    <button onClick={() => setIsEditing(!isEditing)} className="ef-btn" style={{ background: isEditing ? '#fff' : 'transparent', border: isEditing ? '1px solid #d0d0d0' : 'none' }}>
-                        {isEditing ? '🛑 HỦY SỬA' : '✍️ SỬA LỊCH'}
-                    </button>
-
                     <div style={{ flex: 1 }}></div>
 
                     <button onClick={exportToCSV} className="ef-btn">XUẤT EXCEL</button>
-                    <button onClick={handleSave} className="ef-btn ef-btn-primary">LƯU CÁC THAY ĐỔI</button>
                 </div>
             </div>
 
@@ -557,11 +543,8 @@ export default function SchedulingMatrix({ user, onBack }) {
                 <table className="ef-table no-top-border" style={{ tableLayout: 'fixed', minWidth: '100%' }}>
                     <thead>
                         <tr>
-                            <th className="c" style={{ width: '40px', position: 'sticky', left: 0, zIndex: 10, background: '#f5f5f5', borderRight: '1px solid #d0d0d0' }}>
-                                <input type="checkbox" onChange={handleSelectAll} checked={matrixData.length > 0 && selectedEmployees.length === matrixData.length} />
-                            </th>
-                            <th className="c" style={{ width: '40px', position: 'sticky', left: '40px', zIndex: 10, background: '#f5f5f5', borderRight: '1px solid #d0d0d0' }}>#</th>
-                            <th style={{ width: '200px', position: 'sticky', left: '80px', zIndex: 10, background: '#f5f5f5', borderRight: '1px solid #d0d0d0' }}>Nhân Viên</th>
+                            <th className="c" style={{ width: '40px', position: 'sticky', left: 0, zIndex: 10, background: '#f5f5f5', borderRight: '1px solid #d0d0d0' }}>#</th>
+                            <th style={{ width: '200px', position: 'sticky', left: '40px', zIndex: 10, background: '#f5f5f5', borderRight: '1px solid #d0d0d0' }}>Nhân Viên</th>
                             {!isDepartmentHead && <th style={{ width: '150px' }}>Phòng Ban</th>}
                             <th style={{ width: '150px' }}>Chức Danh</th>
                             
@@ -578,15 +561,15 @@ export default function SchedulingMatrix({ user, onBack }) {
                             <tr><td colSpan={days.length + 5} className="ef-empty">Đang tải biểu mẫu...</td></tr>
                         ) : matrixData.length === 0 ? (
                             <tr><td colSpan={days.length + 5} className="ef-empty">Chưa có dữ liệu lịch làm việc.</td></tr>
-                        ) : matrixData.filter(row => row.fullName.toLowerCase().includes(searchTerm.toLowerCase())).map((row, idx) => (
+                        ) : matrixData
+                                .filter(row => row.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
+                                .filter(row => !isDepartmentHead || !(row.positionName && row.positionName.toLowerCase().includes('trưởng phòng')))
+                                .map((row, idx) => (
                             <tr key={idx}>
                                 <td className="c" style={{ position: 'sticky', left: 0, zIndex: 5, background: '#fff', borderRight: '1px solid #eaeaea' }}>
-                                    <input type="checkbox" checked={selectedEmployees.includes(row.employeeId)} onChange={() => handleSelectEmployee(row.employeeId)} />
-                                </td>
-                                <td className="c" style={{ position: 'sticky', left: '40px', zIndex: 5, background: '#fff', borderRight: '1px solid #eaeaea' }}>
                                     {idx + 1}
                                 </td>
-                                <td style={{ position: 'sticky', left: '80px', zIndex: 5, background: '#fff', borderRight: '1px solid #eaeaea' }}>
+                                <td style={{ position: 'sticky', left: '40px', zIndex: 5, background: '#fff', borderRight: '1px solid #eaeaea' }}>
                                     <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{row.fullName}</div>
                                     <div style={{ fontSize: '10px', color: '#888' }}>{row.employeeCode}</div>
                                 </td>
@@ -607,20 +590,9 @@ export default function SchedulingMatrix({ user, onBack }) {
 
                                     return (
                                         <td key={sIdx} className="c" style={{ padding: '2px', background: cellBackground }}>
-                                            {isEditing ? (
-                                                <select 
-                                                    value={displayShiftId || ''} 
-                                                    onChange={(e) => handleCellChange(row.employeeId, s.date, e.target.value)}
-                                                    style={{ width: '100%', fontSize: '10px', padding: '4px 0', border: pendingShiftId !== undefined ? '1px solid #1a56db' : '1px solid #ccc' }}
-                                                >
-                                                    <option value="">OFF</option>
-                                                    {shifts.map(shift => <option key={shift.id} value={shift.id}>{shift.shiftCode}</option>)}
-                                                </select>
-                                            ) : (
-                                                <span className={textClass} style={{ fontSize: '10px', fontWeight: 'bold', color: displayShiftCode === 'OFF' ? '#aaa' : undefined }}>
-                                                    {displayShiftCode === 'OFF' ? '' : displayShiftCode}
-                                                </span>
-                                            )}
+                                            <span className={textClass} style={{ fontSize: '10px', fontWeight: 'bold', color: displayShiftCode === 'OFF' ? '#aaa' : undefined }}>
+                                                {displayShiftCode === 'OFF' ? '' : displayShiftCode}
+                                            </span>
                                         </td>
                                     );
                                 })}

@@ -39,6 +39,7 @@ function getMenuItems(primaryRole) {
                 { id: 'time-adjustment', label: 'Yêu cầu điều chỉnh', icon: FileText, showFor: employeeRoles },
                 { id: 'my-contract', label: 'Hợp đồng lao động', icon: FileText, showFor: ['Employee', 'DepartmentHead'] },
                 { id: 'my-schedule', label: 'Lịch ca của tôi', icon: Calendar, showFor: ['Employee', 'DepartmentHead'] },
+                { id: 'shift-change', label: 'Xin đổi ca', icon: Calendar, showFor: ['Employee', 'DepartmentHead'] },
                 { id: 'my-payslip', label: 'Bảng lương', icon: DollarSign, showFor: ['Employee', 'DepartmentHead'] },
             ]
         },
@@ -47,7 +48,8 @@ function getMenuItems(primaryRole) {
             label: 'Quản lý Bộ phận',
             items: [
                 { id: 'team-timesheets', label: primaryRole === 'DepartmentManager' ? 'Chốt công Bộ phận' : 'Công Bộ phận', icon: Activity, showFor: ['DepartmentHead', 'DepartmentManager'] },
-                { id: 'team-schedule', label: 'Xếp ca Bộ phận', icon: Calendar, showFor: ['DepartmentHead'] },
+                { id: 'team-schedule', label: 'Lịch Bộ phận', icon: Calendar, showFor: ['DepartmentHead'] },
+                { id: 'team-shift-approvals', label: 'Duyệt xin đổi ca', icon: CheckSquare, showFor: ['DepartmentHead'] },
                 { id: 'team-leaves', label: 'Duyệt đơn Bộ phận', icon: Umbrella, showFor: ['DepartmentHead'] },
                 { id: 'team-contracts', label: 'Duyệt hợp đồng', icon: FileText, showFor: ['DepartmentHead'] },
             ]

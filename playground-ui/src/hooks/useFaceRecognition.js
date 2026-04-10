@@ -26,14 +26,33 @@ export const useFaceRecognition = () => {
 
     // Start webcam stream into a <video> element
     const startWebcam = useCallback(async (videoRef) => {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-        streamRef.current = stream;
-        if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            await new Promise((res) => { videoRef.current.onloadedmetadata = res; });
-            await videoRef.current.play();
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'user',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                } 
+            });
+            streamRef.current = stream;
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                // Wait for video to be ready and have dimensions
+                await new Promise((res, rej) => { 
+                    videoRef.current.onloadedmetadata = res; 
+                    videoRef.current.onerror = rej;
+                    setTimeout(() => rej(new Error("Video loading timeout")), 5000);
+                });
+                await videoRef.current.play();
+            }
+            return stream;
+        } catch (e) {
+            console.error('Webcam start failed:', e);
+            if (e.name === 'NotAllowedError') throw new Error("Quyền truy cập camera bị từ chối. Vui lòng kiểm tra cài đặt trình duyệt.");
+            if (e.name === 'NotFoundError') throw new Error("Không tìm thấy camera trên thiết bị của bạn.");
+            if (e.name === 'NotReadableError') throw new Error("Camera đang bị ứng dụng khác sử dụng hoặc bị lỗi phần cứng.");
+            throw e;
         }
-        return stream;
     }, []);
 
     // Stop webcam stream
@@ -49,12 +68,17 @@ export const useFaceRecognition = () => {
      * Returns null if no face found.
      */
     const detectDescriptor = useCallback(async (videoRef) => {
-        if (!videoRef.current) return null;
-        const detection = await faceapi
-            .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-        return detection ? Array.from(detection.descriptor) : null;
+        if (!videoRef.current || videoRef.current.videoWidth === 0) return null;
+        try {
+            const detection = await faceapi
+                .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+            return detection ? Array.from(detection.descriptor) : null;
+        } catch (e) {
+            console.error('Face detection failed:', e);
+            return null;
+        }
     }, []);
 
     /**
@@ -68,7 +92,11 @@ export const useFaceRecognition = () => {
             .withFaceLandmarks()
             .withFaceDescriptor();
 
+        if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) return null;
+
         const dims = faceapi.matchDimensions(canvasRef.current, videoRef.current, true);
+        if (!dims) return null;
+        
         canvasRef.current.getContext('2d').clearRect(0, 0, dims.width, dims.height);
 
         if (detection) {

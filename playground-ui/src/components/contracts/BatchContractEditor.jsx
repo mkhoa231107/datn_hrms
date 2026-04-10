@@ -3,11 +3,14 @@ import { X, Save, Send, Eye, Users, Plus, Trash2, FileUp, Search } from 'lucide-
 import { api, employeeService, departmentService } from '../../api';
 import toast from 'react-hot-toast';
 
+import ContractTemplate from './ContractTemplate';
+
 export default function BatchContractEditor({ batchId, onClose, onSuccess }) {
   const [batch, setBatch] = useState(null);
   const [contracts, setContracts] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [showEmployeeSelect, setShowEmployeeSelect] = useState(false);
+  const [previewContract, setPreviewContract] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -314,7 +317,18 @@ export default function BatchContractEditor({ batchId, onClose, onSuccess }) {
         >
           <Save size={16} /> LƯU BẢN NHÁP
         </button>
-        <button className="ef-btn" style={{ padding: '8px 24px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}>
+        <button 
+          onClick={() => {
+            if (contracts.length > 0) {
+              // Preview the first one or the one currently being focused
+              setPreviewContract(contracts[0]);
+            } else {
+              toast.error('Chưa có nhân sự nào trong danh sách để xem trước');
+            }
+          }}
+          className="ef-btn" 
+          style={{ padding: '8px 24px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold' }}
+        >
           <Eye size={16} /> XEM TRƯỚC HĐ
         </button>
         <button 
@@ -515,6 +529,32 @@ export default function BatchContractEditor({ batchId, onClose, onSuccess }) {
                   ÁP DỤNG VÀO DANH SÁCH ĐỢT
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Preview Modal */}
+      {previewContract && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-8 overflow-auto">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[900px] min-h-[1200px] p-10 relative">
+            <button 
+              onClick={() => setPreviewContract(null)}
+              className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full transition-colors print:hidden"
+            >
+              <X size={24} className="text-slate-400" />
+            </button>
+            <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm font-medium print:hidden">
+              <strong>CHẾ ĐỘ XEM TRƯỚC:</strong> Đây là bản phác thảo hợp đồng dựa trên dữ liệu hiện tại. Dấu mộc và chữ ký sẽ được áp dụng sau khi ký kết chính thức.
+            </div>
+            <ContractTemplate contract={previewContract} />
+            <div className="mt-10 flex justify-center print:hidden">
+              <button 
+                onClick={() => setPreviewContract(null)}
+                className="ef-btn"
+                style={{ padding: '10px 40px', fontWeight: 'bold' }}
+              >
+                ĐÓNG BẢN XEM TRƯỚC
+              </button>
             </div>
           </div>
         </div>

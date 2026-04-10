@@ -24,8 +24,10 @@ namespace HRMS.Application.Interfaces
         Task<IEnumerable<ContractBatchDto>> GetBatchesAsync();
         
         Task BulkCreateContractsAsync(BulkContractCreateDto dto);
+        Task<int> RenewAllContractsAsync(int creatorId);
         
         // Query
         Task<IEnumerable<HRMS.Application.DTOs.Employees.EmployeeContractDto>> GetContractsAsync(int? employeeId = null, int? departmentId = null, HRMS.Domain.Enums.ContractStatus? status = null);
+        Task UpdateContractAsync(int id, ContractCreateDto dto);
     }
 }

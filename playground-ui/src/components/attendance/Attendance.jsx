@@ -273,6 +273,11 @@ export default function Attendance() {
 
     const ciRec = todayRecords.find(r => r.type === 'CheckIn');
     const coRec = todayRecords.find(r => r.type === 'CheckOut');
+    const noneRec = todayRecords.find(r => r.type === 'None'); // Virtual record from backend if no check-in yet
+    
+    // We use noneRec only if we don't have a real CheckIn yet
+    const activeShift = ciRec || coRec || noneRec;
+
     const isCheckedIn  = !!ciRec;
     const isCheckedOut = !!coRec;
 
@@ -347,10 +352,9 @@ export default function Attendance() {
         });
 
     // Apply combined filter (chip = subtab)
-    // Apply combined filter (chip = subtab)
     let filteredRows = [...allRows];
-    if (chipFilter === 'late')   filteredRows = filteredRows.filter(r => r.st.cls === 'st-late');
-    if (chipFilter === 'early')  filteredRows = filteredRows.filter(r => r.st.cls === 'st-early');
+    if (chipFilter === 'late')   filteredRows = filteredRows.filter(r => r.st.isLate);
+    if (chipFilter === 'early')  filteredRows = filteredRows.filter(r => r.st.isEarly);
     if (chipFilter === 'miss')   filteredRows = filteredRows.filter(r => r.ci && !r.co);
 
     const totalPages = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
@@ -359,8 +363,8 @@ export default function Attendance() {
 
     // Counts
     const okCnt    = allRows.filter(r => r.st.cls === 'st-ok').length;
-    const lateCnt  = allRows.filter(r => r.st.cls === 'st-late').length;
-    const earlyCnt = allRows.filter(r => r.st.cls === 'st-early').length;
+    const lateCnt  = allRows.filter(r => r.st.isLate).length;
+    const earlyCnt = allRows.filter(r => r.st.isEarly).length;
     const missCnt  = allRows.filter(r => r.ci && !r.co).length;
 
     // Tổng hợp thực tế (Aggregate)
@@ -461,8 +465,8 @@ export default function Attendance() {
                                 <tr>
                                     <th>Ca làm việc</th>
                                     <td>
-                                        {ciRec?.shiftName || coRec?.shiftName || 'Hành chính'} &nbsp;
-                                        ({(ciRec?.shiftStartTime || coRec?.shiftStartTime || '08:00:00').substring(0,5)} – {(ciRec?.shiftEndTime || coRec?.shiftEndTime || '17:00:00').substring(0,5)})
+                                        {activeShift?.shiftName || 'Hành chính'} &nbsp;
+                                        ({(activeShift?.shiftStartTime || '08:00:00').substring(0,5)} – {(activeShift?.shiftEndTime || '17:00:00').substring(0,5)})
                                     </td>
                                 </tr>
                                 {(ciRec?.otStartTime || coRec?.otStartTime) && (

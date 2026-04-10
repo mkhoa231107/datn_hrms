@@ -11,13 +11,15 @@ export function getNavItems(primaryRole) {
         attendance:       { id: 'attendance',        label: 'Chấm công',          roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
         leave:            { id: 'leave',             label: 'Đơn từ & Nghỉ phép', roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
         'my-schedule':    { id: 'my-schedule',       label: 'Lịch ca',            roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
+        'shift-change':   { id: 'shift-change',      label: 'Xin đổi ca',         roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
         'my-payslip':     { id: 'my-payslip',        label: 'Bảng lương',         roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
         'my-contract':    { id: 'my-contract',       label: 'Hợp đồng',           roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
         'my-insurance':   { id: 'my-insurance',      label: 'Bảo hiểm',           roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
 
         // Department Head
         'team-attendance':{ id: 'team-attendance',   label: 'Tăng ca Bộ phận',    roles: ['DepartmentHead','Admin'] },
-        'team-schedule':  { id: 'team-schedule',     label: 'Xếp ca Bộ phận',     roles: ['DepartmentHead','Admin'] },
+        'team-schedule':  { id: 'team-schedule',     label: 'Lịch làm việc BP',     roles: ['DepartmentHead','Admin'] },
+        'team-shift-approvals': { id: 'team-shift-approvals', label: 'Duyệt đổi ca BP', roles: ['DepartmentHead','Admin'] },
         'team-leaves':    { id: 'team-leaves',       label: 'Duyệt đơn BP',       roles: ['DepartmentHead','Admin'] },
         'team-timesheets':{ 
             id: 'team-timesheets',   
@@ -40,8 +42,8 @@ export function getNavItems(primaryRole) {
     const ORDER = {
         Admin:             ['me','employees','admin-contracts','payroll-processing','insurance-management','face-registration'],
         DepartmentManager: ['me','employees','dept-leaves','dept-activities','team-timesheets','admin-contracts'],
-        DepartmentHead:    ['me','leave','team-schedule','team-leaves','team-timesheets', 'payroll-processing'],
-        Employee:          ['me','attendance','leave','my-schedule','my-payslip','my-contract','my-insurance'],
+        DepartmentHead:    ['me','leave','team-schedule','team-shift-approvals','team-leaves','team-timesheets', 'payroll-processing'],
+        Employee:          ['me','attendance','leave','my-schedule','shift-change','my-payslip','my-contract','my-insurance'],
         HrAdmin:           ['me','employees'],
     };
 

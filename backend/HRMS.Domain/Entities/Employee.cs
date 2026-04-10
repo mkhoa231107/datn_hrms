@@ -18,6 +18,7 @@ namespace HRMS.Domain.Entities
         public DateTime DateOfBirth { get; set; }   // Ngày sinh
         public string Gender { get; set; }          // Giới tính: "Nam", "Nữ", "Khác"
         public string? PlaceOfOrigin { get; set; }  // Quê quán
+        public string? PlaceOfBirth { get; set; }   // Nơi sinh
         public string? Ethnicity { get; set; }      // Dân tộc
         public string? Religion { get; set; }       // Tôn giáo
         public string? IdentityNumber { get; set; }  // CMND/CCCD
@@ -47,6 +48,10 @@ namespace HRMS.Domain.Entities
         
         public int PositionId { get; set; }
         public Position Position { get; set; }
+
+        public decimal BasicSalary { get; set; }    // Lương cơ bản hiện tại (đồng bộ từ hợp đồng)
+        public int? ShiftId { get; set; }           // Ca làm việc cố định hiện tại (đồng bộ từ hợp đồng)
+        public WorkShift? Shift { get; set; }
         
         // Manager relationship (self-referencing)
         public int? ManagerId { get; set; }

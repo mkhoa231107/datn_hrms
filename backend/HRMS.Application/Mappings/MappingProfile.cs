@@ -28,7 +28,9 @@ namespace HRMS.Application.Mappings
 
             // CONTRACT MAPPINGS
             CreateMap<ContractCreateDto, EmployeeContract>()
-                .ForMember(dest => dest.ContractType, opt => opt.MapFrom(src => (HRMS.Domain.Enums.ContractType)src.ContractTypeId));
+                .ForMember(dest => dest.ContractType, opt => opt.MapFrom(src => (HRMS.Domain.Enums.ContractType)src.ContractTypeId))
+                .ForMember(dest => dest.TargetDepartmentId, opt => opt.MapFrom(src => src.DepartmentId))
+                .ForMember(dest => dest.TargetPositionId, opt => opt.MapFrom(src => src.PositionId));
 
             CreateMap<ContractBatch, ContractBatchDto>()
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
@@ -53,6 +55,10 @@ namespace HRMS.Application.Mappings
             CreateMap<Employee, EmployeeProfileDto>()
                 .ForMember(dest => dest.DepartmentName, opt => opt.MapFrom(src => src.Department.DepartmentName))
                 .ForMember(dest => dest.PositionName, opt => opt.MapFrom(src => src.Position.PositionName))
+                .ForMember(dest => dest.PositionBaseSalaryMin, opt => opt.MapFrom(src => src.Position.BaseSalaryMin))
+                .ForMember(dest => dest.PositionBaseSalaryMax, opt => opt.MapFrom(src => src.Position.BaseSalaryMax))
+                .ForMember(dest => dest.PositionDefaultShiftId, opt => opt.MapFrom(src => src.Position.DefaultShiftId))
+                .ForMember(dest => dest.ShiftName, opt => opt.MapFrom(src => src.Shift != null ? src.Shift.ShiftName : null))
                 .ForMember(dest => dest.CurrentContract, opt => opt.Ignore()); // Sẽ được xử lý trong Service nếu cần
 
             CreateMap<EmployeeContract, EmployeeContractDto>()
@@ -61,15 +67,33 @@ namespace HRMS.Application.Mappings
                 .ForMember(dest => dest.EmployeeId, opt => opt.MapFrom(src => src.EmployeeId))
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))
                 .ForMember(dest => dest.EmployeeName, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.FullName : string.Empty))
+                .ForMember(dest => dest.MealAllowance, opt => opt.MapFrom(src => src.MealAllowance))
+                .ForMember(dest => dest.PhoneAllowance, opt => opt.MapFrom(src => src.PhoneAllowance))
+                .ForMember(dest => dest.PetrolAllowance, opt => opt.MapFrom(src => src.PetrolAllowance))
+                .ForMember(dest => dest.HousingAllowance, opt => opt.MapFrom(src => src.HousingAllowance))
                 .ForMember(dest => dest.EmployeeCode, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.EmployeeCode : string.Empty))
                 .ForMember(dest => dest.DepartmentName, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Department != null) ? src.Employee.Department.DepartmentName : string.Empty))
                 .ForMember(dest => dest.IdentityNumber, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.IdentityNumber : string.Empty))
+                .ForMember(dest => dest.DateOfBirth, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.DateOfBirth : DateTime.MinValue))
+                .ForMember(dest => dest.Address, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.Address : string.Empty))
+                .ForMember(dest => dest.CurrentAddress, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.CurrentAddress : string.Empty))
+                .ForMember(dest => dest.IdentityDate, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.IdentityDate : null))
+                .ForMember(dest => dest.IdentityPlace, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.IdentityPlace : string.Empty))
+                .ForMember(dest => dest.PlaceOfOrigin, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.PlaceOfOrigin : string.Empty))
+                .ForMember(dest => dest.PlaceOfBirth, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.PlaceOfBirth : string.Empty))
+                .ForMember(dest => dest.PositionName, opt => opt.MapFrom(src => src.Employee != null && src.Employee.Position != null ? src.Employee.Position.PositionName : string.Empty))
                 .ForMember(dest => dest.JobDescription, opt => opt.MapFrom(src => src.JobDescription))
                 .ForMember(dest => dest.WorkLocation, opt => opt.MapFrom(src => src.WorkLocation))
                 .ForMember(dest => dest.EmployeeSignature, opt => opt.MapFrom(src => src.EmployeeSignature))
                 .ForMember(dest => dest.EmployeeSignedAt, opt => opt.MapFrom(src => src.EmployeeSignedAt))
                 .ForMember(dest => dest.SignedBy, opt => opt.MapFrom(src => src.SignedBy))
-                .ForMember(dest => dest.ContractBatchId, opt => opt.MapFrom(src => src.ContractBatchId));
+                .ForMember(dest => dest.ContractBatchId, opt => opt.MapFrom(src => src.ContractBatchId))
+                .ForMember(dest => dest.ShiftId, opt => opt.MapFrom(src => src.ShiftId))
+                .ForMember(dest => dest.ShiftName, opt => opt.MapFrom(src => src.Shift != null ? src.Shift.ShiftName : null))
+                .ForMember(dest => dest.ShiftCode, opt => opt.MapFrom(src => src.Shift != null ? src.Shift.ShiftCode : null))
+                .ForMember(dest => dest.ShiftTime, opt => opt.MapFrom(src => src.Shift != null
+                    ? $"{src.Shift.StartTime:hh\\:mm} - {src.Shift.EndTime:hh\\:mm}"
+                    : null));
             
             CreateMap<EmployeeBankAccount, EmployeeBankAccountDto>();
             CreateMap<EmployeeEmergencyContact, EmergencyContactDto>();
@@ -122,6 +146,8 @@ namespace HRMS.Application.Mappings
             
             CreateMap<PayrollRecord, PayrollRecordDto>()
                 .ForMember(dest => dest.EmployeeName, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.FullName : "N/A"));
+
+            CreateMap<Position, HRMS.Application.DTOs.Employees.PositionDto>();
         }
     }
 }

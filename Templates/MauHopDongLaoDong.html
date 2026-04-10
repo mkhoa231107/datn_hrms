@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Hợp Đồng Lao Động</title>
+    <style>
+        body { font-family: 'Times New Roman', Times, serif; background: #e0e0e0; display: flex; justify-content: center; }
+        .page { background: white; width: 210mm; min-height: 297mm; padding: 20mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-top: 20px; box-sizing: border-box; margin-bottom: 20px; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h3 { margin: 0; font-size: 16pt; font-weight: bold; }
+        .header h4 { margin: 5px 0 0 0; font-size: 14pt; font-weight: bold; text-decoration: underline; }
+        .doc-no { text-align: center; font-style: italic; margin-top: 10px; font-size: 14pt; }
+        .title { text-align: center; margin: 30px 0 10px 0; font-size: 18pt; font-weight: bold; }
+        .content { font-size: 13.5pt; line-height: 1.5; }
+        .content p { margin: 8px 0; }
+        .signature-section { display: flex; justify-content: space-between; margin-top: 50px; text-align: center; }
+        .signature-box { width: 45%; }
+        .italic { font-style: italic; }
+        .bold { font-weight: bold; }
+        .heading-section { font-weight: bold; text-decoration: underline; margin-top: 15px; margin-bottom: 5px; }
+        @media print {
+            body { background: white; margin: 0; padding: 0; }
+            .page { box-shadow: none; margin: 0; width: auto; height: auto; padding: 0; }
+            .no-print { display: none; }
+        }
+        .btn-print { position: fixed; top: 20px; right: 20px; padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <button class="btn-print no-print" onclick="window.print()">🖨️ Lưu thành PDF / In</button>
+    <div class="page">
+        <div class="header">
+            <h3>CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM</h3>
+            <h4>Độc lập – Tự do – Hạnh phúc</h4>
+        </div>
+        
+        <div class="title">HỢP ĐỒNG LAO ĐỘNG</div>
+        <div class="doc-no">(Số: ........./20..../HĐLĐ)</div>
+
+        <div class="content" style="margin-top: 20px;">
+            <p>Hôm nay, ngày ..... tháng ..... năm 20...., tại .........................................................................., chúng tôi gồm có:</p>
+            
+            <p class="heading-section">BÊN A (NGƯỜI SỬ DỤNG LAO ĐỘNG):</p>
+            <p>Tên doanh nghiệp: ...............................................................................................................</p>
+            <p>Địa chỉ: .................................................................................................................................</p>
+            <p>Đại diện bởi Ông/Bà: ................................................. Chức vụ: .......................................</p>
+            <p>Mã số thuế: ..........................................................................................................................</p>
+
+            <p class="heading-section">BÊN B (NGƯỜI LAO ĐỘNG):</p>
+            <p>Họ và tên: ................................................................... Giới tính: ......................................</p>
+            <p>Sinh ngày: ...../...../.......... Quê quán: ................................................................................</p>
+            <p>CCCD/CMND số: .............................. Cấp ngày: ...../...../.......... Nơi cấp: ..........................</p>
+            <p>Địa chỉ thường trú: ..............................................................................................................</p>
+
+            <p style="margin-top: 15px;">Thỏa thuận ký kết Hợp đồng lao động và cam kết làm đúng những điều khoản sau đây:</p>
+
+            <p class="heading-section">ĐIỀU 1: Điều khoản chung</p>
+            <p>1. Loại hợp đồng: ...............................................................................................................</p>
+            <p>2. Thời hạn hợp đồng: Từ ngày ...../...../20.... đến ngày ...../...../20....</p>
+            <p>3. Địa điểm làm việc: .........................................................................................................</p>
+            <p>4. Chức danh chuyên môn: ........................................ Bộ phận: .......................................</p>
+            <p>5. Ca làm việc cố định: .......................................................................................................</p>
+
+            <p class="heading-section">ĐIỀU 2: Chế độ làm việc</p>
+            <p>1. Thời giờ làm việc: ..........................................................................................................</p>
+            <p>2. Được trang bị những phương tiện làm việc gồm: ..........................................................</p>
+
+            <p class="heading-section">ĐIỀU 3: Nghĩa vụ và các quyền lợi của người lao động</p>
+            <p>1. Mức lương chính thức/cơ bản: ........................................ VNĐ/tháng.</p>
+            <p>2. Hình thức trả lương: Lương được trả theo tháng vào ngày ............................................</p>
+            <p>3. Tiền thưởng, phụ cấp: ...................................................................................................</p>
+            <p>4. Chế độ nâng lương: Theo quy định của Công ty và đánh giá năng lực hằng năm.</p>
+
+            <p class="heading-section">ĐIỀU 4: Nghĩa vụ và quyền hạn của người sử dụng lao động</p>
+            <p>1. Thực hiện đầy đủ, đúng thời hạn các chế độ và quyền lợi cho người lao động.</p>
+            <p>2. Có quyền điều hành người lao động hoàn thành công việc theo hợp đồng.</p>
+
+            <p class="heading-section">ĐIỀU 5: Điều khoản thi hành</p>
+            <p>1. Những vấn đề lao động không ghi trong hợp đồng này áp dụng theo quy định của Pháp luật.</p>
+            <p>2. Hợp đồng này được lập thành 02 bản có giá trị pháp lý như nhau, mỗi bên giữ 01 bản.</p>
+
+            <div class="signature-section">
+                <div class="signature-box">
+                    <p class="bold">BÊN A (Đại diện Công ty)</p>
+                    <p class="italic">(Ký, ghi rõ họ tên và đóng dấu)</p>
+                </div>
+                <div class="signature-box">
+                    <p class="bold">BÊN B (Người lao động)</p>
+                    <p class="italic">(Ký và ghi rõ họ tên)</p>
+                </div>
+            </div>
+            
+            <br>
+        </div>
+    </div>
+</body>
+</html>

@@ -23,6 +23,12 @@ namespace HRMS.Domain.Entities
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
         
+        // Setup configuration
+        public decimal? BaseSalaryMin { get; set; } // Lương cơ bản thấp nhất
+        public decimal? BaseSalaryMax { get; set; } // Lương cơ bản cao nhất
+        public int? DefaultShiftId { get; set; }    // Ca làm việc cố định mặc định
+        public WorkShift DefaultShift { get; set; }
+        
         // Navigation properties
         public ICollection<Employee> Employees { get; set; }
     }

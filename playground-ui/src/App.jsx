@@ -28,19 +28,22 @@ import PayrollSettings from './components/payroll/PayrollSettings';
 import MyPayslip from './components/payroll/MyPayslip';
 import InsuranceManagement from './components/payroll/InsuranceManagement';
 import MyInsurance from './components/payroll/MyInsurance';
-import EasyDashboard from './components/dashboard/EasyDashboard';
+
 import DailyAttendanceAdmin from './components/attendance/DailyAttendanceAdmin';
 
+import ShiftChangeRequest from './components/request/ShiftChangeRequest';
+import ShiftChangeApproval from './components/scheduling/ShiftChangeApproval';
 import OvertimeScheduling from './components/scheduling/OvertimeScheduling';
+import UserRoles from './components/admin/UserRoles';
 
 
 // Default tab per role when first logged in
 const DEFAULT_TAB = {
-  Admin: 'me',
-  DepartmentManager: 'me',
-  DepartmentHead: 'me',
+  Admin: 'admin-roles',
+  DepartmentManager: 'employees',
+  DepartmentHead: 'employees',
   Employee: 'me',
-  HrAdmin: 'me',
+  HrAdmin: 'employees',
 };
 
 // A reusable "Coming Soon" placeholder for features not yet implemented
@@ -162,7 +165,6 @@ export default function App() {
   }
 
 
-  const isDashboard = activeTab === 'dashboard';
   const tab = (id) => activeTab === id;
 
   const handleTabChange = (t) => {
@@ -225,30 +227,16 @@ export default function App() {
             </div>
           )}
 
-          {/* ── HRMS Net Dashboard ── */}
-          {tab('dashboard') && (
-            <EasyDashboard 
-              user={user} 
-              onModuleClick={(moduleId) => {
-                const primaryRole = getPrimaryRole(user?.roles || []);
-                // If Admin clicks "Hệ thống", go to the management interface (old interface)
-                if (moduleId === 'admin-system' && primaryRole === 'Admin') {
-                  setActiveTab('employees');
-                } else {
-                  setActiveTab(moduleId);
-                }
-              }} 
-            />
-          )}
+
 
           {/* ── Personal (All roles) ── */}
           {tab('me') && (
             <RoleGuard user={user} allowedRoles={['Admin', 'HrAdmin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
-              <Profile mode="me" onBack={() => setActiveTab('dashboard')} />
+              <Profile mode="me" onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('attendance') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
               {hasUnsignedContract ? (
                 <RestrictedView 
                   title="Tính năng Điểm danh bị khóa" 
@@ -256,12 +244,12 @@ export default function App() {
                   onGoToContract={() => setActiveTab('my-contract')} 
                 />
               ) : (
-                <Attendance onBack={() => setActiveTab('dashboard')} />
+                <Attendance onBack={() => setActiveTab('me')} />
               )}
             </RoleGuard>
           )}
           {tab('leave') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
               {hasUnsignedContract ? (
                 <RestrictedView 
                   title="Tính năng Đơn từ bị khóa" 
@@ -269,12 +257,12 @@ export default function App() {
                   onGoToContract={() => setActiveTab('my-contract')} 
                 />
               ) : (
-                <Leave user={user} onBack={() => setActiveTab('dashboard')} />
+                <Leave user={user} onBack={() => setActiveTab('me')} />
               )}
             </RoleGuard>
           )}
           {tab('time-adjustment') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
               {hasUnsignedContract ? (
                 <RestrictedView 
                   title="Tính năng Điều chỉnh bị khóa" 
@@ -286,12 +274,12 @@ export default function App() {
             </RoleGuard>
           )}
           {tab('my-contract') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
-              <MyContract user={user} onSignSuccess={checkUnsignedContracts} onBack={() => setActiveTab('dashboard')} />
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
+              <MyContract user={user} onSignSuccess={checkUnsignedContracts} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('my-schedule') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
               {hasUnsignedContract ? (
                 <RestrictedView 
                   title="Lịch làm việc bị khóa" 
@@ -299,62 +287,80 @@ export default function App() {
                   onGoToContract={() => setActiveTab('my-contract')} 
                 />
               ) : (
-                <MySchedule user={user} onBack={() => setActiveTab('dashboard')} />
+                <MySchedule user={user} onBack={() => setActiveTab('me')} />
+              )}
+            </RoleGuard>
+          )}
+          {tab('shift-change') && (
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
+              {hasUnsignedContract ? (
+                <RestrictedView 
+                  title="Bị khóa" 
+                  description="Đổi ca tạm thời bị ẩn. Vui lòng ký kết hợp đồng trước."
+                  onGoToContract={() => setActiveTab('my-contract')} 
+                />
+              ) : (
+                <ShiftChangeRequest onBack={() => setActiveTab('me')} />
               )}
             </RoleGuard>
           )}
           {tab('my-payslip') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
-              <MyPayslip user={user} onBack={() => setActiveTab('dashboard')} />
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
+              <MyPayslip user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('my-insurance') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'DepartmentHead', 'Employee']}>
-              <MyInsurance user={user} onBack={() => setActiveTab('dashboard')} />
+            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'Employee']}>
+              <MyInsurance user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
 
           {/* ── DepartmentHead ── */}
           {tab('team-timesheets') && (
             <RoleGuard user={user} allowedRoles={['DepartmentHead', 'DepartmentManager']}>
-              <TimesheetApproval user={user} onBack={() => setActiveTab('dashboard')} />
+              <TimesheetApproval user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('team-schedule') && (
             <RoleGuard user={user} allowedRoles={['DepartmentHead', 'Admin', 'HrAdmin']}>
-              <SchedulingMatrix user={user} onBack={() => setActiveTab('dashboard')} />
+              <SchedulingMatrix user={user} onBack={() => setActiveTab('me')} />
+            </RoleGuard>
+          )}
+          {tab('team-shift-approvals') && (
+            <RoleGuard user={user} allowedRoles={['DepartmentHead', 'Admin', 'HrAdmin']}>
+              <ShiftChangeApproval user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('team-leaves') && (
             <RoleGuard user={user} allowedRoles={['DepartmentHead', 'Admin', 'HrAdmin']}>
-              <Leave user={user} approvalOnly={true} onBack={() => setActiveTab('dashboard')} />
+              <Leave user={user} approvalOnly={true} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('team-contracts') && (
             <RoleGuard user={user} allowedRoles={['DepartmentHead', 'Admin', 'HrAdmin']}>
-              <ContractApproval user={user} scope="team" onBack={() => setActiveTab('dashboard')} />
+              <ContractApproval user={user} scope="team" onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
 
           {/* ── DepartmentManager ── */}
           {tab('employees') && (
             <RoleGuard user={user} allowedRoles={['DepartmentManager', 'Admin', 'HrAdmin']}>
-              <EmployeeList user={user} onViewProfile={handleViewEmployee} onBack={() => setActiveTab('dashboard')} />
+              <EmployeeList user={user} onViewProfile={handleViewEmployee} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('dept-activities') && (
             <RoleGuard user={user} allowedRoles={['DepartmentManager', 'Admin']}>
-              <DeptActivities user={user} onBack={() => setActiveTab('dashboard')} />
+              <DeptActivities user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('dept-leaves') && (
             <RoleGuard user={user} allowedRoles={['DepartmentManager', 'Admin']}>
-              <Leave user={user} approvalOnly={true} onBack={() => setActiveTab('dashboard')} />
+              <Leave user={user} approvalOnly={true} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('dept-contracts') && (
             <RoleGuard user={user} allowedRoles={['DepartmentManager', 'Admin']}>
-              <ContractApproval user={user} scope="department" onBack={() => setActiveTab('dashboard')} />
+              <ContractApproval user={user} scope="department" onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
 
@@ -368,12 +374,12 @@ export default function App() {
           )}
           {tab('admin-contracts') && (
             <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager']}>
-              <ContractManagement user={user} onBack={() => setActiveTab('dashboard')} />
+              <ContractManagement user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
            {tab('face-registration') && (
             <RoleGuard user={user} allowedRoles={['Admin']}>
-              <FaceRegistration onBack={() => setActiveTab('dashboard')} />
+              <FaceRegistration onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('daily-attendance') && (
@@ -388,7 +394,7 @@ export default function App() {
           )}
           {tab('payroll-settings') && (
             <RoleGuard user={user} allowedRoles={['Admin']} customCheck={user?.username === 'hr_cb_01'}>
-              <PayrollSettings onBack={() => setActiveTab('dashboard')} />
+              <PayrollSettings onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('insurance-management') && (
@@ -398,12 +404,7 @@ export default function App() {
           )}
           {tab('admin-roles') && (
             <RoleGuard user={user} allowedRoles={['Admin']}>
-              <ComingSoon
-                icon="🔐"
-                title="Phân quyền User"
-                description="Quản lý tài khoản người dùng, gán vai trò, và thiết lập quyền hạn truy cập hệ thống."
-                onBack={() => setActiveTab('dashboard')}
-              />
+              <UserRoles user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('admin-system') && (

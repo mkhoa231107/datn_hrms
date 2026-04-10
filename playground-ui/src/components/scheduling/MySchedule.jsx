@@ -207,8 +207,8 @@ export default function MySchedule({ user, onBack }) {
                                                         display: 'inline-block',
                                                         border: shiftCode === 'OFF' ? '1px dashed #ccc' : '1px solid #999', 
                                                         padding: '4px 8px', 
-                                                        backgroundColor: shiftCode === 'OFF' ? '#fafafa' : shiftCode.startsWith('D') ? '#333' : '#f0fdf4',
-                                                        color: shiftCode === 'OFF' ? '#888' : shiftCode.startsWith('D') ? '#fff' : '#15803d',
+                                                        backgroundColor: shiftCode === 'OFF' ? '#fafafa' : shiftCode === 'C3' ? '#333' : '#f0fdf4',
+                                                        color: shiftCode === 'OFF' ? '#888' : shiftCode === 'C3' ? '#fff' : '#15803d',
                                                         fontSize: '11px',
                                                         width: '70%'
                                                     }}>
@@ -235,7 +235,7 @@ export default function MySchedule({ user, onBack }) {
                     </div>
                     
                     <div style={{ padding: '12px 15px', backgroundColor: '#fafafa', border: '1px solid #ccc', borderTop: 'none', fontSize: '12px', color: '#555' }}>
-                        <strong>GHI CHÚ CA:</strong> HC (Hành chính), S1/C1 (Sáng/Chiều), D1 (Ca Đêm), OFF (Ngày Nghỉ)
+                        <strong>GHI CHÚ CA:</strong> HC (Hành chính), C1 (Ca 1), C2 (Ca 2), C3 (Ca 3), OFF (Ngày Nghỉ)
                     </div>
                 </>
             ) : (

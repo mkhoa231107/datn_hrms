@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using HRMS.Application.Interfaces;
 using HRMS.Application.Mappings;
 using HRMS.Infrastructure.Data;
@@ -65,6 +66,7 @@ builder.Services.AddScoped<IAuthorizationHandler, DepartmentScopeHandler>();
 // DEPENDENCY INJECTION - SERVICE LAYER
 // ========================================
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IContractService, ContractService>();
 builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
@@ -75,9 +77,11 @@ builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<ILeaveService, LeaveService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IPayrollService, PayrollService>();
+builder.Services.AddScoped<IPositionService, PositionService>();
 builder.Services.AddScoped<IInsuranceService, InsuranceService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IShiftChangeRequestService, ShiftChangeRequestService>();
 
 // Recruitment Services
 builder.Services.AddScoped<HRMS.Application.Interfaces.Recruitment.IJobPostingService, HRMS.Infrastructure.Services.Recruitment.JobPostingService>();
@@ -107,7 +111,12 @@ builder.Services.AddCors(options =>
 // ========================================
 // API CONTROLLERS & SWAGGER
 // ========================================
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -215,16 +224,69 @@ using (var scope = app.Services.CreateScope())
                 ALTER TABLE [Employees] ADD [NumberOfDependents] int NOT NULL DEFAULT 0;
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Employees]') AND name = 'InsuranceSalary')
                 ALTER TABLE [Employees] ADD [InsuranceSalary] decimal(18,2) NULL;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Employees]') AND name = 'PlaceOfOrigin')
+                ALTER TABLE [Employees] ADD [PlaceOfOrigin] nvarchar(max) NULL;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Employees]') AND name = 'PlaceOfBirth')
+                ALTER TABLE [Employees] ADD [PlaceOfBirth] nvarchar(max) NULL;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Employees]') AND name = 'BasicSalary')
+                ALTER TABLE [Employees] ADD [BasicSalary] decimal(18,2) NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Employees]') AND name = 'ShiftId')
+                ALTER TABLE [Employees] ADD [ShiftId] int NULL CONSTRAINT FK_Employees_ShiftId_WorkShifts FOREIGN KEY REFERENCES [WorkShifts](Id);
+
+            -- Seed sample data for PlaceOfBirth and PlaceOfOrigin if they are empty
+            EXEC(N'UPDATE [Employees] SET [PlaceOfBirth] = N''Hà Nội'' WHERE [PlaceOfBirth] IS NULL');
+            EXEC(N'UPDATE [Employees] SET [PlaceOfOrigin] = N''Hà Nội, Việt Nam'' WHERE [PlaceOfOrigin] IS NULL');
+
+            -- Synchronize existing Active contracts data to Employees table
+            EXEC(N'
+                UPDATE E
+                SET 
+                    E.[BasicSalary] = C.[BasicSalary],
+                    E.[ShiftId] = C.[ShiftId]
+                FROM [Employees] E
+                INNER JOIN [EmployeeContracts] C ON E.[Id] = C.[EmployeeId]
+                WHERE C.[Status] = 2 -- ContractStatus.Active
+            ');
 
             -- EmployeeContracts Table
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'Status')
                 ALTER TABLE [EmployeeContracts] ADD [Status] int NOT NULL DEFAULT 0;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'MealAllowance')
+                ALTER TABLE [EmployeeContracts] ADD [MealAllowance] decimal(18,2) NOT NULL DEFAULT 730000;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'PhoneAllowance')
+                ALTER TABLE [EmployeeContracts] ADD [PhoneAllowance] decimal(18,2) NOT NULL DEFAULT 300000;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'PetrolAllowance')
+                ALTER TABLE [EmployeeContracts] ADD [PetrolAllowance] decimal(18,2) NOT NULL DEFAULT 600000;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'HousingAllowance')
+                ALTER TABLE [EmployeeContracts] ADD [HousingAllowance] decimal(18,2) NOT NULL DEFAULT 700000;
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'HrApprovedById')
                 ALTER TABLE [EmployeeContracts] ADD [HrApprovedById] int NULL;
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'DeptHeadApprovedById')
                 ALTER TABLE [EmployeeContracts] ADD [DeptHeadApprovedById] int NULL;
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'AdminApprovedById')
                 ALTER TABLE [EmployeeContracts] ADD [AdminApprovedById] int NULL;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'ShiftId')
+                ALTER TABLE [EmployeeContracts] ADD [ShiftId] int NULL CONSTRAINT FK_EmployeeContracts_ShiftId_WorkShifts FOREIGN KEY REFERENCES [WorkShifts](Id);
+
+            -- ShiftChangeRequests Table
+            IF OBJECT_ID('[ShiftChangeRequests]') IS NULL
+            BEGIN
+                CREATE TABLE [ShiftChangeRequests] (
+                    [Id]               INT          PRIMARY KEY IDENTITY,
+                    [EmployeeId]       INT          NOT NULL REFERENCES [Employees](Id),
+                    [RequestedShiftId] INT          NOT NULL REFERENCES [WorkShifts](Id),
+                    [CurrentShiftId]   INT          NULL     REFERENCES [WorkShifts](Id),
+                    [StartDate]        DATE         NOT NULL,
+                    [EndDate]          DATE         NOT NULL,
+                    [Reason]           NVARCHAR(MAX) NULL,
+                    [Status]           INT          NOT NULL DEFAULT 0,
+                    [ApproverId]       INT          NULL     REFERENCES [Employees](Id),
+                    [ApprovedAt]       DATETIME2    NULL,
+                    [RejectReason]     NVARCHAR(500) NULL,
+                    [CreatedAt]        DATETIME2    NOT NULL DEFAULT GETUTCDATE(),
+                    [UpdatedAt]        DATETIME2    NULL
+                );
+            END
 
             -- AttendanceSummary Approval
             IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[AttendanceSummaries]') AND name = 'Status')
@@ -254,6 +316,20 @@ using (var scope = app.Services.CreateScope())
             BEGIN
                 ALTER TABLE JobApplications ALTER COLUMN UserId INT NULL;
             END
+
+            -- Positions Table Default Salaries
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Positions]') AND name = 'BaseSalaryMin')
+                ALTER TABLE [Positions] ADD [BaseSalaryMin] decimal(18,2) NULL;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Positions]') AND name = 'BaseSalaryMax')
+                ALTER TABLE [Positions] ADD [BaseSalaryMax] decimal(18,2) NULL;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[Positions]') AND name = 'DefaultShiftId')
+                ALTER TABLE [Positions] ADD [DefaultShiftId] int NULL CONSTRAINT FK_Positions_DefaultShiftId_WorkShifts FOREIGN KEY REFERENCES [WorkShifts](Id);
+
+            -- EmployeeContracts Target Fields
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'TargetDepartmentId')
+                ALTER TABLE [EmployeeContracts] ADD [TargetDepartmentId] int NULL;
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[EmployeeContracts]') AND name = 'TargetPositionId')
+                ALTER TABLE [EmployeeContracts] ADD [TargetPositionId] int NULL;
         ";
 
         using (var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString))
@@ -266,20 +342,24 @@ using (var scope = app.Services.CreateScope())
         }
         Console.WriteLine("✅ Database schema self-heal applied.");
 
-        Console.WriteLine("🔄 Starting database initialization...");
-        var context = services.GetRequiredService<HRMSDbContext>();
+        try 
+        {
+            Console.WriteLine("🔄 Starting database initialization...");
+            var context = services.GetRequiredService<HRMSDbContext>();
 
-        // Self-heal Step 2: Apply migrations
-        context.Database.Migrate();
-        Console.WriteLine("✅ Migrations applied successfully.");
+            // Self-heal Step 2: Apply migrations
+            context.Database.Migrate();
+            Console.WriteLine("✅ Migrations applied successfully.");
 
-        Console.WriteLine("🌱 Starting data seeding...");
-        await DbInitializer.InitializeAsync(context); // Seed data
-        
-        // Data Fixes & Enhancements
-        await HRMS.Infrastructure.Seeders.MockCvSeeder.SeedAsync(services);
-        await HRMS.Infrastructure.Seeders.DataFixSeeder.CleanupCBApril2026Async(context);
-        Console.WriteLine("✅ Data seeding and cleanup completed successfully!");
+            Console.WriteLine("🌱 Starting data seeding...");
+            await DbInitializer.InitializeAsync(context); // Seed data
+            Console.WriteLine("✅ Database initialized successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ DATABASE INITIALIZATION FAILED: {ex.Message}");
+            Console.WriteLine(ex.StackTrace);
+        }
     }
     catch (Exception ex)
     {
@@ -291,7 +371,6 @@ using (var scope = app.Services.CreateScope())
         {
             Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
         }
-        throw; // Rethrow to prevent silent failures
     }
 }
 

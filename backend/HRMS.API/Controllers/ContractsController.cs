@@ -66,7 +66,10 @@ namespace HRMS.API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetContracts([FromQuery] HRMS.Domain.Enums.ContractStatus? status, [FromQuery] bool personal = false)
+        public async Task<IActionResult> GetContracts(
+            [FromQuery] HRMS.Domain.Enums.ContractStatus? status, 
+            [FromQuery] int? deptId,
+            [FromQuery] bool personal = false)
         {
             try
             {
@@ -78,43 +81,46 @@ namespace HRMS.API.Controllers
                 if (string.IsNullOrEmpty(userIdStr) || !int.TryParse(userIdStr, out int userId)) return Unauthorized();
 
                 int? filterEmpId = null;
-                int? filterDeptId = null;
+                int? filterDeptId = deptId; // Use explicitly provided deptId if present
 
                 if (personal || userRole == "Employee")
                 {
                     filterEmpId = userId;
+                    filterDeptId = null; // Ignore explicit deptId for personal view
                 }
                 else if (userRole == "DepartmentHead" || userRole == "DepartmentManager")
                 {
-                    if (userRole == "DepartmentManager" && (deptCode == "HR" || deptIdStr == "1")) 
+                    // If not HR, restricted to their own department
+                    if (!(userRole == "DepartmentManager" && (deptCode == "HR" || deptIdStr == "1"))) 
                     {
-                    }
-                    else if (int.TryParse(deptIdStr, out int deptId))
-                    {
-                        filterDeptId = deptId;
+                        if (int.TryParse(deptIdStr, out int myDeptId))
+                        {
+                            filterDeptId = myDeptId;
+                        }
                     }
                 }
 
                 var contracts = await _contractService.GetContractsAsync(filterEmpId, filterDeptId, status);
-
-                // Self-healing: Nếu đang xem "Cá nhân" và đã có hợp đồng Active (5), 
-                // thì tự động ẩn danh sách Chờ ký (4) hoặc chuyển chúng sang Terminated (7) 
-                // để xóa banner "Yêu cầu ký" bị treo.
-                if (personal && status == HRMS.Domain.Enums.ContractStatus.WaitingSign)
-                {
-                    var allMyContracts = await _contractService.GetContractsAsync(filterEmpId, null, null);
-                    if (allMyContracts.Any(c => c.Status == HRMS.Domain.Enums.ContractStatus.Active.ToString()))
-                    {
-                        // Nếu đã có bản ghi Active, trả về danh sách rỗng cho WaitingSign
-                        return Ok(new List<HRMS.Application.DTOs.Employees.EmployeeContractDto>());
-                    }
-                }
-
                 return Ok(contracts);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi hệ thống khi tải hợp đồng", detail = ex.Message });
+            }
+        }
+
+        [HttpPut("{id}")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        public async Task<IActionResult> UpdateContract(int id, [FromBody] ContractCreateDto dto)
+        {
+            try
+            {
+                await _contractService.UpdateContractAsync(id, dto);
+                return Ok(new { message = "Cập nhật hợp đồng thành công" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
         }
 
@@ -280,6 +286,24 @@ namespace HRMS.API.Controllers
         {
             await _contractService.SubmitBatchAsync(id);
             return Ok();
+        }
+
+        [HttpPost("renew-all")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        public async Task<IActionResult> RenewAll()
+        {
+            try
+            {
+                var userIdStr = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (!int.TryParse(userIdStr, out int userId)) return Unauthorized();
+
+                var batchId = await _contractService.RenewAllContractsAsync(userId);
+                return Ok(new { message = "Đã khởi tạo đợt gia hạn hợp đồng cho toàn bộ nhân sự.", batchId });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
     }
 }

@@ -34,7 +34,13 @@ namespace HRMS.API.Workers
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error occurred executing ContractStatusWorker.");
+                    // Use a very simple string to avoid formatting/serialization issues in the logger
+                    Console.WriteLine($"⚠️ [CRITICAL] ContractStatusWorker Error: {ex.Message}");
+                    try { _logger.LogError("ContractStatusWorker encountered a processing error."); } catch { }
+                    
+                    // Delay slightly longer on error to avoid spamming logs/CPU if DB is down
+                    await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
+                    continue;
                 }
 
                 // Run once a day at midnight.

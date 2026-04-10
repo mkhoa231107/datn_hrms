@@ -29,16 +29,18 @@ namespace HRMS.Infrastructure.Services
         {
             var timestamp = dto.Timestamp ?? DateTime.Now;
             var employeeId = dto.EmployeeId ?? 0;
-            Console.WriteLine($"[DEBUG] Check-in attempt: EmpId={employeeId}, Time={timestamp}");
             
+            Console.WriteLine($"[ATTENDANCE] Check-in attempt: EmpId={employeeId}, Time={timestamp}");
+
             if (employeeId <= 0)
             {
+                Console.WriteLine("[ATTENDANCE] Error: Invalid EmployeeId 0");
                 throw new InvalidOperationException("ID nhân viên không hợp lệ (0). Vui lòng đăng xuất và đăng nhập lại.");
             }
 
             var today = timestamp.Date;
 
-            // Kiểm tra hợp đồng hợp lệ (ACTIVE)
+            // 1. Kiểm tra hợp đồng hợp lệ (ACTIVE)
             var activeContract = await _context.EmployeeContracts
                 .FirstOrDefaultAsync(c => c.EmployeeId == employeeId 
                     && c.Status == HRMS.Domain.Enums.ContractStatus.Active
@@ -47,11 +49,11 @@ namespace HRMS.Infrastructure.Services
 
             if (activeContract == null)
             {
-                Console.WriteLine($"[DEBUG] Check-in failed: No active contract for EmpId={employeeId}");
+                Console.WriteLine($"[ATTENDANCE] Error: No active contract found for Employee {employeeId} on {today:yyyy-MM-dd}");
                 throw new InvalidOperationException("Bạn không thể chấm công do không có hợp đồng lao động đang có hiệu lực.");
             }
             
-            // Kiểm tra xem nhân viên đã check-in hôm nay chưa
+            // 2. Kiểm tra xem nhân viên đã check-in hôm nay chưa
             var existingCheckIn = await _context.TimeAttendanceRecords
                 .FirstOrDefaultAsync(r => r.EmployeeId == employeeId 
                     && r.Date == today 
@@ -59,19 +61,31 @@ namespace HRMS.Infrastructure.Services
             
             if (existingCheckIn != null)
             {
-                Console.WriteLine($"[DEBUG] Already checked in: EmpId={employeeId}");
+                Console.WriteLine($"[ATTENDANCE] Error: Employee {employeeId} already checked in today ({today:yyyy-MM-dd})");
                 throw new InvalidOperationException("Bạn đã check-in hôm nay rồi!");
             }
 
-            // Kiểm tra lịch làm việc
+            // 3. Kiểm tra lịch làm việc (Ưu tiên lịch cụ thể, fallback về ca trong hợp đồng)
             var workSchedule = await _context.WorkSchedules
                 .Include(ws => ws.WorkShift)
                 .FirstOrDefaultAsync(ws => ws.EmployeeId == employeeId 
                     && ws.WorkingDate.Date == today);
 
+            var employee = await _context.Employees
+                .Include(e => e.Shift)
+                .FirstOrDefaultAsync(e => e.Id == employeeId);
+            
+            if (employee == null) throw new InvalidOperationException("Không tìm thấy nhân viên.");
+
             if (workSchedule == null)
             {
-                throw new InvalidOperationException($"Bạn không có lịch làm việc hôm nay ({today:yyyy-MM-dd})!");
+                // Nếu không có lịch cụ thể, kiểm tra xem có ca mặc định từ hợp đồng (đã đồng bộ vào Profile) không
+                if (!employee.ShiftId.HasValue)
+                {
+                    Console.WriteLine($"[ATTENDANCE] Error: No schedule and no default shift for Employee {employeeId}");
+                    throw new InvalidOperationException($"Bạn không có lịch làm việc hôm nay và chưa được gán ca mặc định trong hợp đồng!");
+                }
+                Console.WriteLine($"[ATTENDANCE] No specific schedule. Using default contract shift ID: {employee.ShiftId}");
             }
 
             // Tạo record mới
@@ -83,7 +97,7 @@ namespace HRMS.Infrastructure.Services
                 Location = dto.Location ?? "",
                 DeviceInfo = dto.DeviceInfo ?? "",
                 Date = today,
-                WorkScheduleId = workSchedule.Id,
+                WorkScheduleId = workSchedule?.Id,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -91,7 +105,8 @@ namespace HRMS.Infrastructure.Services
             await _context.SaveChangesAsync();
 
             // Map sang DTO để trả về
-            var employee = await _context.Employees.FindAsync(dto.EmployeeId);
+            var shiftInfo = workSchedule?.WorkShift ?? employee.Shift;
+
             return new AttendanceRecordDto
             {
                 Id = record.Id,
@@ -101,9 +116,9 @@ namespace HRMS.Infrastructure.Services
                 Type = record.Type,
                 Location = record.Location,
                 Date = record.Date,
-                ShiftName = workSchedule.WorkShift?.ShiftName ?? "",
-                ShiftStartTime = workSchedule.WorkShift?.StartTime,
-                ShiftEndTime = workSchedule.WorkShift?.EndTime
+                ShiftName = shiftInfo?.ShiftName ?? "",
+                ShiftStartTime = shiftInfo?.StartTime,
+                ShiftEndTime = shiftInfo?.EndTime
             };
         }
 
@@ -129,6 +144,8 @@ namespace HRMS.Infrastructure.Services
             var checkInRecord = await _context.TimeAttendanceRecords
                 .Include(r => r.WorkSchedule)
                     .ThenInclude(ws => ws.WorkShift)
+                .Include(r => r.Employee)
+                    .ThenInclude(e => e.Shift)
                 .FirstOrDefaultAsync(r => r.EmployeeId == employeeId 
                     && r.Date == today 
                     && r.Type == "CheckIn");
@@ -179,7 +196,9 @@ namespace HRMS.Infrastructure.Services
             _context.TimeAttendanceRecords.Add(record);
             await _context.SaveChangesAsync();
 
-            var employee = await _context.Employees.FindAsync(dto.EmployeeId);
+            var employee = checkInRecord.Employee;
+            var shiftInfo = checkInRecord.WorkSchedule?.WorkShift ?? employee?.Shift;
+
             return new AttendanceRecordDto
             {
                 Id = record.Id,
@@ -189,9 +208,9 @@ namespace HRMS.Infrastructure.Services
                 Type = record.Type,
                 Location = record.Location,
                 Date = record.Date,
-                ShiftName = checkInRecord.WorkSchedule?.WorkShift?.ShiftName ?? "",
-                ShiftStartTime = checkInRecord.WorkSchedule?.WorkShift?.StartTime,
-                ShiftEndTime = checkInRecord.WorkSchedule?.WorkShift?.EndTime
+                ShiftName = shiftInfo?.ShiftName ?? "",
+                ShiftStartTime = shiftInfo?.StartTime,
+                ShiftEndTime = shiftInfo?.EndTime
             };
         }
 
@@ -220,7 +239,7 @@ namespace HRMS.Infrastructure.Services
                 .Where(or => or.EmployeeId == employeeId && or.Date >= f && or.Date <= t && or.Status == "Approved")
                 .ToListAsync();
 
-            return records.Select(r => {
+            var result = records.Select(r => {
                 var ot = otRequests.FirstOrDefault(o => o.Date.Date == r.Date.Date);
                 return new AttendanceRecordDto
                 {
@@ -238,6 +257,37 @@ namespace HRMS.Infrastructure.Services
                     OTEndTime = ot?.EndTime
                 };
             }).ToList();
+
+            // FIX: If today is within range and no records exist for today, 
+            // try to fetch the scheduled shift to help the frontend display the shift name before check-in.
+            var today = DateTime.Today;
+            if (today >= f && today <= t && !result.Any(r => r.Date.Date == today))
+            {
+                var schedule = await _context.WorkSchedules
+                    .Include(ws => ws.WorkShift)
+                    .Include(ws => ws.Employee)
+                    .FirstOrDefaultAsync(ws => ws.EmployeeId == employeeId && ws.WorkingDate == today);
+
+                if (schedule != null)
+                {
+                    var ot = otRequests.FirstOrDefault(o => o.Date.Date == today);
+                    result.Add(new AttendanceRecordDto
+                    {
+                        Id = 0, // Virtual record
+                        EmployeeId = employeeId,
+                        EmployeeName = schedule.Employee?.FullName ?? "",
+                        Date = today,
+                        Type = "None", // Special type to indicate no check-in/out yet
+                        ShiftName = schedule.WorkShift?.ShiftName ?? "",
+                        ShiftStartTime = schedule.WorkShift?.StartTime,
+                        ShiftEndTime = schedule.WorkShift?.EndTime,
+                        OTStartTime = ot?.StartTime,
+                        OTEndTime = ot?.EndTime
+                    });
+                }
+            }
+
+            return result.OrderByDescending(r => r.Date).ThenByDescending(r => r.Timestamp).ToList();
         }
 
         public async Task<AttendanceSummaryDto> GetMyAttendanceSummaryAsync(int employeeId, int periodId)
@@ -662,7 +712,7 @@ namespace HRMS.Infrastructure.Services
                 .ToListAsync();
             _context.AttendanceSummaries.RemoveRange(existingSummaries);
 
-            var employees = await _context.Employees.ToListAsync();
+            var employees = await _context.Employees.Include(e => e.Shift).ToListAsync();
             int count = 0;
 
             // Grace Period constants
@@ -727,7 +777,7 @@ namespace HRMS.Infrastructure.Services
                     
                     rawWorkingDays++;
 
-                    var shift = checkIn.WorkSchedule?.WorkShift;
+                    var shift = checkIn.WorkSchedule?.WorkShift ?? emp.Shift;
 
                     bool isLate = false;
                     bool isEarlyLeave = false;
