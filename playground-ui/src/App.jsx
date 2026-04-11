@@ -30,6 +30,7 @@ import InsuranceManagement from './components/payroll/InsuranceManagement';
 import MyInsurance from './components/payroll/MyInsurance';
 
 import DailyAttendanceAdmin from './components/attendance/DailyAttendanceAdmin';
+import BarcodeAttendancePage from './components/attendance/BarcodeAttendancePage';
 
 import ShiftChangeRequest from './components/request/ShiftChangeRequest';
 import ShiftChangeApproval from './components/scheduling/ShiftChangeApproval';
@@ -161,7 +162,10 @@ export default function App() {
   );
 
   if (!user) {
-      return <Login onLoginSuccess={handleLogin} onShowPublic={() => setPublicView(true)} />;
+      if (publicView === 'barcode') {
+          return <BarcodeAttendancePage onBack={() => setPublicView(false)} />;
+      }
+      return <Login onLoginSuccess={handleLogin} onShowPublic={() => setPublicView('barcode')} />;
   }
 
 
@@ -380,6 +384,11 @@ export default function App() {
            {tab('face-registration') && (
             <RoleGuard user={user} allowedRoles={['Admin']}>
               <FaceRegistration onBack={() => setActiveTab('me')} />
+            </RoleGuard>
+          )}
+          {tab('barcode-attendance') && (
+            <RoleGuard user={user} allowedRoles={['Admin']}>
+              <BarcodeAttendancePage />
             </RoleGuard>
           )}
           {tab('daily-attendance') && (

@@ -34,7 +34,7 @@ function getMenuItems(primaryRole) {
             label: 'Cá nhân',
             items: [
                 { id: 'me', label: 'Hồ sơ của tôi', icon: UserCircle, showFor: employeeRoles },
-                { id: 'attendance', label: 'Chấm công', icon: Clock, showFor: ['Employee'] },
+                { id: 'attendance', label: 'Chấm công', icon: Clock, showFor: ['Employee', 'Admin'] },
                 { id: 'leave', label: 'Đơn từ & Nghỉ phép', icon: Umbrella, showFor: ['Employee', 'DepartmentHead'] },
                 { id: 'time-adjustment', label: 'Yêu cầu điều chỉnh', icon: FileText, showFor: employeeRoles },
                 { id: 'my-contract', label: 'Hợp đồng lao động', icon: FileText, showFor: ['Employee', 'DepartmentHead'] },
@@ -72,8 +72,10 @@ function getMenuItems(primaryRole) {
                 { id: 'employees', label: 'Quản lý nhân viên', icon: Users, showFor: ['Admin'] },
                 { id: 'add-employee', label: 'Thêm nhân viên', icon: UserPlus, showFor: ['Admin'] },
                 { id: 'admin-contracts', label: 'Quản lý HĐLĐ', icon: FileText, showFor: ['Admin', 'DepartmentManager'] },
+                { id: 'barcode-attendance', label: 'Chấm công Mã vạch', icon: BarChart2, showFor: ['Admin'] },
                 { id: 'face-registration', label: 'Quét khuôn mặt', icon: Camera, showFor: ['Admin'] },
                 { id: 'admin-roles', label: 'Phân quyền User', icon: Shield, showFor: ['Admin'] },
+                { id: 'daily-attendance', label: 'Bảng công hàng ngày', icon: FileSpreadsheet, showFor: ['Admin', 'HrAdmin'] },
                 { id: 'admin-system', label: 'Cấu hình hệ thống', icon: Settings, showFor: ['Admin'] },
                 { id: 'payroll-processing', label: primaryRole === 'Admin' ? 'Xem bảng lương' : 'Xử lý lương & C&B', icon: DollarSign, showFor: ['Admin', 'DepartmentHead'] },
             ]

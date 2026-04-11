@@ -108,6 +108,37 @@ namespace HRMS.API.Controllers
         }
 
         /// <summary>
+        /// Chấm công nhanh bằng máy quét mã vạch
+        /// </summary>
+        [HttpPost("scan-barcode")]
+        [AllowAnonymous] // Cho phép quét từ máy trạm chung mà không cần login cá nhân
+        public async Task<IActionResult> ScanBarcode([FromBody] ScanBarcodeDto dto)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dto.EmployeeCode))
+                    return BadRequest(new { success = false, message = "Mã nhân viên không được để trống." });
+
+                var result = await _attendanceService.ScanAttendanceByCodeAsync(dto.EmployeeCode, dto.Location ?? "Barcode Scanner", dto.DeviceInfo ?? "Station 1");
+                
+                string action = result.Type == "CheckIn" ? "Vào ca" : "Tan ca";
+                return Ok(new { 
+                    success = true, 
+                    data = result, 
+                    message = $"Chấm công [{action}] thành công cho nhân viên: {result.EmployeeName}" 
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Lấy lịch sử chấm công của tôi
         /// </summary>
         [HttpGet("my-records")]

@@ -250,6 +250,10 @@ export const attendanceService = {
   getDepartmentOvertime: async (deptId) => {
     const res = await api.get(`/attendance/department/${deptId}/overtime`);
     return res.data;
+  },
+  scanBarcode: async (employeeCode) => {
+    const res = await api.post('/attendance/scan-barcode', { employeeCode });
+    return res.data;
   }
 };
 

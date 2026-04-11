@@ -40,5 +40,8 @@ namespace HRMS.Application.Interfaces
 
         // Data Retention
         Task<string> ExportAndCleanupOldAttendanceAsync(int month, int year);
+
+        // Barcode Scanning
+        Task<AttendanceRecordDto> ScanAttendanceByCodeAsync(string employeeCode, string location, string deviceInfo);
     }
 }

@@ -18,6 +18,13 @@ namespace HRMS.Application.DTOs.Attendance
         public string? DeviceInfo { get; set; }
     }
 
+    public class ScanBarcodeDto
+    {
+        public string EmployeeCode { get; set; }
+        public string? Location { get; set; }
+        public string? DeviceInfo { get; set; }
+    }
+
     public class AttendanceRecordDto
     {
         public int Id { get; set; }

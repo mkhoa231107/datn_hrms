@@ -1201,5 +1201,52 @@ namespace HRMS.Infrastructure.Services
 
             return $"/exports/{fileName}";
         }
+
+        public async Task<AttendanceRecordDto> ScanAttendanceByCodeAsync(string employeeCode, string location, string deviceInfo)
+        {
+            var employee = await _context.Employees
+                .FirstOrDefaultAsync(e => e.EmployeeCode == employeeCode);
+
+            if (employee == null)
+            {
+                throw new InvalidOperationException($"Không tìm thấy nhân viên với mã: {employeeCode}");
+            }
+
+            var today = DateTime.Today;
+
+            // Kiểm tra xem đã check-in hôm nay chưa
+            var checkInRecord = await _context.TimeAttendanceRecords
+                .FirstOrDefaultAsync(r => r.EmployeeId == employee.Id && r.Date == today && r.Type == "CheckIn");
+
+            if (checkInRecord == null)
+            {
+                // Thực hiện Check-in
+                return await CheckInAsync(new CheckInDto
+                {
+                    EmployeeId = employee.Id,
+                    Location = location,
+                    DeviceInfo = deviceInfo,
+                    Timestamp = DateTime.Now
+                });
+            }
+
+            // Nếu đã check-in, kiểm tra xem đã check-out chưa
+            var checkOutRecord = await _context.TimeAttendanceRecords
+                .FirstOrDefaultAsync(r => r.EmployeeId == employee.Id && r.Date == today && r.Type == "CheckOut");
+
+            if (checkOutRecord == null)
+            {
+                // Thực hiện Check-out
+                return await CheckOutAsync(new CheckOutDto
+                {
+                    EmployeeId = employee.Id,
+                    Location = location,
+                    DeviceInfo = deviceInfo,
+                    Timestamp = DateTime.Now
+                });
+            }
+
+            throw new InvalidOperationException("Nhân viên này đã hoàn thành chấm công (vào và ra) trong ngày hôm nay.");
+        }
     }
 }

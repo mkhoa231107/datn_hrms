@@ -185,13 +185,13 @@ export default function Login({ onLoginSuccess, onShowPublic }) {
                             </button>
                             
                             <div className="mt-4 pt-6 text-center border-t border-white/10">
-                                <p className="text-slate-400 text-sm mb-3">Bạn là ứng viên đang tìm việc?</p>
+                                <p className="text-slate-400 text-sm mb-3">Bạn muốn điểm danh bằng mã vạch?</p>
                                 <button 
                                     type="button" 
                                     onClick={onShowPublic} 
                                     className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-[5px] text-sm font-medium transition-colors"
                                 >
-                                    Xem Cơ hội việc làm
+                                    Chấm công bằng Mã Vạch
                                 </button>
                             </div>
                         </form>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { employeeService, departmentService } from '../../api';
 import { toast } from 'react-hot-toast';
 import { Users } from 'lucide-react';
+import BarcodePreview from './BarcodePreview';
 
 export default function EmployeeList({ user, onViewProfile, onBack }) {
     const [employees, setEmployees] = useState([]);
@@ -9,6 +10,7 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
     const [loading, setLoading] = useState(true);
     const [selectedDeptId, setSelectedDeptId] = useState('All');
     const [subDepts, setSubDepts] = useState([]);
+    const [barcodeEmp, setBarcodeEmp] = useState(null); // { code, name, department }
 
     const isScopedManager = (user?.roles?.includes('DepartmentManager') || user?.roles?.includes('DepartmentHead')) && !user?.roles?.includes('Admin');
 
@@ -85,6 +87,7 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
     const mainDepts = departments.filter(d => !d.parentDepartmentId).slice(0, 5);
 
     return (
+        <>
         <div className="ef-wrap">
             {/* Admin Tabs */}
             {!isScopedManager && (
@@ -175,12 +178,20 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
                                     </span>
                                 </td>
                                 <td style={{ textAlign: 'center' }}>
-                                    <button
-                                        onClick={() => onViewProfile(emp.id)}
-                                        className="ef-btn" style={{ padding: '2px 8px', fontSize: '11px' }}
-                                    >
-                                        HỒ SƠ
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                        <button
+                                            onClick={() => onViewProfile(emp.id)}
+                                            className="ef-btn" style={{ padding: '2px 8px', fontSize: '11px' }}
+                                        >
+                                            HỒ SƠ
+                                        </button>
+                                        <button
+                                            onClick={() => setBarcodeEmp({ code: emp.employeeCode, name: emp.fullName, department: emp.departmentName })}
+                                            className="ef-btn" style={{ padding: '2px 8px', fontSize: '11px', background: '#1e40af', color: '#fff', border: 'none' }}
+                                        >
+                                            🔲 MÃ
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -188,5 +199,16 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
                 </table>
             </div>
         </div>
+
+        {/* Barcode Preview Modal */}
+        {barcodeEmp && (
+            <BarcodePreview
+                value={barcodeEmp.code}
+                name={barcodeEmp.name}
+                department={barcodeEmp.department}
+                onClose={() => setBarcodeEmp(null)}
+            />
+        )}
+        </>
     );
 }
