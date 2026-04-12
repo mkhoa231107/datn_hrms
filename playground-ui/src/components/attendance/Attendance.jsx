@@ -1,121 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import attendanceService from '../../services/attendanceService';
-import { useFaceRecognition } from '../../hooks/useFaceRecognition';
 import api from '../../api';
 import './Attendance.css';
-import { Camera, CheckCircle2, AlertCircle, X, Loader2 } from 'lucide-react';
 
-/* ─────────────────────────────────────────────────────────────
-   FACE MODAL (logic unchanged — uses Tailwind overlay)
-───────────────────────────────────────────────────────────── */
-const FaceModal = ({ actionType, currentEmployeeId, onSuccess, onCancel }) => {
-    const videoRef = useRef(null);
-    const canvasRef = useRef(null);
-    const timerRef = useRef(null);
-    const [status, setStatus] = useState('loading');
-    const [text, setText] = useState('Đang khởi động...');
-    const [faces, setFaces] = useState([]);
-    const { loadModels, startWebcam, stopWebcam, detectAndDraw, detectDescriptor, verifyFace } = useFaceRecognition();
-    const cleanup = useCallback(() => { clearInterval(timerRef.current); stopWebcam(); }, [stopWebcam]);
-
-    useEffect(() => {
-        let dead = false;
-        (async () => {
-            try {
-                await loadModels();
-                const r = await api.get('/employees/face-descriptors');
-                if (dead) return;
-                setFaces(r.data || []);
-                await startWebcam(videoRef);
-                setStatus('ready');
-                setText('Nhìn thẳng vào camera rồi nhấn Xác nhận');
-                timerRef.current = setInterval(() => detectAndDraw(videoRef, canvasRef), 150);
-            } catch (e) {
-                if (!dead) { setStatus('error'); setText('Lỗi camera: ' + e.message); }
-            }
-        })();
-        return () => { dead = true; cleanup(); };
-    }, []);
-
-    const verify = async () => {
-        setStatus('detecting'); setText('Đang nhận diện...');
-        try {
-            const desc = await detectDescriptor(videoRef);
-            if (!desc) {
-                setStatus('error'); setText('Không tìm thấy khuôn mặt');
-                setTimeout(() => { setStatus('ready'); setText('Nhìn thẳng vào camera rồi nhấn Xác nhận'); }, 2000);
-                return;
-            }
-            const mine = faces.find(f => String(f.employeeId) === String(currentEmployeeId));
-            if (!mine?.descriptor) {
-                setStatus('error'); setText('Chưa đăng ký khuôn mặt — liên hệ nhân sự');
-                setTimeout(() => { setStatus('ready'); setText('Nhìn thẳng vào camera rồi nhấn Xác nhận'); }, 3000);
-                return;
-            }
-            if (verifyFace(desc, mine.descriptor, 0.45)) {
-                setStatus('matched'); setText('Xác minh thành công!');
-                cleanup(); setTimeout(onSuccess, 700);
-            } else {
-                setStatus('error'); setText('Khuôn mặt không khớp');
-                setTimeout(() => { setStatus('ready'); setText('Nhìn thẳng vào camera rồi nhấn Xác nhận'); }, 2500);
-            }
-        } catch (e) { setStatus('error'); setText(e.message); }
-    };
-
-    const isIn = actionType === 'CheckIn';
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
-            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-200">
-                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-xl text-white ${isIn ? 'bg-indigo-600' : 'bg-slate-800'}`}>
-                            <Camera className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-800">{isIn ? 'Xác Nhận Vào Ca' : 'Xác Nhận Ra Ca'}</h3>
-                            <p className="text-xs text-slate-500">AI Face Recognition</p>
-                        </div>
-                    </div>
-                    <button onClick={() => { cleanup(); onCancel(); }} className="p-2 hover:bg-slate-200 rounded-full text-slate-400">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-                <div className="relative w-full aspect-square bg-slate-900 overflow-hidden">
-                    <video ref={videoRef} muted playsInline className={`w-full h-full object-cover transition-opacity duration-500 ${status === 'loading' ? 'opacity-0' : 'opacity-100'}`} />
-                    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-                    {status === 'loading' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-white space-y-3">
-                            <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
-                            <p className="text-sm font-medium animate-pulse">Đang khởi tạo Camera AI...</p>
-                        </div>
-                    )}
-                    <div className="absolute bottom-4 left-4 right-4">
-                        <div className={`p-3 rounded-xl backdrop-blur-md border text-sm font-bold flex items-center justify-center gap-2 ${
-                            status === 'error'   ? 'bg-rose-500/90 border-rose-400 text-white' :
-                            status === 'matched' ? 'bg-emerald-500/90 border-emerald-400 text-white' :
-                            'bg-slate-900/70 border-slate-700 text-white'
-                        }`}>
-                            {status === 'error'     && <AlertCircle className="w-4 h-4" />}
-                            {status === 'matched'   && <CheckCircle2 className="w-4 h-4" />}
-                            {status === 'detecting' && <Loader2 className="w-4 h-4 animate-spin" />}
-                            {text}
-                        </div>
-                    </div>
-                </div>
-                <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3">
-                    <button onClick={() => { cleanup(); onCancel(); }}
-                        className="flex-1 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-sm hover:bg-slate-100">
-                        Hủy
-                    </button>
-                    <button onClick={verify} disabled={status !== 'ready'}
-                        className={`flex-[2] py-3 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 ${isIn ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-slate-800 hover:bg-slate-900'}`}>
-                        {status === 'detecting' ? 'Đang Quét AI...' : 'Xác Nhận Khuôn Mặt'}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
+function fmtDuration(minutes) {
+    if (!minutes || minutes <= 0) return "";
+    if (minutes < 60) return `${minutes}p`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}h ${m}p` : `${h}h`;
+}
 
 /* ─────────────────────────────────────────────────────────────
    HELPERS
@@ -154,13 +48,13 @@ function getStatusInfo(ci, co, shiftStart, shiftEnd) {
     let cls = 'st-ok';
     
     if (isLate && isEarly) {
-        label = 'Trễ & Sớm';
+        label = `Trễ ${fmtDuration(lateMin)} & Sớm ${fmtDuration(earlyMin)}`;
         cls = 'st-late';
     } else if (isLate) {
-        label = `Muộn ${lateMin}p`;
+        label = `Muộn ${fmtDuration(lateMin)}`;
         cls = 'st-late';
     } else if (isEarly) {
-        label = `Sớm ${earlyMin}p`;
+        label = `Sớm ${fmtDuration(earlyMin)}`;
         cls = 'st-early';
     }
     
@@ -200,11 +94,8 @@ export default function Attendance() {
     const [subtabFilter,  setSubtabFilter]  = useState('all');         // history sub-tabs
     const [history,       setHistory]       = useState([]);
     const [todayRecords,  setTodayRecords]  = useState([]);
-    const [modal,         setModal]         = useState(null);
     const [user,          setUser]          = useState(null);
     const [clock,         setClock]         = useState(new Date());
-    const [loading,       setLoading]       = useState(false);
-    const [flash,         setFlash]         = useState(null);
     const [page,          setPage]          = useState(1);
     const [overtime,      setOvertime]      = useState([]); // { date, startTime, endTime, status }
 
@@ -237,12 +128,12 @@ export default function Attendance() {
             const to   = `${yr}-${String(mo).padStart(2,'0')}-${last}`;
             
             const r = await attendanceService.getMyRecords(from, to);
-            if (r?.success) setHistory(r.data); else setHistory([]);
+            if (r?.success) setHistory(r.data || []); else setHistory([]);
 
             // Fetch OT for the month
             const otR = await attendanceService.getMyOvertime();
             if (otR?.success) {
-                const filteredOt = otR.data.filter(it => {
+                const filteredOt = (otR.data || []).filter(it => {
                     const d = new Date(it.date);
                     return d.getFullYear() === yr && (d.getMonth() + 1) === mo;
                 });
@@ -251,24 +142,6 @@ export default function Attendance() {
                 setOvertime([]);
             }
         } catch { setHistory([]); setOvertime([]); }
-    };
-
-    const onVerified = async (type) => {
-        setModal(null); setLoading(true); setFlash(null);
-        try {
-            const r = type === 'CheckIn'
-                ? await attendanceService.checkIn()
-                : await attendanceService.checkOut();
-            if (r.success) {
-                setFlash({ ok: true, text: type === 'CheckIn' ? '✓ Vào ca thành công!' : '✓ Ra ca thành công!' });
-                loadToday(); loadHistory(selectedMonth);
-                setTimeout(() => setFlash(null), 5000);
-            } else {
-                setFlash({ ok: false, text: r.message || 'Thao tác thất bại' });
-            }
-        } catch {
-            setFlash({ ok: false, text: 'Lỗi hệ thống' });
-        } finally { setLoading(false); }
     };
 
     const ciRec = todayRecords.find(r => r.type === 'CheckIn');
@@ -386,13 +259,7 @@ export default function Attendance() {
         }, 0);
 
     return (
-        <div className="att-wrap">
-
-            {/* Flash / Loading */}
-            {loading && <div className="att-loading">⏳ Đang xử lý...</div>}
-            {flash && !loading && (
-                <div className={`att-flash ${flash.ok ? 'ok' : 'err'}`}>{flash.text}</div>
-            )}
+        <div className="att-wrap animate-fade-in">
 
             {/* ══ TAB BAR ══ */}
             <div className="att-tab-bar">
@@ -493,25 +360,6 @@ export default function Attendance() {
                                 )}
                             </tbody>
                         </table>
-
-                        <div className="att-action-row">
-                            <button
-                                id="att-btn-checkin"
-                                className={`att-btn-in${isCheckedIn ? ' done' : ''}`}
-                                onClick={() => setModal('CheckIn')}
-                                disabled={isCheckedIn || loading}
-                            >
-                                ✓ {isCheckedIn ? 'Đã vào ca' : 'Vào Ca (Check In)'}
-                            </button>
-                            <button
-                                id="att-btn-checkout"
-                                className="att-btn-out"
-                                onClick={() => setModal('CheckOut')}
-                                disabled={!isCheckedIn || isCheckedOut || loading}
-                            >
-                                + {isCheckedOut ? 'Đã ra ca' : 'Ra Ca (Check Out)'}
-                            </button>
-                        </div>
                     </div>
 
                     {/* Monthly summary */}
@@ -686,7 +534,7 @@ export default function Attendance() {
                                                 {inT ? (
                                                     <div className="flex flex-col items-center leading-tight">
                                                         <span>{inT}</span>
-                                                        {st.isLate && <span className="text-[11px] text-red-500 font-normal mt-0.5">(trễ {st.lateMin}p)</span>}
+                                                        {st.isLate && <span className="text-[11px] text-red-500 font-normal mt-0.5">(trễ {fmtDuration(st.lateMin)})</span>}
                                                     </div>
                                                 ) : <span className="att-tn">--:--</span>}
                                             </td>
@@ -702,7 +550,7 @@ export default function Attendance() {
                                                 {outT ? (
                                                     <div className="flex flex-col items-center leading-tight">
                                                         <span>{outT}</span>
-                                                        {st.isEarly && <span className="text-[11px] text-red-500 font-normal mt-0.5">(sớm {st.earlyMin}p)</span>}
+                                                        {st.isEarly && <span className="text-[11px] text-red-500 font-normal mt-0.5">(sớm {fmtDuration(st.earlyMin)})</span>}
                                                     </div>
                                                 ) : <span className="att-tn">--:--</span>}
                                             </td>
@@ -780,16 +628,6 @@ export default function Attendance() {
                         </div>
                     </div>
                 </>
-            )}
-
-            {/* Face recognition modal */}
-            {modal && user && (
-                <FaceModal
-                    actionType={modal}
-                    currentEmployeeId={user.employeeId}
-                    onSuccess={() => onVerified(modal)}
-                    onCancel={() => setModal(null)}
-                />
             )}
         </div>
     );

@@ -233,12 +233,22 @@ namespace HRMS.API.Controllers
         /// </summary>
         [HttpGet("department/{departmentId}/date/{date}")]
         [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")]
-        public async Task<IActionResult> GetDepartmentAttendance(int departmentId, DateTime date)
+        public async Task<IActionResult> GetDepartmentAttendance(int departmentId, string date)
         {
             try
             {
+                // Parse date string manually to avoid timezone offset issues when ASP.NET Core parses DateTime from route
+                if (!DateTime.TryParseExact(date, new[] { "yyyy-MM-dd", "yyyy/MM/dd", "dd-MM-yyyy", "dd/MM/yyyy" },
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+                {
+                    return BadRequest(new { success = false, message = "Định dạng ngày không hợp lệ. Vui lòng dùng yyyy-MM-dd." });
+                }
+                // Ensure it's treated as local date with no time component
+                parsedDate = DateTime.SpecifyKind(parsedDate.Date, DateTimeKind.Local);
+
                 ValidateDepartmentAccess(departmentId);
-                var records = await _attendanceService.GetAttendanceRecordsByDepartmentAsync(departmentId, date);
+                var records = await _attendanceService.GetAttendanceRecordsByDepartmentAsync(departmentId, parsedDate);
                 return Ok(new { success = true, data = records });
             }
             catch (Exception ex)

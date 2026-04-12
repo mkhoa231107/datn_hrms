@@ -36,11 +36,11 @@ export function getNavItems(primaryRole) {
         'admin-contracts':{ id: 'admin-contracts',   label: 'Quản lý HĐLĐ',      roles: ['Admin','DepartmentManager'] },
         'payroll-processing':{ id: 'payroll-processing', label: 'Lương',          roles: ['Admin', 'DepartmentHead'] },
         'insurance-management':{ id: 'insurance-management', label: 'Bảo hiểm',   roles: ['Admin','DepartmentManager','DepartmentHead'] },
-        'face-registration':{ id: 'face-registration', label: 'Quét khuôn mặt', roles: ['Admin'] },
+        'attendance-management':{ id: 'attendance-management', label: 'Quản lý chấm công', roles: ['Admin','HrAdmin'] },
     };
 
     const ORDER = {
-        Admin:             ['me','employees','admin-contracts','payroll-processing','insurance-management','face-registration'],
+        Admin:             ['me','employees','admin-contracts','payroll-processing','insurance-management','attendance-management'],
         DepartmentManager: ['me','employees','dept-leaves','dept-activities','team-timesheets','admin-contracts'],
         DepartmentHead:    ['me','leave','team-schedule','team-shift-approvals','team-leaves','team-timesheets', 'payroll-processing'],
         Employee:          ['me','attendance','leave','my-schedule','shift-change','my-payslip','my-contract','my-insurance'],
@@ -100,7 +100,7 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab, onT
         employees: 'Phòng ban', 'dept-leaves': 'Phòng ban', 'dept-activities': 'Phòng ban',
         'admin-contracts': 'Quản trị', 'admin-recruitment': 'Quản trị',
         'payroll-processing': 'Quản trị', 'insurance-management': 'Quản trị',
-        'face-registration': 'Quản trị',
+        'attendance-management': 'Quản trị',
     };
     const sectionLabel = groupMap[activeTab] || 'Tổng quan';
 

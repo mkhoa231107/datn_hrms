@@ -397,15 +397,20 @@ namespace HRMS.Infrastructure.Services
         // Admin/Manager functions
         public async Task<List<AttendanceRecordDto>> GetAttendanceRecordsByDepartmentAsync(int departmentId, DateTime date)
         {
+            var targetDate = date.Date; // Normalize: strip time component
+            Console.WriteLine($"[ADMIN ATTENDANCE] Querying date={targetDate:yyyy-MM-dd}, deptId={departmentId}");
+
             var records = await _context.TimeAttendanceRecords
                 .Include(r => r.Employee)
                     .ThenInclude(e => e.Department)
                 .Include(r => r.WorkSchedule)
                     .ThenInclude(ws => ws.WorkShift)
-                .Where(r => r.Employee.DepartmentId == departmentId && r.Date == date.Date)
+                .Where(r => (departmentId == 0 || r.Employee.DepartmentId == departmentId) && r.Date == targetDate)
                 .OrderBy(r => r.Employee.FullName)
                 .ThenBy(r => r.Timestamp)
                 .ToListAsync();
+            
+            Console.WriteLine($"[ADMIN ATTENDANCE] Found {records.Count} records for date={targetDate:yyyy-MM-dd}");
 
             return records.Select(r => new AttendanceRecordDto
             {

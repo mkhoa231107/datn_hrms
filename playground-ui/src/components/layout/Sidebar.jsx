@@ -73,9 +73,8 @@ function getMenuItems(primaryRole) {
                 { id: 'add-employee', label: 'Thêm nhân viên', icon: UserPlus, showFor: ['Admin'] },
                 { id: 'admin-contracts', label: 'Quản lý HĐLĐ', icon: FileText, showFor: ['Admin', 'DepartmentManager'] },
                 { id: 'barcode-attendance', label: 'Chấm công Mã vạch', icon: BarChart2, showFor: ['Admin'] },
-                { id: 'face-registration', label: 'Quét khuôn mặt', icon: Camera, showFor: ['Admin'] },
+                { id: 'attendance-management', label: 'Quản lý chấm công', icon: Activity, showFor: ['Admin', 'HrAdmin'] },
                 { id: 'admin-roles', label: 'Phân quyền User', icon: Shield, showFor: ['Admin'] },
-                { id: 'daily-attendance', label: 'Bảng công hàng ngày', icon: FileSpreadsheet, showFor: ['Admin', 'HrAdmin'] },
                 { id: 'admin-system', label: 'Cấu hình hệ thống', icon: Settings, showFor: ['Admin'] },
                 { id: 'payroll-processing', label: primaryRole === 'Admin' ? 'Xem bảng lương' : 'Xử lý lương & C&B', icon: DollarSign, showFor: ['Admin', 'DepartmentHead'] },
             ]

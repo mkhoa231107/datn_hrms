@@ -11,7 +11,7 @@ import TimeAdjustmentRequest from './components/request/TimeAdjustmentRequest';
 import Leave from './components/leave/Leave';
 import MySchedule from './components/scheduling/MySchedule';
 import DeptActivities from './components/dashboard/DeptActivities';
-import FaceRegistration from './components/attendance/FaceRegistration';
+import AttendanceManagement from './components/attendance/AttendanceManagement';
 import Login from './components/auth/Login';
 import { RoleGuard } from './components/auth/RoleGuard';
 import ContractManagement from './components/contracts/ContractManagement';
@@ -29,7 +29,7 @@ import MyPayslip from './components/payroll/MyPayslip';
 import InsuranceManagement from './components/payroll/InsuranceManagement';
 import MyInsurance from './components/payroll/MyInsurance';
 
-import DailyAttendanceAdmin from './components/attendance/DailyAttendanceAdmin';
+// import DailyAttendanceAdmin from './components/attendance/DailyAttendanceAdmin';
 import BarcodeAttendancePage from './components/attendance/BarcodeAttendancePage';
 
 import ShiftChangeRequest from './components/request/ShiftChangeRequest';
@@ -381,19 +381,14 @@ export default function App() {
               <ContractManagement user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
-           {tab('face-registration') && (
-            <RoleGuard user={user} allowedRoles={['Admin']}>
-              <FaceRegistration onBack={() => setActiveTab('me')} />
+          {tab('attendance-management') && (
+            <RoleGuard user={user} allowedRoles={['Admin', 'HrAdmin']}>
+              <AttendanceManagement onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('barcode-attendance') && (
             <RoleGuard user={user} allowedRoles={['Admin']}>
               <BarcodeAttendancePage />
-            </RoleGuard>
-          )}
-          {tab('daily-attendance') && (
-            <RoleGuard user={user} allowedRoles={['Admin', 'HrAdmin']}>
-              <DailyAttendanceAdmin />
             </RoleGuard>
           )}
            {tab('payroll-processing') && (
