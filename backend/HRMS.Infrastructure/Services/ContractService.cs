@@ -19,12 +19,14 @@ namespace HRMS.Infrastructure.Services
         private readonly HRMSDbContext _context;
         private readonly IMapper _mapper;
         private readonly IInsuranceService _insuranceService;
+        private readonly IWorkScheduleService _workScheduleService;
 
-        public ContractService(HRMSDbContext context, IMapper mapper, IInsuranceService insuranceService)
+        public ContractService(HRMSDbContext context, IMapper mapper, IInsuranceService insuranceService, IWorkScheduleService workScheduleService)
         {
             _context = context;
             _mapper = mapper;
             _insuranceService = insuranceService;
+            _workScheduleService = workScheduleService;
         }
 
         public async Task<int> CreateContractAsync(ContractCreateDto dto)
@@ -208,6 +210,25 @@ namespace HRMS.Infrastructure.Services
             {
                 // Log error but don't break the signing process
                 Console.WriteLine($"Error registering mandatory insurance for employee {contract.EmployeeId}: {ex.Message}");
+            }
+
+            // ────────────────────────────────────────────────────────────────
+            // Tự động sinh lịch làm việc từ ca trong hợp đồng (cho năm hiện tại)
+            // Nếu StartDate thuộc năm sau, sinh cho năm đó luôn.
+            // ────────────────────────────────────────────────────────────────
+            if (contract.ShiftId.HasValue)
+            {
+                try
+                {
+                    var contractYear = contract.StartDate.Year;
+                    await _workScheduleService.GenerateFromContractAsync(contract.EmployeeId, contractYear, overwrite: false);
+                    Console.WriteLine($"✅ Auto-generated work schedule for employee {contract.EmployeeId} for year {contractYear}.");
+                }
+                catch (Exception ex)
+                {
+                    // Schedule generation failure should NOT block contract signing
+                    Console.WriteLine($"[ContractService] Warning: Could not auto-generate schedule for employee {contract.EmployeeId}: {ex.Message}");
+                }
             }
         }
 

@@ -3,21 +3,20 @@ import {
     UserCircle, Clock, Umbrella, FileText,
     Users, Calendar, CheckSquare, BarChart2,
      DollarSign, FileSpreadsheet, Shield,
-    UserPlus, Settings, ChevronRight, Activity, Briefcase, Camera
+    UserPlus, Settings, ChevronRight, Activity, Camera
 } from 'lucide-react';
 
 // Role label và màu badge tiếng Việt
 export const ROLE_META = {
     Admin: { label: 'Quản trị viên', color: 'bg-rose-500', light: 'bg-rose-50 text-rose-700 border border-rose-200' },
-    HrAdmin: { label: 'HR Admin', color: 'bg-purple-500', light: 'bg-purple-50 text-purple-700 border border-purple-200' },
-    DepartmentManager: { label: 'Trưởng phòng', color: 'bg-amber-500', light: 'bg-amber-50 text-amber-700 border border-amber-200' },
-    DepartmentHead: { label: 'Trưởng bộ phận', color: 'bg-sky-500', light: 'bg-sky-50 text-sky-700 border border-sky-200' },
-    Employee: { label: 'Nhân viên', color: 'bg-slate-400', light: 'bg-slate-100 text-slate-600 border border-slate-200' },
+    DepartmentManager: { label: 'Trưởng phòng', color: 'bg-indigo-600', light: 'bg-indigo-50 text-indigo-700 border border-indigo-200' },
+    DepartmentHead: { label: 'Trưởng bộ phận', color: 'bg-amber-500', light: 'bg-amber-50 text-amber-700 border border-amber-200' },
+    TeamLeader: { label: 'Tổ trưởng', color: 'bg-orange-500', light: 'bg-orange-50 text-orange-700 border border-orange-200' },
+    Employee: { label: 'Nhân viên / Công nhân', color: 'bg-slate-500', light: 'bg-slate-50 text-slate-700 border border-slate-200' },
 };
 
-// Returns the primary role for a user (first recognized role)
 export function getPrimaryRole(roles = []) {
-    const PRIORITY = ['Admin', 'HrAdmin', 'DepartmentManager', 'DepartmentHead', 'Employee'];
+    const PRIORITY = ['Admin', 'DepartmentManager', 'DepartmentHead', 'TeamLeader', 'Employee'];
     return PRIORITY.find(r => roles.includes(r)) || 'Employee';
 }
 
@@ -26,57 +25,59 @@ export function getPrimaryRole(roles = []) {
  * showFor: array of roles that CAN see this item. Empty means all.
  */
 function getMenuItems(primaryRole) {
-    const isAdmin = primaryRole === 'Admin' || primaryRole === 'HrAdmin';
-    const employeeRoles = ['DepartmentManager', 'DepartmentHead', 'Employee'];
+    const isAdmin = primaryRole === 'Admin';
+    const isDeptMgr = primaryRole === 'DepartmentManager';
+    const isDeptHead = primaryRole === 'DepartmentHead';
+    const isTeamLead = primaryRole === 'TeamLeader';
 
     const MENUS = {
         personal: {
             label: 'Cá nhân',
             items: [
-                { id: 'me', label: 'Hồ sơ của tôi', icon: UserCircle, showFor: employeeRoles },
-                { id: 'attendance', label: 'Chấm công', icon: Clock, showFor: ['Employee', 'Admin'] },
-                { id: 'leave', label: 'Đơn từ & Nghỉ phép', icon: Umbrella, showFor: ['Employee', 'DepartmentHead'] },
-                { id: 'time-adjustment', label: 'Yêu cầu điều chỉnh', icon: FileText, showFor: employeeRoles },
-                { id: 'my-contract', label: 'Hợp đồng lao động', icon: FileText, showFor: ['Employee', 'DepartmentHead'] },
-                { id: 'my-schedule', label: 'Lịch ca của tôi', icon: Calendar, showFor: ['Employee', 'DepartmentHead'] },
-                { id: 'shift-change', label: 'Xin đổi ca', icon: Calendar, showFor: ['Employee', 'DepartmentHead'] },
-                { id: 'my-payslip', label: 'Bảng lương', icon: DollarSign, showFor: ['Employee', 'DepartmentHead'] },
+                { id: 'me', label: 'Hồ sơ của tôi', icon: UserCircle, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager', 'Admin'] },
+                { id: 'attendance', label: 'Chấm công', icon: Clock, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
+                { id: 'my-ot-schedule', label: 'Lịch tăng ca', icon: Calendar, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
+                { id: 'leave', label: 'Đơn từ & Nghỉ phép', icon: Umbrella, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
+                { id: 'my-contract', label: 'Hợp đồng lao động', icon: FileSpreadsheet, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
+                { id: 'my-payslip', label: 'Bảng lương', icon: DollarSign, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
             ]
         },
-        // ─── Tổ trưởng ────────────────────────────────────────────────────
+        // ─── Team Leader (Tổ trưởng) ─────────────────────────
         team: {
             label: 'Quản lý Bộ phận',
             items: [
-                { id: 'team-timesheets', label: primaryRole === 'DepartmentManager' ? 'Chốt công Bộ phận' : 'Công Bộ phận', icon: Activity, showFor: ['DepartmentHead', 'DepartmentManager'] },
-                { id: 'team-schedule', label: 'Lịch Bộ phận', icon: Calendar, showFor: ['DepartmentHead'] },
-                { id: 'team-shift-approvals', label: 'Duyệt xin đổi ca', icon: CheckSquare, showFor: ['DepartmentHead'] },
-                { id: 'team-leaves', label: 'Duyệt đơn Bộ phận', icon: Umbrella, showFor: ['DepartmentHead'] },
-                { id: 'team-contracts', label: 'Duyệt hợp đồng', icon: FileText, showFor: ['DepartmentHead'] },
+                { id: 'ot-assignment', label: 'Đề cử Tăng ca', icon: Calendar, showFor: ['TeamLeader', 'DepartmentHead', 'Admin'] },
+                { id: 'team-timesheets', label: 'Công bộ phận', icon: Activity, showFor: ['TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
+                { id: 'team-schedule', label: 'Xếp ca bộ phận', icon: Calendar, showFor: ['TeamLeader'] },
+                { id: 'team-leaves', label: 'Duyệt đơn bộ phận', icon: CheckSquare, showFor: ['TeamLeader'] },
             ]
         },
-        // ─── Trưởng phòng ─────────────────────────────────────────────────
-        department: {
-            label: 'Quản lý Phòng ban',
+        // ─── Management (Trưởng phòng / Trưởng bộ phận) ───────────────────
+        management: {
+            label: 'Quản lý Điều hành',
             items: [
-                { id: 'employees', label: 'Nhân viên bộ phận', icon: Users, showFor: ['DepartmentManager', 'DepartmentHead'] },
-                { id: 'dept-activities', label: 'Hoạt động bộ phận', icon: BarChart2, showFor: ['DepartmentManager', 'DepartmentHead'] },
-                { id: 'dept-leaves', label: 'Phê duyệt đơn nghỉ', icon: FileText, showFor: ['DepartmentManager'] },
-                { id: 'dept-contracts', label: 'Phê duyệt HĐLĐ', icon: FileText, showFor: ['DepartmentManager'] },
+                { id: 'ot-planning', label: 'Kế hoạch OT tháng', icon: BarChart2, showFor: ['DepartmentManager', 'Admin'] },
+                { id: 'employees', label: 'Nhân sự quản lý', icon: Users, showFor: ['DepartmentManager', 'DepartmentHead', 'Admin'] },
+                { id: 'dept-activities', label: 'Báo cáo hoạt động', icon: Activity, showFor: ['DepartmentManager', 'DepartmentHead'] },
+                { id: 'dept-leaves', label: 'Phê duyệt nghỉ phép', icon: FileSpreadsheet, showFor: ['DepartmentManager', 'DepartmentHead'] },
             ]
         },
-
-        // ─── Admin / HrAdmin ──────────────────────────────────────────────
+        // ─── Admin / HR Management ─────────────────────────────
+        hr: {
+            label: 'Nhân sự & Tiền lương',
+            items: [
+                { id: 'payroll-processing', label: 'Tính lương & Thuế', icon: DollarSign, showFor: ['Admin'] },
+                { id: 'attendance-management', label: 'Quản lý chấm công', icon: Activity, showFor: ['Admin'] },
+                { id: 'insurance-management', label: 'Bảo hiểm xã hội', icon: Shield, showFor: ['Admin'] },
+                { id: 'payroll-settings', label: 'Cấu hình lương', icon: Settings, showFor: ['Admin'] },
+            ]
+        },
         admin: {
-            label: 'Quản trị',
+            label: 'Hệ thống',
             items: [
-                { id: 'employees', label: 'Quản lý nhân viên', icon: Users, showFor: ['Admin'] },
-                { id: 'add-employee', label: 'Thêm nhân viên', icon: UserPlus, showFor: ['Admin'] },
-                { id: 'admin-contracts', label: 'Quản lý HĐLĐ', icon: FileText, showFor: ['Admin', 'DepartmentManager'] },
-                { id: 'barcode-attendance', label: 'Chấm công Mã vạch', icon: BarChart2, showFor: ['Admin'] },
-                { id: 'attendance-management', label: 'Quản lý chấm công', icon: Activity, showFor: ['Admin', 'HrAdmin'] },
                 { id: 'admin-roles', label: 'Phân quyền User', icon: Shield, showFor: ['Admin'] },
-                { id: 'admin-system', label: 'Cấu hình hệ thống', icon: Settings, showFor: ['Admin'] },
-                { id: 'payroll-processing', label: primaryRole === 'Admin' ? 'Xem bảng lương' : 'Xử lý lương & C&B', icon: DollarSign, showFor: ['Admin', 'DepartmentHead'] },
+                { id: 'admin-system', label: 'Cấu hình tham số', icon: Settings, showFor: ['Admin'] },
+                { id: 'barcode-attendance', label: 'Điểm danh mã vạch', icon: Camera, showFor: ['Admin'] },
             ]
         }
     };
@@ -95,17 +96,8 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
     const roles = user?.roles || [];
     const primaryRole = getPrimaryRole(roles);
     const roleMeta = ROLE_META[primaryRole] || ROLE_META.Employee;
-    const menuGroups = getMenuItems(primaryRole).map(group => ({
-        ...group,
-        items: group.items.filter(item => {
-            if (item.id === 'payroll-processing') {
-                if (primaryRole === 'Admin') return true;
-                if (primaryRole === 'DepartmentHead' && user?.departmentId === 7) return true;
-                return false;
-            }
-            return true;
-        })
-    })).filter(group => group.items.length > 0);
+    const menuGroups = getMenuItems(primaryRole);
+
 
     return (
         <nav className={`

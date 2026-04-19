@@ -9,6 +9,9 @@ namespace HRMS.Infrastructure.Data
     {
         public static async Task InitializeAsync(HRMSDbContext context)
         {
+            // 0. Priority Patch Schema
+            await DataFixSeeder.FixOvertimeSchemaAsync(context);
+
             // 1. Cleanup all existing data to ensure a fresh start
             // await CleanupSeeder.SeedAsync(context);
 
@@ -25,18 +28,18 @@ namespace HRMS.Infrastructure.Data
             // 5. Seed Work Shifts and Initial Period
             await WorkShiftSeeder.SeedAsync(context);
 
-            // 6. Seed Leave Types
-            await LeaveTypeSeeder.SeedAsync(context);
-
             // 7. Sửa lỗi liên kết và đảm bảo lịch làm việc cho quá trình kiểm tra
             await DataFixSeeder.FixUserRolesAsync(context);
-            await DataFixSeeder.FixAdminEmployeeLinkageAsync(context); // This now fixes ALL users
-            // await DataFixSeeder.EnsureAllManagersHaveEmployeesAsync(context); // Commented out to prevent crashes
-            // await DataFixSeeder.ClearLeaveHistoryAsync(context); // Commented out for safety
-            // await DataFixSeeder.EnsureSchedulesForTestingAsync(context);
+            await DataFixSeeder.FixAdminEmployeeLinkageAsync(context); 
+            await DataFixSeeder.EnsureAllManagersHaveEmployeesAsync(context);
 
-            // 8. Seed initial Leave Balances (NOW including all employees created above)
+            // 8. Seed initial Leave Balances
             await LeaveTypeSeeder.SeedLeaveBalancesAsync(context, DateTime.Now.Year);
+
+            // 9. Mass Seed 151 PRD-ASS Workers with 2026 Rotating Schedules
+            // Force running once to apply new rotation logic for the whole year
+            var connectionString = context.Database.GetDbConnection().ConnectionString;
+            await MassWorkerSeeder.SeedAsync(context, connectionString);
 
             var empCount = await context.Employees.CountAsync();
             var userCount = await context.Users.CountAsync();

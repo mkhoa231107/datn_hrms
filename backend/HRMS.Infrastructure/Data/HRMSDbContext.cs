@@ -47,6 +47,10 @@ namespace HRMS.Infrastructure.Data
         public DbSet<TimeAdjustmentRequest> TimeAdjustmentRequests { get; set; }
         public DbSet<OvertimeRequest> OvertimeRequests { get; set; }
         public DbSet<EmployeeOvertime> EmployeeOvertimes { get; set; }
+        
+        // New Overtime module
+        public DbSet<OvertimePlan> OvertimePlans { get; set; }
+        public DbSet<OvertimeAssignment> OvertimeAssignments { get; set; }
 
         // Leave Module
         public DbSet<LeaveType> LeaveTypes { get; set; }
@@ -59,12 +63,10 @@ namespace HRMS.Infrastructure.Data
         public DbSet<PayrollRecord> PayrollRecords { get; set; }
         public DbSet<EmployeeInsurance> EmployeeInsurances { get; set; }
         public DbSet<PasswordResetOTP> PasswordResetOTPs { get; set; }
-        // Recruitment Module
-        public DbSet<JobPosting> JobPostings { get; set; }
-        public DbSet<JobCriteria> JobCriteria { get; set; }
-        public DbSet<JobApplication> JobApplications { get; set; }
+        
         public DbSet<CompanyNews> CompanyNews { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<ShiftSwapRequest> ShiftSwapRequests { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -199,6 +201,10 @@ namespace HRMS.Infrastructure.Data
             modelBuilder.Entity<Employee>()
                 .Property(e => e.InsuranceSalary)
                 .HasPrecision(18, 2);
+
+            modelBuilder.Entity<Employee>()
+                .Property(e => e.BasicSalary)
+                .HasPrecision(18, 2);
             
             // EmployeeContract: Employee relationship
             modelBuilder.Entity<EmployeeContract>()
@@ -214,7 +220,23 @@ namespace HRMS.Infrastructure.Data
 
             modelBuilder.Entity<EmployeeContract>()
                 .Property(ec => ec.BasicSalary)
-                .HasColumnType("decimal(18,2)");
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<EmployeeContract>()
+                .Property(ec => ec.HousingAllowance)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<EmployeeContract>()
+                .Property(ec => ec.MealAllowance)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<EmployeeContract>()
+                .Property(ec => ec.PetrolAllowance)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<EmployeeContract>()
+                .Property(ec => ec.PhoneAllowance)
+                .HasPrecision(18, 2);
 
             // EmployeeContract: WorkShift (ca cố định từ hợp đồng)
             modelBuilder.Entity<EmployeeContract>()
@@ -253,11 +275,15 @@ namespace HRMS.Infrastructure.Data
 
             modelBuilder.Entity<AttendanceSummary>()
                 .Property(asum => asum.TotalWorkingHours)
-                .HasColumnType("decimal(18,2)");
+                .HasPrecision(18, 2);
 
             modelBuilder.Entity<AttendanceSummary>()
                 .Property(asum => asum.OvertimeHours)
-                .HasColumnType("decimal(18,2)");
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<AttendanceSummary>()
+                .Property(asum => asum.AdjustedWorkingDays)
+                .HasPrecision(18, 2);
             
             // EmployeeBankAccount: Employee relationship
             modelBuilder.Entity<EmployeeBankAccount>()
@@ -375,6 +401,50 @@ namespace HRMS.Infrastructure.Data
 
             // TimeAttendanceRecord: Employee relationship
             modelBuilder.Entity<TimeAttendanceRecord>()
+                .HasIndex(t => new { t.EmployeeId, t.Date });
+
+            // OvertimePlan Configuration
+            modelBuilder.Entity<OvertimePlan>()
+                .HasOne(op => op.Department)
+                .WithMany()
+                .HasForeignKey(op => op.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<OvertimePlan>()
+                .Property(op => op.TotalBudgetHours)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<OvertimePlan>()
+                .HasOne(op => op.CreatedBy)
+                .WithMany()
+                .HasForeignKey(op => op.CreatedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // OvertimeAssignment Configuration
+            modelBuilder.Entity<OvertimeAssignment>()
+                .HasOne(oa => oa.OvertimePlan)
+                .WithMany(op => op.Assignments)
+                .HasForeignKey(oa => oa.OvertimePlanId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            modelBuilder.Entity<OvertimeAssignment>()
+                .HasOne(oa => oa.Employee)
+                .WithMany()
+                .HasForeignKey(oa => oa.EmployeeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<OvertimeAssignment>()
+                .Property(oa => oa.AssignedMaxHours)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<OvertimeAssignment>()
+                .HasOne(oa => oa.AssignedBy)
+                .WithMany()
+                .HasForeignKey(oa => oa.AssignedById)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // TimeAttendanceRecord: Employee relationship
+            modelBuilder.Entity<TimeAttendanceRecord>()
                 .HasOne(tar => tar.Employee)
                 .WithMany()
                 .HasForeignKey(tar => tar.EmployeeId)
@@ -452,6 +522,19 @@ namespace HRMS.Infrastructure.Data
                 .WithMany()
                 .HasForeignKey(or => or.ApprovedById)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            // AttendanceDetail Precision
+            modelBuilder.Entity<AttendanceDetail>()
+                .Property(ad => ad.WorkingHours)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<AttendanceDetail>()
+                .Property(ad => ad.OTHours)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<AttendanceDetail>()
+                .Property(ad => ad.WorkingDays)
+                .HasPrecision(18, 2);
 
             // ==========================================
             // LEAVE MODULE CONFIGURATIONS
@@ -594,44 +677,47 @@ namespace HRMS.Infrastructure.Data
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ==========================================
-            // RECRUITMENT MODULE CONFIGURATIONS
-            // ==========================================
-            
-            // JobApplication: JobPosting relationship
-            modelBuilder.Entity<JobApplication>()
-                .HasOne(ja => ja.JobPosting)
-                .WithMany(jp => jp.Applications)
-                .HasForeignKey(ja => ja.JobPostingId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // JobApplication: User (Candidate) relationship
-            modelBuilder.Entity<JobApplication>()
-                .HasOne(ja => ja.Candidate)
-                .WithMany()
-                .HasForeignKey(ja => ja.UserId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // JobCriteria: JobPosting relationship (1:1)
-            modelBuilder.Entity<JobCriteria>()
-                .HasOne(jc => jc.JobPosting)
-                .WithOne(jp => jp.JobCriteria)
-                .HasForeignKey<JobCriteria>(jc => jc.JobPostingId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // CompanyNews: User (Author) relationship
-            modelBuilder.Entity<CompanyNews>()
-                .HasOne(cn => cn.Author)
-                .WithMany()
-                .HasForeignKey(cn => cn.AuthorId)
-                .OnDelete(DeleteBehavior.Restrict);
-
             // Notification configurations
             modelBuilder.Entity<Notification>()
                 .HasOne(n => n.Employee)
                 .WithMany()
                 .HasForeignKey(n => n.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // ==========================================
+            // SHIFT SWAP REQUEST CONFIGURATIONS
+            // ==========================================
+
+            modelBuilder.Entity<ShiftSwapRequest>()
+                .HasOne(s => s.EmployeeA)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeAId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ShiftSwapRequest>()
+                .HasOne(s => s.EmployeeB)
+                .WithMany()
+                .HasForeignKey(s => s.EmployeeBId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ShiftSwapRequest>()
+                .HasOne(s => s.TargetShift)
+                .WithMany()
+                .HasForeignKey(s => s.TargetShiftId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+
+            modelBuilder.Entity<ShiftSwapRequest>()
+                .HasOne(ssr => ssr.Manager)
+                .WithMany()
+                .HasForeignKey(ssr => ssr.ManagerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<ShiftSwapRequest>()
+                .HasOne(ssr => ssr.HR)
+                .WithMany()
+                .HasForeignKey(ssr => ssr.HRId)
+                .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

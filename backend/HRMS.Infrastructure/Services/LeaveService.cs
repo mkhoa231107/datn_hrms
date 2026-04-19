@@ -8,6 +8,7 @@ using HRMS.Domain.Entities;
 using HRMS.Domain.Enums;
 using HRMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using HRMS.Infrastructure.Helpers;
 
 namespace HRMS.Infrastructure.Services
 {
@@ -15,11 +16,13 @@ namespace HRMS.Infrastructure.Services
     {
         private readonly HRMSDbContext _context;
         private readonly INotificationService _notificationService;
+        private readonly Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env;
 
-        public LeaveService(HRMSDbContext context, INotificationService notificationService)
+        public LeaveService(HRMSDbContext context, INotificationService notificationService, Microsoft.AspNetCore.Hosting.IWebHostEnvironment env)
         {
             _context = context;
             _notificationService = notificationService;
+            _env = env;
         }
 
         // ===== Reference data =====
@@ -67,7 +70,34 @@ namespace HRMS.Infrastructure.Services
                 .Include(lr => lr.LeaveType)
                 .Include(lr => lr.Approver)
                 .OrderByDescending(lr => lr.CreatedAt)
-                .Select(lr => MapToDto(lr))
+                .Select(lr => new LeaveRequestDto
+                {
+                    Id = lr.Id,
+                    EmployeeId = lr.EmployeeId,
+                    EmployeeName = lr.Employee.FullName,
+                    EmployeeCode = lr.Employee.EmployeeCode,
+                    EmployeePositionName = lr.Employee.Position.PositionName,
+                    EmployeeDepartmentId = lr.Employee.DepartmentId,
+                    EmployeeDepartmentName = lr.Employee.Department.DepartmentName,
+                    LeaveTypeId = lr.LeaveTypeId,
+                    LeaveTypeName = lr.LeaveType.Name,
+                    IsPaid = lr.LeaveType.IsPaid,
+                    FromDate = lr.FromDate,
+                    ToDate = lr.ToDate,
+                    TotalDays = lr.TotalDays,
+                    Reason = lr.Reason,
+                    Phone = lr.Phone,
+                    Address = lr.Address,
+                    JobTitle = lr.JobTitle,
+                    RequesterSignature = lr.RequesterSignature,
+                    ApproverSignature = lr.ApproverSignature,
+                    Status = lr.Status,
+                    ApproverNote = lr.ApproverNote,
+                    ApproverName = lr.Approver.FullName,
+                    AttachmentUrl = lr.AttachmentUrl,
+                    ApprovedAt = lr.ApprovedAt,
+                    CreatedAt = lr.CreatedAt
+                })
                 .ToListAsync();
         }
 
@@ -107,7 +137,67 @@ namespace HRMS.Infrastructure.Services
             if (totalDays > remaining)
                 throw new InvalidOperationException($"Số ngày nghỉ yêu cầu ({totalDays}) vượt quá số ngày còn lại ({remaining}).");
 
-            // 5. Create request
+            // 5. Lead Time & Backdating Validations
+            var now = DateTime.UtcNow;
+            var fromDateLocal = dto.FromDate.Date;
+            var requestLeadTime = fromDateLocal - now.Date;
+
+            var leaveType = await _context.LeaveTypes.FindAsync(dto.LeaveTypeId);
+            bool isSickLeave = leaveType?.Code == "SICK";
+
+            // 5.1 No Backdating (except SICK)
+            if (!isSickLeave && fromDateLocal < now.Date)
+            {
+                throw new InvalidOperationException("Không thể tạo đơn nghỉ phép lùi về quá khứ (trừ trường hợp nghỉ ốm).");
+            }
+
+            // 5.2 Lead Time Validation
+            if (!isSickLeave)
+            {
+                if (totalDays < 3)
+                {
+                    // Require 24h notice (1 day)
+                    if (requestLeadTime.TotalDays < 1)
+                        throw new InvalidOperationException("Đơn nghỉ dưới 3 ngày phải báo trước ít nhất 24 giờ.");
+                }
+                else
+                {
+                    // Require 1 week notice (7 days)
+                    if (requestLeadTime.TotalDays < 7)
+                        throw new InvalidOperationException("Đơn nghỉ từ 3 ngày trở lên phải báo trước ít nhất 1 tuần.");
+                }
+            }
+
+            // 6. Process Attachment (Base64 to File)
+            string? attachmentUrl = null;
+            if (!string.IsNullOrEmpty(dto.AttachmentBase64))
+            {
+                try
+                {
+                    string uploadsFolder = System.IO.Path.Combine(_env.WebRootPath ?? System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot"), "uploads", "leave");
+                    if (!System.IO.Directory.Exists(uploadsFolder))
+                        System.IO.Directory.CreateDirectory(uploadsFolder);
+
+                    string fileName = Guid.NewGuid().ToString() + ".png"; // Default to png for simplicity, can be improved
+                    string filePath = System.IO.Path.Combine(uploadsFolder, fileName);
+
+                    // Extract base64 content
+                    string base64Content = dto.AttachmentBase64;
+                    if (base64Content.Contains(","))
+                        base64Content = base64Content.Split(',')[1];
+
+                    byte[] fileBytes = Convert.FromBase64String(base64Content);
+                    await System.IO.File.WriteAllBytesAsync(filePath, fileBytes);
+
+                    attachmentUrl = $"/uploads/leave/{fileName}";
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error saving leave attachment: {ex.Message}");
+                }
+            }
+
+            // 7. Create request
             var request = new LeaveRequest
             {
                 EmployeeId = employeeId,
@@ -116,12 +206,80 @@ namespace HRMS.Infrastructure.Services
                 ToDate = dto.ToDate,
                 TotalDays = totalDays,
                 Reason = dto.Reason,
+                Phone = dto.Phone,
+                Address = dto.Address,
+                RequesterSignature = dto.RequesterSignature,
+                AttachmentUrl = attachmentUrl,
+                JobTitle = (await _context.Employees.Include(e => e.Position).FirstOrDefaultAsync(e => e.Id == employeeId))?.Position?.PositionName ?? "N/A",
                 Status = LeaveStatus.Pending,
                 CreatedAt = DateTime.UtcNow
             };
 
             _context.LeaveRequests.Add(request);
             await _context.SaveChangesAsync();
+
+            // 7. Notify Approver(s)
+            try
+            {
+                var employee = await _context.Employees.Include(e => e.Department).FirstOrDefaultAsync(e => e.Id == employeeId);
+                if (employee != null)
+                {
+                    List<int> approverEmployeeIds = new List<int>();
+
+                    if (totalDays <= 3)
+                    {
+                        // Notify Department Heads of the same department
+                        var headRoleId = (await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentHead"))?.Id;
+                        if (headRoleId != null)
+                        {
+                            approverEmployeeIds = await _context.UserRoles
+                                .Where(ur => ur.RoleId == headRoleId)
+                                .Join(_context.Employees, ur => ur.UserId, e => e.UserId, (ur, e) => e)
+                                .Where(e => e.DepartmentId == employee.DepartmentId)
+                                .Select(e => e.Id)
+                                .ToListAsync();
+                        }
+                    }
+                    else
+                    {
+                        // Notify Department Manager
+                        // Option 1: ManagerId of the department
+                        if (employee.Department?.ManagerId != null)
+                        {
+                            approverEmployeeIds.Add(employee.Department.ManagerId.Value);
+                        }
+                        
+                        // Option 2: Anyone with DepartmentManager role in the team hierarchy (fallback/redundancy)
+                        var managerRoleId = (await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentManager"))?.Id;
+                        if (managerRoleId != null && !approverEmployeeIds.Any())
+                        {
+                            approverEmployeeIds.AddRange(await _context.UserRoles
+                                .Where(ur => ur.RoleId == managerRoleId)
+                                .Join(_context.Employees, ur => ur.UserId, e => e.UserId, (ur, e) => e)
+                                .Where(e => e.DepartmentId == employee.DepartmentId || e.Id == employee.Department.ManagerId)
+                                .Select(e => e.Id)
+                                .ToListAsync());
+                        }
+                    }
+
+                    foreach (var approverEmpId in approverEmployeeIds.Distinct())
+                    {
+                        await _notificationService.CreateNotificationAsync(new HRMS.Application.DTOs.Notification.CreateNotificationDto
+                        {
+                            EmployeeId = approverEmpId,
+                            Title = "Đơn nghỉ phép mới đang chờ duyệt",
+                            Message = $"Nhân viên {employee.FullName} đã gửi đơn nghỉ phép {totalDays} ngày từ {dto.FromDate:dd/MM} đến {dto.ToDate:dd/MM}.",
+                            Type = "Leave",
+                            RelatedId = request.Id.ToString()
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-blocking error for notifications
+                Console.WriteLine($"Error sending approver notification: {ex.Message}");
+            }
 
             // Reload with navigation properties
             await _context.Entry(request).Reference(r => r.LeaveType).LoadAsync();
@@ -214,8 +372,8 @@ namespace HRMS.Infrastructure.Services
 
                     if (isOnlyHead)
                     {
-                        // ONLY a Head (not a Manager): sees < 3 days AND NOT from other Heads in their team
-                        query = query.Where(lr => lr.TotalDays < 3 && 
+                        // ONLY a Head (not a Manager): sees <= 3 days AND NOT from other Heads in their team
+                        query = query.Where(lr => lr.TotalDays <= 3 && 
                                             !_context.UserRoles.Any(ur => ur.UserId == lr.Employee.UserId && ur.Role.RoleName == "DepartmentHead"));
                         
                         // Base Team filter
@@ -233,8 +391,8 @@ namespace HRMS.Infrastructure.Services
                         query = query.Where(lr => deptIds.Contains(lr.Employee.DepartmentId) && (
                             // All requests from Heads
                             _context.UserRoles.Any(ur => ur.UserId == lr.Employee.UserId && ur.RoleId == headRoleId) ||
-                            // OR Requests >= 3 days from others
-                            (lr.TotalDays >= 3)
+                            // OR Requests > 3 days from others
+                            (lr.TotalDays > 3)
                         ));
                     }
                 }
@@ -245,23 +403,75 @@ namespace HRMS.Infrastructure.Services
                 return Enumerable.Empty<LeaveRequestDto>();
             }
 
-            var requests = await query.OrderByDescending(lr => lr.CreatedAt).ToListAsync();
-            return requests.Select(lr => MapToDto(lr));
+            return await query
+                .OrderByDescending(lr => lr.CreatedAt)
+                .Select(lr => new LeaveRequestDto
+                {
+                    Id = lr.Id,
+                    EmployeeId = lr.EmployeeId,
+                    EmployeeName = lr.Employee.FullName,
+                    EmployeeCode = lr.Employee.EmployeeCode,
+                    EmployeePositionName = lr.Employee.Position.PositionName,
+                    EmployeeDepartmentId = lr.Employee.DepartmentId,
+                    EmployeeDepartmentName = lr.Employee.Department.DepartmentName,
+                    LeaveTypeId = lr.LeaveTypeId,
+                    LeaveTypeName = lr.LeaveType.Name,
+                    IsPaid = lr.LeaveType.IsPaid,
+                    FromDate = lr.FromDate,
+                    ToDate = lr.ToDate,
+                    TotalDays = lr.TotalDays,
+                    Reason = lr.Reason,
+                    Phone = lr.Phone,
+                    Address = lr.Address,
+                    JobTitle = lr.JobTitle,
+                    RequesterSignature = lr.RequesterSignature,
+                    ApproverSignature = lr.ApproverSignature,
+                    Status = lr.Status,
+                    ApproverNote = lr.ApproverNote,
+                    ApproverName = lr.Approver.FullName,
+                    AttachmentUrl = lr.AttachmentUrl,
+                    ApprovedAt = lr.ApprovedAt,
+                    CreatedAt = lr.CreatedAt
+                })
+                .ToListAsync();
         }
 
         public async Task<IEnumerable<LeaveRequestDto>> GetApprovalHistoryAsync(int approverId)
         {
-            var history = await _context.LeaveRequests
+            return await _context.LeaveRequests
                 .Where(lr => lr.ApproverId == approverId && lr.Status != LeaveStatus.Pending)
                 .Include(lr => lr.LeaveType)
                 .Include(lr => lr.Employee)
-                    .ThenInclude(e => e.Position)
-                .Include(lr => lr.Employee)
-                    .ThenInclude(e => e.Department)
                 .OrderByDescending(lr => lr.ApprovedAt)
+                .Select(lr => new LeaveRequestDto
+                {
+                    Id = lr.Id,
+                    EmployeeId = lr.EmployeeId,
+                    EmployeeName = lr.Employee.FullName,
+                    EmployeeCode = lr.Employee.EmployeeCode,
+                    EmployeePositionName = lr.Employee.Position.PositionName,
+                    EmployeeDepartmentId = lr.Employee.DepartmentId,
+                    EmployeeDepartmentName = lr.Employee.Department.DepartmentName,
+                    LeaveTypeId = lr.LeaveTypeId,
+                    LeaveTypeName = lr.LeaveType.Name,
+                    IsPaid = lr.LeaveType.IsPaid,
+                    FromDate = lr.FromDate,
+                    ToDate = lr.ToDate,
+                    TotalDays = lr.TotalDays,
+                    Reason = lr.Reason,
+                    Phone = lr.Phone,
+                    Address = lr.Address,
+                    JobTitle = lr.JobTitle,
+                    RequesterSignature = lr.RequesterSignature,
+                    ApproverSignature = lr.ApproverSignature,
+                    Status = lr.Status,
+                    ApproverNote = lr.ApproverNote,
+                    ApproverName = lr.Approver.FullName,
+                    AttachmentUrl = lr.AttachmentUrl,
+                    ApprovedAt = lr.ApprovedAt,
+                    CreatedAt = lr.CreatedAt
+                })
                 .ToListAsync();
-
-            return history.Select(lr => MapToDto(lr));
         }
 
         private bool IsAuthorizedToDecide(LeaveRequest request, System.Security.Claims.ClaimsPrincipal user)
@@ -282,7 +492,7 @@ namespace HRMS.Infrastructure.Services
                     .Include(ur => ur.Role)
                     .Any(ur => ur.UserId == request.Employee.UserId && ur.Role.RoleName == "DepartmentHead");
 
-                if (isUnderManager && (request.TotalDays >= 3 || isRequesterHead)) return true;
+                if (isUnderManager && (request.TotalDays > 3 || isRequesterHead)) return true;
             }
 
             if (user.IsInRole("DepartmentHead"))
@@ -294,7 +504,7 @@ namespace HRMS.Infrastructure.Services
                     .Include(ur => ur.Role)
                     .Any(ur => ur.UserId == request.Employee.UserId && ur.Role.RoleName == "DepartmentHead");
 
-                if (request.Employee.DepartmentId == deptId && !isRequesterHead && request.TotalDays < 3) return true;
+                if (request.Employee.DepartmentId == deptId && !isRequesterHead && request.TotalDays <= 3) return true;
             }
 
             return false;
@@ -318,6 +528,7 @@ namespace HRMS.Infrastructure.Services
                 request.Status = LeaveStatus.Approved;
                 request.ApproverId = approverId;
                 request.ApproverNote = note;
+                request.ApproverSignature = user.FindFirst("ApproverSignature")?.Value ?? (note?.Contains("SIGN:") == true ? note.Substring(note.IndexOf("SIGN:") + 5) : null); // Fallback logic if signature passed in note or claim
                 request.ApprovedAt = DateTime.UtcNow;
                 request.UpdatedAt = DateTime.UtcNow;
 
@@ -331,6 +542,45 @@ namespace HRMS.Infrastructure.Services
                 {
                     balance.UsedDays += request.TotalDays;
                     balance.UpdatedAt = DateTime.UtcNow;
+                }
+
+                // Update work schedule to reflect leave
+                var schedulesToUpdate = await _context.WorkSchedules
+                    .Where(ws => ws.EmployeeId == request.EmployeeId 
+                              && ws.WorkingDate.Date >= request.FromDate.Date 
+                              && ws.WorkingDate.Date <= request.ToDate.Date)
+                    .ToListAsync();
+                
+                foreach (var schedule in schedulesToUpdate)
+                {
+                    schedule.WorkShiftId = null;
+                    schedule.Note = "Nghỉ phép";
+                    schedule.UpdatedAt = DateTime.UtcNow;
+
+                    // Also update AttendanceDetail to prevent negative marks
+                    var attendance = await _context.AttendanceDetails
+                        .FirstOrDefaultAsync(ad => ad.EmployeeId == request.EmployeeId && ad.Date.Date == schedule.WorkingDate.Date);
+                    
+                    if (attendance == null)
+                    {
+                        attendance = new AttendanceDetail
+                        {
+                            EmployeeId = request.EmployeeId,
+                            Date = schedule.WorkingDate.Date,
+                            Status = "Nghỉ phép",
+                            Note = request.LeaveType?.Name ?? "Nghỉ phép (Có đơn)",
+                            WorkingDays = request.LeaveType?.IsPaid == true ? 1.0m : 0m,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.AttendanceDetails.Add(attendance);
+                    }
+                    else if (attendance.Status == "Vắng mặt" || string.IsNullOrEmpty(attendance.Status))
+                    {
+                        attendance.Status = "Nghỉ phép";
+                        attendance.Note = request.LeaveType?.Name ?? "Nghỉ phép (Có đơn)";
+                        attendance.WorkingDays = request.LeaveType?.IsPaid == true ? 1.0m : 0m;
+                        attendance.UpdatedAt = DateTime.UtcNow;
+                    }
                 }
 
                 await _context.SaveChangesAsync();
@@ -412,9 +662,8 @@ namespace HRMS.Infrastructure.Services
                 }
                 else
                 {
-                    // Fallback to standard weekend logic if no schedule is found
-                    // Only Sunday is a day off now
-                    if (d.DayOfWeek != DayOfWeek.Sunday)
+                    // Fallback to HolidayHelper (Excludes Sunday + Public Holidays)
+                    if (HolidayHelper.IsWorkingDay(d))
                         count++;
                 }
             }
@@ -426,6 +675,7 @@ namespace HRMS.Infrastructure.Services
             Id = lr.Id,
             EmployeeId = lr.EmployeeId,
             EmployeeName = lr.Employee?.FullName ?? "",
+            EmployeeCode = lr.Employee?.EmployeeCode,
             EmployeePositionName = lr.Employee?.Position?.PositionName,
             EmployeeDepartmentId = lr.Employee?.DepartmentId,
             EmployeeDepartmentName = lr.Employee?.Department?.DepartmentName,
@@ -436,9 +686,15 @@ namespace HRMS.Infrastructure.Services
             ToDate = lr.ToDate,
             TotalDays = lr.TotalDays,
             Reason = lr.Reason,
+            Phone = lr.Phone,
+            Address = lr.Address,
+            JobTitle = lr.JobTitle,
+            RequesterSignature = lr.RequesterSignature,
+            ApproverSignature = lr.ApproverSignature,
             Status = lr.Status,
             ApproverNote = lr.ApproverNote,
             ApproverName = lr.Approver?.FullName,
+            AttachmentUrl = lr.AttachmentUrl,
             ApprovedAt = lr.ApprovedAt,
             CreatedAt = lr.CreatedAt
         };

@@ -27,6 +27,7 @@ namespace HRMS.Domain.Entities
         public int CheckOutCount { get; set; } = 0;
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
 
         // Navigation Properties
         public Employee Employee { get; set; } = null!;

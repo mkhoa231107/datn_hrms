@@ -62,7 +62,7 @@ namespace HRMS.API.Middleware
             }
         }
         
-        private async Task<string> GetInnerExceptions(Exception ex)
+        private string GetInnerExceptions(Exception ex)
         {
             var sb = new StringBuilder();
             var current = ex;

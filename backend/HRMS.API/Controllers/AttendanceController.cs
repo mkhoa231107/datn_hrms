@@ -389,108 +389,6 @@ namespace HRMS.API.Controllers
             }
         }
 
-        // ==================== OVERTIME ENDPOINTS (Refactored) ====================
-
-        /// <summary>
-        /// [EMPLOYEE] Gửi đơn xin tăng ca (phải trước 1 ngày)
-        /// </summary>
-        [HttpPost("overtime/request")]
-        public async Task<IActionResult> SubmitOvertimeRequest([FromBody] CreateOvertimeRequestDto dto)
-        {
-            try
-            {
-                var employeeId = GetEmployeeId();
-                var result = await _attendanceService.SubmitOvertimeRequestAsync(employeeId, dto);
-                return Ok(new { success = true, data = result, message = "Đã gửi đơn xin tăng ca thành công, đang chờ duyệt." });
-            }
-            catch (InvalidOperationException ex)
-            {
-                return BadRequest(new { success = false, message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// [HEAD/MANAGER] Duyệt hoặc Từ chối đơn tăng ca
-        /// </summary>
-        [HttpPost("overtime/review")]
-        [Authorize(Roles = "Admin,DepartmentHead,DepartmentManager")]
-        public async Task<IActionResult> ReviewOvertimeRequest([FromBody] OvertimeReviewDto dto)
-        {
-            try
-            {
-                var approverId = GetEmployeeId();
-                var success = await _attendanceService.ReviewOvertimeRequestAsync(dto.RequestId, approverId, dto.Status, dto.Note ?? "");
-                if (success)
-                    return Ok(new { success = true, message = $"Đã { (dto.Status == "Approved" ? "duyệt" : "từ chối") } đơn tăng ca." });
-                
-                return BadRequest(new { success = false, message = "Không tìm thấy đơn tăng ca hoặc thao tác thất bại." });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// [HEAD/MANAGER] Xem danh sách đơn tăng ca chờ duyệt của bộ phận
-        /// </summary>
-        [HttpGet("overtime/pending/{departmentId}")]
-        [Authorize(Roles = "Admin,DepartmentHead,DepartmentManager")]
-        public async Task<IActionResult> GetPendingOvertime(int departmentId)
-        {
-            try
-            {
-                ValidateDepartmentAccess(departmentId);
-                var results = await _attendanceService.GetOvertimeToApproveAsync(departmentId);
-                return Ok(new { success = true, data = results });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// [HEAD/MANAGER] Xem lịch sử tăng ca của bộ phận
-        /// </summary>
-        [HttpGet("department/{departmentId}/overtime")]
-        [Authorize(Roles = "Admin,DepartmentHead,DepartmentManager")]
-        public async Task<IActionResult> GetDepartmentOvertime(int departmentId)
-        {
-            try
-            {
-                ValidateDepartmentAccess(departmentId);
-                var results = await _attendanceService.GetOvertimeRequestsByDepartmentAsync(departmentId);
-                return Ok(new { success = true, data = results });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
-            }
-        }
-
-        /// <summary>
-        /// [EMPLOYEE] Xem danh sách đơn tăng ca của tôi
-        /// </summary>
-        [HttpGet("my-overtime")]
-        public async Task<IActionResult> GetMyOvertime()
-        {
-            try
-            {
-                var employeeId = GetEmployeeId();
-                var results = await _attendanceService.GetMyOvertimeRequestsAsync(employeeId);
-                return Ok(new { success = true, data = results });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
-            }
-        }
-
         /// <summary>
         /// [MANAGER] Tổng hợp dữ liệu công cho nhân viên (Chạy trước khi Chốt/Duyệt)
         /// </summary>
@@ -523,6 +421,32 @@ namespace HRMS.API.Controllers
             {
                 var filePath = await _attendanceService.ExportAndCleanupOldAttendanceAsync(month, year);
                 return Ok(new { success = true, file = filePath, message = "Đã dọn dẹp và kết xuất thành công." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Lấy danh sách tăng ca của tôi (Dùng cho trang chuyên cần cá nhân)
+        /// </summary>
+        [HttpGet("my-overtime")]
+        public async Task<IActionResult> GetMyOvertime([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
+        {
+            try
+            {
+                var employeeId = GetEmployeeId();
+                // Nếu không truyền ngày, lấy mặc định cả năm nay để frontend tự filter
+                var start = fromDate ?? new DateTime(DateTime.Today.Year, 1, 1);
+                var end = toDate ?? new DateTime(DateTime.Today.Year, 12, 31);
+                
+                var records = await _attendanceService.GetMyOvertimeAssignmentsAsync(employeeId, start, end);
+                return Ok(new { success = true, data = records });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { success = false, message = ex.Message });
             }
             catch (Exception ex)
             {

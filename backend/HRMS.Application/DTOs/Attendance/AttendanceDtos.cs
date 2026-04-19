@@ -8,6 +8,7 @@ namespace HRMS.Application.DTOs.Attendance
         public DateTime? Timestamp { get; set; }
         public string? Location { get; set; }
         public string? DeviceInfo { get; set; }
+        public string? Note { get; set; }
     }
 
     public class CheckOutDto
@@ -16,6 +17,7 @@ namespace HRMS.Application.DTOs.Attendance
         public DateTime? Timestamp { get; set; }
         public string? Location { get; set; }
         public string? DeviceInfo { get; set; }
+        public string? Note { get; set; }
     }
 
     public class ScanBarcodeDto
@@ -137,5 +139,54 @@ namespace HRMS.Application.DTOs.Attendance
         public decimal TotalOT { get; set; }
         public string Status { get; set; }
         public bool IsAdmin { get; set; }
+    }
+
+    // --- New Overtime module DTOs ---
+
+    public class CreateOvertimePlanDto
+    {
+        public int DepartmentId { get; set; }
+        public int Month { get; set; }
+        public int Year { get; set; }
+        public decimal TotalBudgetHours { get; set; }
+        public string? Description { get; set; }
+    }
+
+    public class OvertimePlanDto
+    {
+        public int Id { get; set; }
+        public int DepartmentId { get; set; }
+        public string DepartmentName { get; set; }
+        public int Month { get; set; }
+        public int Year { get; set; }
+        public decimal TotalBudgetHours { get; set; }
+        public string? Description { get; set; }
+        public string Status { get; set; }
+        public string CreatedBy { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class OvertimeAssignmentDto
+    {
+        public int Id { get; set; }
+        public int EmployeeId { get; set; }
+        public string EmployeeName { get; set; }
+        public DateTime Date { get; set; }
+        public decimal AssignedMaxHours { get; set; }
+        public string AssignedBy { get; set; }
+        public bool IsConfirmed { get; set; }
+    }
+
+    public class BulkAssignOvertimeDto
+    {
+        public int? PlanId { get; set; }
+        public List<AssignmentItemDto> Assignments { get; set; } = new List<AssignmentItemDto>();
+    }
+
+    public class AssignmentItemDto
+    {
+        public int EmployeeId { get; set; }
+        public DateTime Date { get; set; }
+        public decimal Hours { get; set; }
     }
 }

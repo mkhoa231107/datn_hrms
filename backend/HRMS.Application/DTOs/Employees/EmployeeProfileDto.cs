@@ -25,6 +25,7 @@ namespace HRMS.Application.DTOs.Employees
         public DateTime? IdentityExpirationDate { get; set; }
         public string? Avatar { get; set; }
         public bool IsActive { get; set; }
+        public string? Signature { get; set; }
         
         // Thông tin công việc
         public DateTime JoinDate { get; set; }

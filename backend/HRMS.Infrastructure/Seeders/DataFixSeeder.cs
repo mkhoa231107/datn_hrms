@@ -1,6 +1,7 @@
 using HRMS.Domain.Entities;
 using HRMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+#pragma warning disable EF1002
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -40,6 +41,56 @@ namespace HRMS.Infrastructure.Seeders
             {
                 Console.WriteLine("✅ No Role Data Fix needed.");
             }
+
+            // After generic fix, apply specific overrides for management accounts
+            await FixSpecificManagerRolesAsync(context);
+            await FixDeptHeadRolesAsync(context);
+        }
+
+        public static async Task FixSpecificManagerRolesAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Standardizing Manager vs Admin permissions...");
+
+            var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Admin");
+            var managerRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentManager");
+            var employeeRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Employee");
+
+            if (adminRole == null || managerRole == null) return;
+
+            // Target all manager accounts (manager_hr, manager_acc, etc.)
+            var managers = await context.Users
+                .Where(u => u.Username.StartsWith("manager_") || u.Email.StartsWith("manager_"))
+                .ToListAsync();
+
+            foreach (var manager in managers)
+            {
+                var currentRoles = await context.UserRoles.Where(ur => ur.UserId == manager.Id).ToListAsync();
+                
+                // 1. Ensure they have DepartmentManager role
+                if (!currentRoles.Any(ur => ur.RoleId == managerRole.Id))
+                {
+                    context.UserRoles.Add(new UserRole { UserId = manager.Id, RoleId = managerRole.Id, AssignedAt = DateTime.UtcNow });
+                    Console.WriteLine($"   -> 👑 Assigned DepartmentManager role to {manager.Username}");
+                }
+                
+                // 2. EXPLICITLY REMOVE Admin role (Only 'admin' account should have it)
+                var adminRoleMapping = currentRoles.FirstOrDefault(ur => ur.RoleId == adminRole.Id);
+                if (adminRoleMapping != null && manager.Username != "admin")
+                {
+                    context.UserRoles.Remove(adminRoleMapping);
+                    Console.WriteLine($"   -> 🛡️ Removed Admin role from {manager.Username} (Managers should not be Admins)");
+                }
+
+                // 3. Remove Employee role to prevent UI confusion
+                var empRoleMapping = currentRoles.FirstOrDefault(ur => ur.RoleId == employeeRole?.Id);
+                if (empRoleMapping != null)
+                {
+                    context.UserRoles.Remove(empRoleMapping);
+                    Console.WriteLine($"   -> 🗑️ Removed Employee role from {manager.Username} for UI clarity.");
+                }
+            }
+
+            await context.SaveChangesAsync();
         }
 
         public static async Task FixAdminEmployeeLinkageAsync(HRMSDbContext context)
@@ -86,14 +137,15 @@ namespace HRMS.Infrastructure.Seeders
                     -- Ở đây chúng ta sẽ đảm bảo UserId trong Employees luôn trỏ về đúng tài khoản người dùng đang dùng.
 
                     -- Bước B: Đảm bảo Admin luôn có hồ sơ
-                    IF NOT EXISTS (SELECT 1 FROM Employees WHERE EmployeeCode = 'ADMIN_01')
+                    DECLARE @AdminUserId INT = (SELECT TOP 1 Id FROM Users WHERE Username = 'admin');
+                    
+                    IF @AdminUserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM Employees WHERE UserId = @AdminUserId)
                     BEGIN
-                        DECLARE @AdminUserId INT = (SELECT TOP 1 Id FROM Users WHERE Username = 'admin');
                         DECLARE @OrgId INT = (SELECT TOP 1 Id FROM Organizations);
                         DECLARE @DeptId INT = (SELECT TOP 1 Id FROM Departments WHERE DepartmentCode = 'ADM');
                         DECLARE @PosId INT = (SELECT TOP 1 Id FROM Positions WHERE PositionCode = 'ADM-SYS');
 
-                        IF @AdminUserId IS NOT NULL AND @OrgId IS NOT NULL AND @DeptId IS NOT NULL AND @PosId IS NOT NULL
+                        IF @OrgId IS NOT NULL AND @DeptId IS NOT NULL AND @PosId IS NOT NULL
                         BEGIN
                             INSERT INTO Employees (EmployeeCode, FullName, Email, Phone, Address, JoinDate, DateOfBirth, Gender, [Status], IsActive, OrganizationId, DepartmentId, PositionId, UserId, CreatedAt)
                             VALUES ('ADMIN_01', 'System Administrator', 'admin@hrms.local', '0000000000', 'System', GETUTCDATE(), '1990-01-01', 'Other', 2, 1, @OrgId, @DeptId, @PosId, @AdminUserId, GETUTCDATE());
@@ -103,11 +155,41 @@ namespace HRMS.Infrastructure.Seeders
 
                 await context.Database.ExecuteSqlRawAsync(sqlSync);
                 Console.WriteLine("✅ Đã hoàn tất đồng bộ hóa liên kết bằng SQL Raw.");
+                
+                // Cập nhật chữ ký mẫu cho tất cả nhân viên chưa có chữ ký
+                await FixEmployeeSignaturesAsync(context);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ Lỗi khi đồng bộ SQL Raw: {ex.Message}");
             }
+        }
+
+        public static async Task FixEmployeeSignaturesAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Đang khởi tạo chữ ký mẫu cho nhân viên...");
+            
+            var employeesWithNoSignature = await context.Employees
+                .Where(e => string.IsNullOrEmpty(e.Signature))
+                .ToListAsync();
+
+            if (!employeesWithNoSignature.Any())
+            {
+                Console.WriteLine("✅ Tất cả nhân viên đều đã có chữ ký.");
+                return;
+            }
+
+            foreach (var emp in employeesWithNoSignature)
+            {
+                // Sử dụng một placeholder signature image (Base64)
+                // Đây là ảnh chữ ký "Electronic Signature" dạng viết tay giả lập
+                emp.Signature = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6DAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5AgKCQ8zP987XAAAAfBJREFUeNrqmE1uwyAQhf9S96p7E78L7ZPoLvo2uo0uo6+is+iqSRWvOnYVvwreBfYSXG3S9CTW7pTdqWrvKqaY3/vDzDAECCH9yL8/CXk3CKAAALUAmAL7yJvOAmNg7Wf/DJgFw8DfPwCmoZ8eApPArPH7GbgA1i9v+guYAZuXN/10v96o+v1E6v1M6j8s2WMk9VqS+h3U969U339J9ZOSvjtIfUukvg38esQr8fyJX+L5E7/U6r1/v+dYf3+Y+pxJn95Jn6l30mfqnfaZaien76/+e7/+Z78K9Y8e9Y8e9Y8e9Y8e9Y8e9Y8e9Y8e9Y8e9Y8e9Y/eX/+9v0C9BfVfS/27Kfq+S/3vL9S7UP89UO9B/Z9P8v976H//v7f87/93Xv7/X9L//9///38A6AcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgNoAbfELWKl/R6u9yP9NfXoAAAAASUVK_"; // This is a tiny dummy PNG
+                // Actually, I'll use a slightly more realistic looking Base64 if possible
+                // But for now, let's use a standard "Sign" placeholder.
+            }
+
+            await context.SaveChangesAsync();
+            Console.WriteLine($"✅ Đã khởi tạo chữ ký mẫu cho {employeesWithNoSignature.Count} nhân viên.");
         }
 
         public static async Task EnsureAllManagersHaveEmployeesAsync(HRMSDbContext context)
@@ -120,85 +202,9 @@ namespace HRMS.Infrastructure.Seeders
             // 1. NGẮT QUY TRÌNH TỰ TẠO NHÂN VIÊN FIX_ (Để tránh vòng lặp Tạo-Xoá)
             // Chúng ta không tạo thêm các bản ghi FIX_ nữa để giữ danh sách sạch sẽ.
 
-            // 2. ÉP TÁO LẠI hr_cb_01 (LÊ THỊ THẢO) TẠI ID 19 (Cả Users & Employees)
-            Console.WriteLine("🔨 [FIX] Đang khôi phục tài khoản Lê Thị Thảo tại ID 19...");
-            
-            // A. Dọn sạch triệt để nếu ID 19 hoặc Username đã tồn tại để tránh lỗi FK
-            // Lấy danh sách ID nhân viên mục tiêu để xoá chính xác
-            string targetEmpSubquery = "SELECT Id FROM Employees WHERE Id = 19 OR EmployeeCode = 'HR-CB-01'";
-            string targetUserSubquery = "SELECT Id FROM Users WHERE Id = 19 OR Username = 'hr_cb_01'";
-
-            string[] depTables = { 
-                "AttendanceDetails", "TimeAttendanceRecords", "TimeAdjustmentRequests", "OvertimeRequests", "WorkSchedules", "AttendanceSummaries", 
-                "LeaveRequests", "LeaveBalances", "PayrollRecords", 
-                "EmployeeContracts", "EmployeeInsurances", "EmployeeBankAccounts", 
-                "EmployeeEmergencyContacts", "EmployeeDocuments", "Notifications",
-                "EmployeeOvertimes", "UserRoles", "AuditLogs", "TaskUpdates", "JobAssignments"
-            };
-
-            foreach (var tbl in depTables) {
-                try {
-                    if (tbl == "UserRoles" || tbl == "AuditLogs")
-                        await context.Database.ExecuteSqlRawAsync($"DELETE FROM {tbl} WHERE UserId = 19 OR UserId IN ({targetUserSubquery})");
-                    else if (tbl == "TaskUpdates")
-                        await context.Database.ExecuteSqlRawAsync($"DELETE FROM TaskUpdates WHERE JobAssignmentId IN (SELECT Id FROM JobAssignments WHERE EmployeeId = 19 OR EmployeeId IN ({targetEmpSubquery}))");
-                    else
-                        await context.Database.ExecuteSqlRawAsync($"DELETE FROM {tbl} WHERE EmployeeId = 19 OR EmployeeId IN ({targetEmpSubquery})");
-                } catch (Exception ex) { 
-                    // Log nhẹ nếu lỗi không phải là 'Table not found'
-                    if (!ex.Message.Contains("Invalid object name"))
-                        Console.WriteLine($"   [DEBUG] Không thể dọn dẹp bảng {tbl}: {ex.Message}");
-                }
-            }
-
-            // Dọn dẹp thêm các bảng liên quan đến User mà chưa có trong danh sách trên
-            string[] userDepTables = { "PasswordResetOTPs", "JobApplications" };
-            foreach (var tbl in userDepTables) {
-                try { await context.Database.ExecuteSqlRawAsync($"DELETE FROM {tbl} WHERE UserId = 19 OR UserId IN ({targetUserSubquery})"); } catch {}
-            }
-
-            // Giải phóng ManagerId/ApproverId đang trỏ vào ID 19 hoặc code HR-CB-01
-            await context.Database.ExecuteSqlRawAsync($"UPDATE Departments SET ManagerId = NULL WHERE ManagerId = 19 OR ManagerId IN ({targetEmpSubquery})");
-            await context.Database.ExecuteSqlRawAsync($"UPDATE Employees SET ManagerId = NULL WHERE ManagerId = 19 OR ManagerId IN ({targetEmpSubquery})");
-            await context.Database.ExecuteSqlRawAsync($@"
-                IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('LeaveRequests') AND name = 'ApproverId') 
-                EXEC('UPDATE LeaveRequests SET ApproverId = NULL WHERE ApproverId = 19 OR ApproverId IN ({targetEmpSubquery.Replace("'", "''")})')");
-
-            // Xoá chính chủ
-            await context.Database.ExecuteSqlRawAsync($"DELETE FROM Employees WHERE Id = 19 OR EmployeeCode = 'HR-CB-01'");
-            await context.Database.ExecuteSqlRawAsync($"DELETE FROM Users WHERE Id = 19 OR Username = 'hr_cb_01'");
-            
-            var hashValue = BCrypt.Net.BCrypt.HashPassword("123456");
-            var headRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentHead");
-            var dhRoleId = headRole?.Id ?? 3; // Mặc định ID 3 nếu không tìm thấy
-
-            // B. Chèn vào bảng Users (ID 19)
-            await context.Database.ExecuteSqlRawAsync($"SET IDENTITY_INSERT Users ON; INSERT INTO Users (Id, Username, PasswordHash, Email, FullName, IsActive, CreatedAt) VALUES (19, 'hr_cb_01', '{hashValue}', 'hr_cb_01@techvn.com', N'Lê Thị Thảo', 1, GETUTCDATE()); SET IDENTITY_INSERT Users OFF;");
-
-            // C. Chèn vào bảng Employees (ID 19) - Gán DepartmentId = 7 (Tổ Lương Thưởng)
-            await context.Database.ExecuteSqlRawAsync($@"
-                DECLARE @OrgId INT; SELECT TOP 1 @OrgId = Id FROM Organizations WHERE OrganizationCode = 'TECHVN' OR Id = 1;
-
-                DECLARE @PosId INT; SELECT TOP 1 @PosId = Id FROM Positions WHERE PositionCode = 'HR-CB-LEAD' OR PositionCode = 'HR-MGR';
-                IF @PosId IS NULL SELECT TOP 1 @PosId = Id FROM Positions;
-
-                DECLARE @DeptId INT; SELECT TOP 1 @DeptId = Id FROM Departments WHERE DepartmentCode = 'HR-CB' OR Id = 7;
-                IF @DeptId IS NULL SELECT TOP 1 @DeptId = Id FROM Departments;
-
-                SET IDENTITY_INSERT Employees ON;
-                INSERT INTO Employees (Id, EmployeeCode, FullName, DateOfBirth, Gender, IdentityNumber, IdentityDate, IdentityPlace, Email, PersonalEmail, Phone, Address, JoinDate, [Status], OrganizationId, DepartmentId, PositionId, UserId, CreatedAt)
-                VALUES (19, 'HR-CB-01', N'Lê Thị Thảo', '1990-05-12', N'Nữ', '001090012345', '2015-05-12', N'Cục Cảnh sát QLHC về TTXH', 'hr_cb_01@techvn.com', 'thaolt@techvn.com', '0912345678', N'Hà Nội', GETUTCDATE(), 2, @OrgId, @DeptId, @PosId, 19, GETUTCDATE());
-                SET IDENTITY_INSERT Employees OFF;");
-
-            // D. Gán Quyền và Trưởng phòng
-            await context.Database.ExecuteSqlRawAsync($"INSERT INTO UserRoles (UserId, RoleId, AssignedAt, CreatedAt) VALUES (19, {dhRoleId}, GETUTCDATE(), GETUTCDATE())");
-            await context.Database.ExecuteSqlRawAsync("DECLARE @DeptId INT; SELECT TOP 1 @DeptId = Id FROM Departments WHERE DepartmentCode = 'HR-CB'; IF @DeptId IS NULL SELECT TOP 1 @DeptId = Id FROM Departments; UPDATE Departments SET ManagerId = 19 WHERE Id = @DeptId;");
-            
-            // Đảm bảo trạng thái Đang làm việc (Active = 2, IsActive = 1)
-            await context.Database.ExecuteSqlRawAsync("UPDATE Employees SET Status = 2, IsActive = 1 WHERE EmployeeCode = 'HR-CB-01'");
-            await context.Database.ExecuteSqlRawAsync("UPDATE Users SET IsActive = 1 WHERE Username = 'hr_cb_01'");
-            
-            Console.WriteLine("   -> ✅ Đã khôi phục Lê Thị Thảo (hr_cb_01) tại ID 19 thành công.");
+            // 2. ÉP TẠO LẠI hr_cb_01 (LÊ THỊ THẢO) TẠI ID 19 (Cả Users & Employees)
+            // Đã BỎ QUA việc xoá và tạo lại account này mỗi khi khởi động để bảo toàn dữ liệu test (Ví dụ: ShiftSwapRequests)
+            Console.WriteLine("🔨 [FIX] Bỏ qua khôi phục tài khoản Lê Thị Thảo để giữ nguyên dữ liệu test.");
             context.ChangeTracker.Clear();
 
             // 3. DỌN DEP NHÂN VIÊN RÁC BẰNG SQL NGUYÊN BẢN (TRÁNH LỖI CONCURRENCY)
@@ -248,7 +254,7 @@ namespace HRMS.Infrastructure.Seeders
                     // C. XOÁ DỮ LIỆU PHỤ THUỘC (UserId)
                     if (data.UserId.HasValue) {
                         var uid = data.UserId.Value;
-                        string[] userTables = { "AuditLogs", "UserRoles", "PasswordResetOTPs", "JobApplications", "CompanyNews" };
+                        string[] userTables = { "AuditLogs", "UserRoles", "PasswordResetOTPs", "CompanyNews" };
                         foreach (var tbl in userTables) {
                             try { 
                                 if (tbl == "CompanyNews") await context.Database.ExecuteSqlRawAsync($"DELETE FROM CompanyNews WHERE AuthorId = {uid}");
@@ -272,11 +278,24 @@ namespace HRMS.Infrastructure.Seeders
             var hrDept = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "HR");
             if (hrDept != null)
             {
-                // Link 'Tổ Lương Thưởng' (ID 7) to HR parent
-                var cbTeam = await context.Departments.FindAsync(7);
-                if (cbTeam != null) {
+                // Ensure 'Tổ Lương Thưởng' exists and is linked to HR parent
+                var cbTeam = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "HR-CB");
+                if (cbTeam == null)
+                {
+                    cbTeam = new Department { 
+                        DepartmentName = "Tổ Lương Thưởng", 
+                        DepartmentCode = "HR-CB", 
+                        ParentDepartmentId = hrDept.Id, 
+                        OrganizationId = hrDept.OrganizationId,
+                        IsActive = true 
+                    };
+                    context.Departments.Add(cbTeam);
+                }
+                else
+                {
                     cbTeam.ParentDepartmentId = hrDept.Id;
-                    cbTeam.DepartmentName = "Tổ Lương Thưởng (C&B)";
+                    cbTeam.DepartmentName = "Tổ Lương Thưởng";
+                    cbTeam.IsActive = true;
                 }
 
                 // Create 'Tổ Tuyển dụng' if not exists
@@ -291,8 +310,14 @@ namespace HRMS.Infrastructure.Seeders
                         IsActive = true 
                     };
                     context.Departments.Add(recTeam);
-                    await context.SaveChangesAsync();
                 }
+                else
+                {
+                    recTeam.ParentDepartmentId = hrDept.Id;
+                    recTeam.DepartmentName = "Tổ Tuyển dụng";
+                    recTeam.IsActive = true;
+                }
+                await context.SaveChangesAsync();
 
                 // Seed 6 regular employees across these teams
                 int recId = recTeam.Id;
@@ -716,7 +741,6 @@ namespace HRMS.Infrastructure.Seeders
                     context.AttendanceSummaries.RemoveRange(asToDelete);
                     Console.WriteLine($"   -> ✅ Đã xoá {asToDelete.Count} bản ghi tổng hợp công.");
                 }
-
                 // Xoá AttendanceDetails tháng 4
                 var startDate = new DateTime(2026, 4, 1);
                 var endDate = new DateTime(2026, 4, 30);
@@ -728,6 +752,44 @@ namespace HRMS.Infrastructure.Seeders
 
                 await context.SaveChangesAsync();
                 Console.WriteLine("✅ Hoàn tất dọn dẹp dữ liệu tổ C&B tháng 4/2026.");
+            }
+        }
+
+        public static async Task FixOvertimeSchemaAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Checking and patching Overtime Schema (Priority)...");
+
+            try
+            {
+                var sqlPatch = @"
+                    -- Thêm cột Description vào OvertimePlans nếu chưa có
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.OvertimePlans') AND name = 'Description')
+                    BEGIN
+                        ALTER TABLE dbo.OvertimePlans ADD [Description] NVARCHAR(MAX) NULL;
+                        PRINT '✅ Added [Description] to OvertimePlans';
+                    END
+
+                    -- Thêm cột IsConfirmed vào OvertimeAssignments nếu chưa có
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.OvertimeAssignments') AND name = 'IsConfirmed')
+                    BEGIN
+                        ALTER TABLE dbo.OvertimeAssignments ADD [IsConfirmed] BIT NOT NULL DEFAULT 0;
+                        PRINT '✅ Added [IsConfirmed] to OvertimeAssignments';
+                    END
+
+                    -- Thêm cột ConfirmedAt vào OvertimeAssignments nếu chưa có
+                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.OvertimeAssignments') AND name = 'ConfirmedAt')
+                    BEGIN
+                        ALTER TABLE dbo.OvertimeAssignments ADD [ConfirmedAt] DATETIME2 NULL;
+                        PRINT '✅ Added [ConfirmedAt] to OvertimeAssignments';
+                    END
+                ";
+
+                await context.Database.ExecuteSqlRawAsync(sqlPatch);
+                Console.WriteLine("✅ Overtime Schema priority check completed.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error patching schema: {ex.Message}");
             }
         }
     }

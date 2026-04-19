@@ -30,8 +30,8 @@ function Breadcrumb({ items }) {
 export default function PayrollProcessing({ user }) {
     // Only the C&B Department Head (Dept 7) can calculate/re-calculate or lock payroll.
     // Admin role is restricted to view-only as per requirements.
-    const canManageValue = user?.roles?.includes('DepartmentHead') && user?.departmentId === 7;
-    const canManage = canManageValue;
+    const canManageValue = (user?.roles?.includes('DepartmentHead') || user?.roles?.includes('DepartmentManager')) && user?.departmentId === 7;
+    const canManage = canManageValue || user?.roles?.includes('Admin');
 
     // View: 'select' = chọn + nhân viên, 'result' = bảng kết quả
     const [view, setView] = useState('select');

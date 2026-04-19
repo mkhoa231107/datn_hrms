@@ -38,6 +38,8 @@ namespace HRMS.Infrastructure.Services
                     .ThenInclude(ur => ur.Role)
                 .Include(u => u.Employee)
                     .ThenInclude(e => e.Department)
+                .Include(u => u.Employee)
+                    .ThenInclude(e => e.Position)
                 .FirstOrDefaultAsync(u => u.Username == request.Username);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
@@ -51,7 +53,8 @@ namespace HRMS.Infrastructure.Services
             }
 
             var token = GenerateJwtToken(user);
-            var expiryMinutes = int.Parse(_configuration["Jwt:ExpiryMinutes"]);
+            var expiryMinutesStr = _configuration["Jwt:ExpiryMinutes"] ?? "60";
+            var expiryMinutes = int.Parse(expiryMinutesStr);
             var userDto = _mapper.Map<UserDto>(user);
 
             return new LoginResponseDto
@@ -103,11 +106,14 @@ namespace HRMS.Infrastructure.Services
                     .ThenInclude(ur => ur.Role)
                 .Include(u => u.Employee)
                     .ThenInclude(e => e.Department)
+                .Include(u => u.Employee)
+                    .ThenInclude(e => e.Position)
                 .FirstOrDefaultAsync(u => u.Id == user.Id);
 
-            var token = GenerateJwtToken(fullUser);
-            var expiryMinutes = int.Parse(_configuration["Jwt:ExpiryMinutes"] ?? "60");
-            var userDto = _mapper.Map<UserDto>(fullUser);
+            var token = GenerateJwtToken(fullUser!);
+            var expiryMinutesStr = _configuration["Jwt:ExpiryMinutes"] ?? "60";
+            var expiryMinutes = int.Parse(expiryMinutesStr);
+            var userDto = _mapper.Map<UserDto>(fullUser!);
 
             return new LoginResponseDto
             {
@@ -124,6 +130,8 @@ namespace HRMS.Infrastructure.Services
                     .ThenInclude(ur => ur.Role)
                 .Include(u => u.Employee)
                     .ThenInclude(e => e.Department)
+                .Include(u => u.Employee)
+                    .ThenInclude(e => e.Position)
                 .FirstOrDefaultAsync(u => u.Id == userId);
 
             if (user == null)

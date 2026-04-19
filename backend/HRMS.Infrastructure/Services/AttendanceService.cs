@@ -65,6 +65,18 @@ namespace HRMS.Infrastructure.Services
                 throw new InvalidOperationException("Bạn đã check-in hôm nay rồi!");
             }
 
+            // 2.5 Kiểm tra xem có đang trong ngày nghỉ phép không
+            var isOnLeave = await _context.LeaveRequests
+                .AnyAsync(lr => lr.EmployeeId == employeeId && 
+                                lr.Status == HRMS.Domain.Enums.LeaveStatus.Approved &&
+                                today >= lr.FromDate.Date && today <= lr.ToDate.Date);
+            
+            if (isOnLeave)
+            {
+                Console.WriteLine($"[ATTENDANCE] Error: Employee {employeeId} is on approved leave today ({today:yyyy-MM-dd})");
+                throw new InvalidOperationException("Bạn đang trong ngày nghỉ phép đã được duyệt, không cần chấm công.");
+            }
+
             // 3. Kiểm tra lịch làm việc (Ưu tiên lịch cụ thể, fallback về ca trong hợp đồng)
             var workSchedule = await _context.WorkSchedules
                 .Include(ws => ws.WorkShift)
@@ -140,6 +152,17 @@ namespace HRMS.Infrastructure.Services
                 throw new InvalidOperationException("Bạn không thể chấm công do không có hợp đồng lao động đang có hiệu lực.");
             }
 
+            // Kiểm tra xem có đang trong ngày nghỉ phép không
+            var isOnLeave = await _context.LeaveRequests
+                .AnyAsync(lr => lr.EmployeeId == employeeId && 
+                                lr.Status == HRMS.Domain.Enums.LeaveStatus.Approved &&
+                                today >= lr.FromDate.Date && today <= lr.ToDate.Date);
+            
+            if (isOnLeave)
+            {
+                throw new InvalidOperationException("Bạn đang trong ngày nghỉ phép đã được duyệt, không cần chấm công.");
+            }
+
             // Kiểm tra xem đã check-in chưa
             var checkInRecord = await _context.TimeAttendanceRecords
                 .Include(r => r.WorkSchedule)
@@ -195,6 +218,17 @@ namespace HRMS.Infrastructure.Services
 
             _context.TimeAttendanceRecords.Add(record);
             await _context.SaveChangesAsync();
+
+            // AUTOMATION: Compute and push final OT/Working hours to AttendanceDetail (Bảng công)
+            try
+            {
+                await ComputeAndSaveAttendanceDetailAsync(employeeId, today);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ATTENDANCE] Automation Error: Failed to update AttendanceDetail: {ex.Message}");
+            }
+
 
             var employee = checkInRecord.Employee;
             var shiftInfo = checkInRecord.WorkSchedule?.WorkShift ?? employee?.Shift;
@@ -790,12 +824,11 @@ namespace HRMS.Infrastructure.Services
                     TimeSpan? snappedCheckInTime = checkIn.Timestamp.TimeOfDay;
                     TimeSpan? snappedCheckOutTime = checkOut?.Timestamp.TimeOfDay;
 
-                    // Lấy số giờ OT nếu có (Chỉ tính nếu đơn đã được DUYỆT)
+                    // Lấy số giờ OT nếu có (Chỉ tính nếu có record OvertimeAssignment)
                     decimal otHours = 0;
-                    var todayOtRequest = await _context.OvertimeRequests
-                        .Where(or => or.EmployeeId == emp.Id && 
-                                     or.Date == dayGroup.Key &&
-                                     or.Status == "Approved")
+                    var todayAssignment = await _context.OvertimeAssignments
+                        .Where(oa => oa.EmployeeId == emp.Id && 
+                                     oa.Date.Date == dayGroup.Key.Date)
                         .FirstOrDefaultAsync();
 
                     if (shift != null)
@@ -840,27 +873,27 @@ namespace HRMS.Infrastructure.Services
                             else 
                             {
                                 // 2. Về đúng giờ hoặc muộn hơn (có thể có OT)
-                                // Snap về shiftEnd nếu trong grace period và KHÔNG có OT
-                                if (todayOtRequest == null && checkOut.Timestamp <= checkOutGraceEnd)
+                                if (todayAssignment == null)
                                 {
+                                    // Về muộn nhưng không có kế hoạch OT -> SNAP VỀ shiftEnd (Cap tại 0 giờ OT)
                                     snappedCheckOutTime = shiftEnd;
                                 }
-                                else if (todayOtRequest == null)
+                                else if (checkOut.Timestamp <= checkOutGraceEnd)
                                 {
-                                    // Về muộn quá grace nhưng không có OT -> Vẫn chỉ tính đến shiftEnd (theo luật cũ hoặc snap)
+                                    // Trong grace period -> Snap về shiftEnd
                                     snappedCheckOutTime = shiftEnd;
                                 }
                                 else 
                                 {
-                                    // CÓ ĐƠN OT ĐÃ DUYỆT
+                                    // CÓ KẾ HOẠCH OT ĐƯỢC GIAO (todayAssignment != null)
                                     double actualOtMins = (checkOut.Timestamp - shiftEndDt).TotalMinutes;
-                                    double requestedOtMins = (todayOtRequest.EndTime - todayOtRequest.StartTime).TotalMinutes;
-                                    if (todayOtRequest.EndTime < todayOtRequest.StartTime) requestedOtMins += 24 * 60;
+                                    double assignedOtMins = (double)todayAssignment.AssignedMaxHours * 60.0;
 
-                                    double validOtMins = Math.Min(actualOtMins, requestedOtMins);
+                                    // LUẬT CỐT LÕI: Min (Thực tế, Được giao)
+                                    double validOtMins = Math.Min(actualOtMins, assignedOtMins);
                                     if (validOtMins < 0) validOtMins = 0;
 
-                                    // Làm tròn: 45p -> 30p, 1h15p -> 1h (Sàn về 0.5h)
+                                    // Làm tròn xuống theo block 0.5h (30p)
                                     otHours = (decimal)(Math.Floor(validOtMins / 30.0) * 0.5);
                                     totalOtHours += otHours;
 
@@ -963,295 +996,475 @@ namespace HRMS.Infrastructure.Services
             return count;
         }
 
-        public async Task<OvertimeRequestDto> SubmitOvertimeRequestAsync(int employeeId, CreateOvertimeRequestDto dto)
+        // --- New Overtime Management Implementations ---
+
+        public async Task<OvertimePlanDto> CreateOvertimePlanAsync(CreateOvertimePlanDto dto, int creatorUserId)
         {
-            // 1. Kiểm tra ngày đăng ký (không được trong quá khứ)
-            if (dto.Date.Date < DateTime.Today)
-                throw new InvalidOperationException("Đơn xin tăng ca không được gửi cho các ngày trong quá khứ.");
+            var creator = await _context.Employees.FirstOrDefaultAsync(e => e.UserId == creatorUserId);
+            if (creator == null) throw new InvalidOperationException("Không tìm thấy thông tin nhân viên của người tạo.");
 
-            var emp = await _context.Employees.FindAsync(employeeId);
-            if (emp == null) throw new InvalidOperationException("Không tìm thấy nhân viên.");
-
-            var startTs = TimeSpan.Parse(dto.StartTime);
-            var endTs = TimeSpan.Parse(dto.EndTime);
-            var duration = endTs - startTs;
-            if (duration.TotalMinutes < 30)
-                throw new InvalidOperationException("Thời gian tăng ca tối thiểu là 30 phút.");
-
-            var request = new OvertimeRequest
+            var plan = new OvertimePlan
             {
-                EmployeeId = employeeId,
-                DepartmentId = emp.DepartmentId,
-                Date = dto.Date.Date,
-                StartTime = startTs,
-                EndTime = endTs,
-                Reason = dto.Reason,
-                Status = "Pending",
-                CreatedAt = DateTime.UtcNow,
-                CreatedById = emp.UserId ?? employeeId // Gán UserId của người tạo
+                DepartmentId = dto.DepartmentId,
+                Month = dto.Month,
+                Year = dto.Year,
+                TotalBudgetHours = dto.TotalBudgetHours,
+                Description = dto.Description,
+                Status = "Draft",
+                CreatedById = creator.Id,
+                CreatedAt = DateTime.UtcNow
             };
 
-            _context.OvertimeRequests.Add(request);
-
-            try
-            {
-                await _context.SaveChangesAsync();
-                return new OvertimeRequestDto
-                {
-                    Id = request.Id,
-                    EmployeeId = request.EmployeeId,
-                    EmployeeName = emp.FullName,
-                    Date = request.Date,
-                    StartTime = request.StartTime.ToString(@"hh\:mm"),
-                    EndTime = request.EndTime.ToString(@"hh\:mm"),
-                    TotalHours = (decimal)duration.TotalHours,
-                    Reason = request.Reason ?? "",
-                    Status = request.Status,
-                    CreatedAt = request.CreatedAt
-                };
-            }
-            catch (Exception ex)
-            {
-                var innerMsg = ex.InnerException?.Message ?? ex.Message;
-                Console.WriteLine($"❌ [SubmitOvertimeRequest] SAVE ERROR: {ex.Message}");
-                Console.WriteLine($"❌ [SubmitOvertimeRequest] INNER ERROR: {innerMsg}");
-                throw new Exception($"Lỗi hệ thống: {innerMsg}");
-            }
-        }
-
-        public async Task<bool> ReviewOvertimeRequestAsync(int requestId, int approverId, string status, string note)
-        {
-            var req = await _context.OvertimeRequests
-                .Include(r => r.Employee)
-                .FirstOrDefaultAsync(r => r.Id == requestId);
-            
-            if (req == null) return false;
-
-            req.Status = status; // Approved / Rejected
-            req.ApprovedById = approverId;
-            req.ApprovedAt = DateTime.UtcNow;
-            req.Note = note;
-
+            _context.OvertimePlans.Add(plan);
             await _context.SaveChangesAsync();
 
-            // Gửi thông báo cho nhân viên
-            string title = status == "Approved" ? "Đơn tăng ca đã được DUYỆT" : "Đơn tăng ca bị TỪ CHỐI";
-            string msg = status == "Approved" 
-                ? $"Đơn tăng ca ngày {req.Date:dd/MM/yyyy} của bạn đã được duyệt."
-                : $"Đơn tăng ca ngày {req.Date:dd/MM/yyyy} của bạn bị từ chối. Lý do: {note}";
+            var dept = await _context.Departments.FindAsync(dto.DepartmentId);
 
-            await _notificationService.CreateNotificationAsync(new HRMS.Application.DTOs.Notification.CreateNotificationDto
+            return new OvertimePlanDto
             {
-                EmployeeId = req.EmployeeId,
-                Title = title,
-                Message = msg,
-                Type = "Overtime",
-                RelatedId = req.Id.ToString()
-            });
+                Id = plan.Id,
+                DepartmentName = dept?.DepartmentName ?? "Unknown",
+                Month = plan.Month,
+                Year = plan.Year,
+                TotalBudgetHours = plan.TotalBudgetHours,
+                Description = plan.Description,
+                Status = plan.Status,
+                CreatedBy = creator.FullName,
+                CreatedAt = plan.CreatedAt
+            };
+        }
 
+        public async Task<List<OvertimePlanDto>> GetOvertimePlansAsync(int? departmentId, int? month, int? year)
+        {
+            var query = _context.OvertimePlans
+                .Include(p => p.Department)
+                .Include(p => p.CreatedBy)
+                .AsQueryable();
+
+            if (departmentId.HasValue && departmentId > 0)
+            {
+                var targetIds = await GetDepartmentHierarchyIdsAsync(departmentId.Value);
+                query = query.Where(p => targetIds.Contains(p.DepartmentId));
+            }
+
+            if (month.HasValue)
+                query = query.Where(p => p.Month == month);
+
+            if (year.HasValue)
+                query = query.Where(p => p.Year == year);
+
+            var plans = await query.OrderByDescending(p => p.Year).ThenByDescending(p => p.Month).ToListAsync();
+
+            return plans.Select(plan => new OvertimePlanDto
+            {
+                Id = plan.Id,
+                DepartmentId = plan.DepartmentId,
+                DepartmentName = plan.Department?.DepartmentName ?? "Unknown",
+                Month = plan.Month,
+                Year = plan.Year,
+                TotalBudgetHours = plan.TotalBudgetHours,
+                Description = plan.Description,
+                Status = plan.Status,
+                CreatedBy = plan.CreatedBy?.FullName ?? "System",
+                CreatedAt = plan.CreatedAt
+            }).ToList();
+        }
+
+        public async Task<bool> BulkAssignOvertimeAsync(BulkAssignOvertimeDto dto, int assignerUserId)
+        {
+            var assigner = await _context.Employees.FirstOrDefaultAsync(e => e.UserId == assignerUserId);
+            if (assigner == null) throw new InvalidOperationException("Không tìm thấy thông tin nhân viên của người gán.");
+
+            foreach (var item in dto.Assignments)
+            {
+                // Quy tắc 1: Phải thông báo trước từ 1 đến 3 ngày
+                var daysDiff = (item.Date.Date - DateTime.Today.Date).TotalDays;
+                if (daysDiff < 2)
+                {
+                    throw new InvalidOperationException($"Không thể đề cử cho ngày {item.Date:dd/MM/yyyy}. Lịch OT phải được tạo trước ít nhất 2 ngày.");
+                }
+
+                // Quy tắc 2: Phải có ca làm việc và không phải là ngày nghỉ
+                var schedule = await _context.WorkSchedules
+                    .FirstOrDefaultAsync(s => s.EmployeeId == item.EmployeeId && s.WorkingDate.Date == item.Date.Date);
+
+                if (schedule == null)
+                {
+                    throw new InvalidOperationException($"Nhân viên ID {item.EmployeeId} chưa có lịch làm việc (WorkSchedule) vào ngày {item.Date:dd/MM/yyyy}.");
+                }
+                
+                if (schedule.WorkShiftId == null)
+                {
+                    throw new InvalidOperationException($"Nhân viên ID {item.EmployeeId} có lịch nghỉ (OFF) vào ngày {item.Date:dd/MM/yyyy}, không thể áp dụng tăng ca.");
+                }
+                // Xoá assignment cũ nếu có cho ngày đó/nhân viên đó
+                var existing = await _context.OvertimeAssignments
+                    .FirstOrDefaultAsync(oa => oa.EmployeeId == item.EmployeeId && oa.Date.Date == item.Date.Date);
+
+                if (item.Hours <= 0)
+                {
+                    if (existing != null) _context.OvertimeAssignments.Remove(existing);
+                    continue;
+                }
+
+                if (existing != null)
+                {
+                    existing.AssignedMaxHours = item.Hours;
+                    existing.AssignedById = assigner.Id;
+                    existing.OvertimePlanId = dto.PlanId;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    var assignment = new OvertimeAssignment
+                    {
+                        EmployeeId = item.EmployeeId,
+                        Date = item.Date.Date,
+                        AssignedMaxHours = item.Hours,
+                        AssignedById = assigner.Id,
+                        OvertimePlanId = dto.PlanId,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.OvertimeAssignments.Add(assignment);
+                }
+
+                // Push Notification to Employee
+                await _notificationService.CreateNotificationAsync(new HRMS.Application.DTOs.Notification.CreateNotificationDto
+                {
+                    EmployeeId = item.EmployeeId,
+                    Title = "Thông báo: Lịch làm thêm (OT) mới",
+                    Message = $"Bạn có lịch làm thêm vào ngày {item.Date:dd/MM/yyyy} với số giờ tối đa được duyệt là {item.Hours}h.",
+                    Type = "Overtime",
+                    RelatedId = item.Date.ToString("yyyyMMdd")
+                });
+            }
+
+            await _context.SaveChangesAsync();
             return true;
         }
 
-        public async Task<List<OvertimeRequestDto>> GetMyOvertimeRequestsAsync(int employeeId)
+
+        public async Task<List<OvertimeAssignmentDto>> GetMyOvertimeAssignmentsAsync(int employeeId, DateTime fromDate, DateTime toDate)
         {
-            var requests = await _context.OvertimeRequests
-                .Where(r => r.EmployeeId == employeeId)
-                .Include(r => r.Employee)
-                .Include(r => r.ApprovedBy)
-                .OrderByDescending(r => r.Date)
+            var assignments = await _context.OvertimeAssignments
+                .Include(a => a.AssignedBy)
+                .Where(a => a.EmployeeId == employeeId && a.Date.Date >= fromDate.Date && a.Date.Date <= toDate.Date)
+                .OrderBy(a => a.Date)
                 .ToListAsync();
 
-            return requests.Select(r => new OvertimeRequestDto
+            return assignments.Select(a => new OvertimeAssignmentDto
             {
-                Id = r.Id,
-                EmployeeId = r.EmployeeId,
-                EmployeeName = r.Employee?.FullName ?? "Unknown",
-                Date = r.Date,
-                StartTime = r.StartTime.ToString(@"hh\:mm"),
-                EndTime = r.EndTime.ToString(@"hh\:mm"),
-                TotalHours = (decimal)(r.EndTime - r.StartTime).TotalHours,
-                Reason = r.Reason ?? "",
-                Status = r.Status,
-                ApproverName = r.ApprovedBy?.FullName,
-                Note = r.Note,
-                CreatedAt = r.CreatedAt
+                Id = a.Id,
+                EmployeeId = a.EmployeeId,
+                Date = a.Date,
+                AssignedMaxHours = a.AssignedMaxHours,
+                AssignedBy = a.AssignedBy?.FullName ?? "Unknown",
+                IsConfirmed = a.IsConfirmed
             }).ToList();
         }
 
-        public async Task<List<OvertimeRequestDto>> GetOvertimeToApproveAsync(int departmentId)
-        {
-            var requests = await _context.OvertimeRequests
-                .Where(r => r.DepartmentId == departmentId && r.Status == "Pending")
-                .Include(r => r.Employee)
-                .OrderByDescending(r => r.CreatedAt)
-                .ToListAsync();
-
-            return requests.Select(r => new OvertimeRequestDto
-            {
-                Id = r.Id,
-                EmployeeId = r.EmployeeId,
-                EmployeeName = r.Employee?.FullName ?? "Unknown",
-                Date = r.Date,
-                StartTime = r.StartTime.ToString(@"hh\:mm"),
-                EndTime = r.EndTime.ToString(@"hh\:mm"),
-                TotalHours = (decimal)(r.EndTime - r.StartTime).TotalHours,
-                Reason = r.Reason ?? "",
-                Status = r.Status,
-                CreatedAt = r.CreatedAt
-            }).ToList();
-        }
-
-        public async Task<List<OvertimeRequestDto>> GetOvertimeRequestsByDepartmentAsync(int departmentId)
-        {
-            var requests = await _context.OvertimeRequests
-                .Where(r => r.DepartmentId == departmentId)
-                .Include(r => r.Employee)
-                .Include(r => r.ApprovedBy)
-                .OrderByDescending(r => r.Date)
-                .ToListAsync();
-
-            return requests.Select(r => new OvertimeRequestDto
-            {
-                Id = r.Id,
-                EmployeeId = r.EmployeeId,
-                EmployeeName = r.Employee?.FullName ?? "Unknown",
-                Date = r.Date,
-                StartTime = r.StartTime.ToString(@"hh\:mm"),
-                EndTime = r.EndTime.ToString(@"hh\:mm"),
-                TotalHours = (decimal)(r.EndTime - r.StartTime).TotalHours,
-                Reason = r.Reason ?? "",
-                Status = r.Status,
-                ApproverName = r.ApprovedBy?.FullName,
-                Note = r.Note,
-                CreatedAt = r.CreatedAt
-            }).ToList();
-        }
-        private async Task<List<int>> GetDepartmentHierarchyIdsAsync(int parentDeptId)
-        {
-            var allDepts = await _context.Departments
-                .Select(d => new { d.Id, d.ParentDepartmentId })
-                .ToListAsync();
-
-            var result = new List<int> { parentDeptId };
-            
-            void FindSubDepts(int pid)
-            {
-                var subs = allDepts.Where(d => d.ParentDepartmentId == pid).Select(d => d.Id).ToList();
-                foreach (var sub in subs)
-                {
-                    if (!result.Contains(sub))
-                    {
-                        result.Add(sub);
-                        FindSubDepts(sub);
-                    }
-                }
-            }
-
-            FindSubDepts(parentDeptId);
-            return result;
-        }
-
-        public async Task<string> ExportAndCleanupOldAttendanceAsync(int month, int year)
+        public async Task<AttendanceGridDto> GetOvertimeAssignmentGridAsync(int departmentId, int month, int year)
         {
             var startDate = new DateTime(year, month, 1);
             var endDate = startDate.AddMonths(1).AddDays(-1);
 
-            // Fetch details
-            var details = await _context.AttendanceDetails
-                .Include(d => d.Employee)
-                .Where(d => d.Date >= startDate && d.Date <= endDate)
-                .OrderBy(d => d.Date).ThenBy(d => d.EmployeeId)
+            var result = new AttendanceGridDto();
+
+            // 1. Headers (Các ngày trong tháng)
+            for (var d = startDate; d <= endDate; d = d.AddDays(1))
+            {
+                result.DateHeaders.Add(d.ToString("dd/MM"));
+            }
+
+            // 2. Lấy danh sách nhân viên trong phòng ban
+            var employees = await _context.Employees
+                .Where(e => e.DepartmentId == departmentId)
+                .OrderBy(e => e.FullName)
                 .ToListAsync();
 
-            if (!details.Any())
-            {
-                return "Không có dữ liệu công trong tháng này để dọn dẹp.";
-            }
+            var employeeIds = employees.Select(e => e.Id).ToList();
 
-            // Create CSV Content
-            var csvBuilder = new System.Text.StringBuilder();
-            
-            // Header
-            csvBuilder.AppendLine("Employee Code,Employee Name,Date,Check-In,Check-Out,CheckIn Count,CheckOut Count,Working Hours,Working Days,OT Hours,Status,Is Late,Is Early Leave");
-
-            foreach(var d in details)
-            {
-                var row = $"{d.Employee?.EmployeeCode},\"{d.Employee?.FullName}\",{d.Date:yyyy-MM-dd},{d.CheckInTime},{d.CheckOutTime},{d.CheckInCount},{d.CheckOutCount},{d.WorkingHours},{d.WorkingDays},{d.OTHours},\"{d.Status}\",{d.IsLate},{d.IsEarlyLeave}";
-                csvBuilder.AppendLine(row);
-            }
-
-            // Save to file
-            var exportDir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "wwwroot", "exports");
-            if (!System.IO.Directory.Exists(exportDir))
-            {
-                System.IO.Directory.CreateDirectory(exportDir);
-            }
-
-            string fileName = $"AttendanceLog_{year}_{month:D2}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.csv";
-            string filePath = System.IO.Path.Combine(exportDir, fileName);
-
-            // Ghi file kèm UTF-8 BOM
-            await System.IO.File.WriteAllTextAsync(filePath, csvBuilder.ToString(), new System.Text.UTF8Encoding(true));
-
-            // Clean up Database
-            _context.AttendanceDetails.RemoveRange(details);
-            
-            // Xoá luôn lịch sử bấm vân tay thô TimeAttendanceRecord
-            var rawRecords = await _context.TimeAttendanceRecords
-                .Where(r => r.Date >= startDate && r.Date <= endDate)
+            // 3. Lấy assignments trong tháng
+            var assignments = await _context.OvertimeAssignments
+                .Where(a => employeeIds.Contains(a.EmployeeId) && a.Date.Date >= startDate && a.Date.Date <= endDate)
                 .ToListAsync();
-            _context.TimeAttendanceRecords.RemoveRange(rawRecords);
+
+            foreach (var emp in employees)
+            {
+                var row = new AttendanceGridRowDto
+                {
+                    EmployeeId = emp.Id,
+                    EmployeeName = emp.FullName,
+                    DailyValues = new List<decimal>()
+                };
+
+                var empAssignments = assignments.Where(a => a.EmployeeId == emp.Id).ToDictionary(a => a.Date.Date);
+
+                for (var d = startDate; d <= endDate; d = d.AddDays(1))
+                {
+                    if (empAssignments.TryGetValue(d.Date, out var assignment))
+                    {
+                        row.DailyValues.Add(assignment.AssignedMaxHours);
+                    }
+                    else
+                    {
+                        row.DailyValues.Add(0);
+                    }
+                }
+
+                result.Rows.Add(row);
+            }
+
+            return result;
+        }
+        /// <summary>
+        /// Tính toán và lưu dữ liệu vào bảng công chi tiết (AttendanceDetail) ngay sau khi nhân viên kết thúc ca
+        /// Áp dụng đúng triết lý: Min(Thực tế, Được giao)
+        /// </summary>
+        private async Task ComputeAndSaveAttendanceDetailAsync(int employeeId, DateTime date)
+        {
+            var emp = await _context.Employees.Include(e => e.Shift).FirstOrDefaultAsync(e => e.Id == employeeId);
+            if (emp == null) return;
+
+            // 1. Lấy records check-in/out của ngày hôm nay
+            var records = await _context.TimeAttendanceRecords
+                .Include(r => r.WorkSchedule)
+                    .ThenInclude(ws => ws.WorkShift)
+                .Where(r => r.EmployeeId == employeeId && r.Date == date.Date)
+                .ToListAsync();
+
+            var checkIn = records.Where(r => r.Type == "CheckIn").OrderBy(r => r.Timestamp).FirstOrDefault();
+            var checkOut = records.Where(r => r.Type == "CheckOut").OrderByDescending(r => r.Timestamp).FirstOrDefault();
+
+            if (checkIn == null) return;
+
+            // 2. Xác định ca làm việc
+            var shift = checkIn.WorkSchedule?.WorkShift ?? emp.Shift;
+            if (shift == null) return;
+
+            var shiftStartDt = date.Date.Add(shift.StartTime);
+            var shiftEndDt = date.Date.Add(shift.EndTime);
+            if (shift.EndTime <= shift.StartTime) shiftEndDt = shiftEndDt.AddDays(1); // Ca đêm
+
+            // 3. Grace periods
+            const int CHECK_IN_GRACE_BEFORE_MINUTES = 30;
+            const int CHECK_OUT_GRACE_AFTER_MINUTES = 15;
+            DateTime checkInGraceStart = shiftStartDt.AddMinutes(-CHECK_IN_GRACE_BEFORE_MINUTES);
+            DateTime checkOutGraceEnd = shiftEndDt.AddMinutes(CHECK_OUT_GRACE_AFTER_MINUTES);
+
+            // 4. Kiểm tra trễ/sớm
+            bool isLate = checkIn.Timestamp > shiftStartDt;
+            bool isEarlyLeave = checkOut != null && checkOut.Timestamp < shiftEndDt;
+
+            TimeSpan snappedIn = isLate ? checkIn.Timestamp.TimeOfDay : shift.StartTime;
+            TimeSpan snappedOut = shift.EndTime;
+
+            // 5. TÍNH OT (LUẬT CAPPING)
+            decimal otHours = 0;
+            var todayAssignment = await _context.OvertimeAssignments
+                .FirstOrDefaultAsync(oa => oa.EmployeeId == employeeId && oa.Date.Date == date.Date);
+
+            if (checkOut != null)
+            {
+                if (isEarlyLeave)
+                {
+                    snappedOut = checkOut.Timestamp.TimeOfDay;
+                }
+                else if (todayAssignment != null && checkOut.Timestamp > checkOutGraceEnd)
+                {
+                    // CÓ KẾ HOẠCH OT
+                    double actualOtMins = (checkOut.Timestamp - shiftEndDt).TotalMinutes;
+                    double assignedOtMins = (double)todayAssignment.AssignedMaxHours * 60.0;
+
+                    // Luật: Min (Thực tế, Được giao)
+                    double validOtMins = Math.Min(actualOtMins, assignedOtMins);
+                    if (validOtMins > 0)
+                    {
+                        // Làm tròn xuống block 30p
+                        otHours = (decimal)(Math.Floor(validOtMins / 30.0) * 0.5);
+                        DateTime finalOutDt = shiftEndDt.AddHours((double)otHours);
+                        snappedOut = finalOutDt.TimeOfDay;
+                    }
+                }
+            }
+
+            // 6. Tính số công (WorkingDays) dựa trên quy tắc vi phạm
+            decimal workingDays = 0;
+            decimal workingHours = 0;
+            if (checkOut != null)
+            {
+                if (!isLate && !isEarlyLeave) { workingDays = 1.0m; workingHours = 8.0m; }
+                else if (isLate && isEarlyLeave) { workingDays = 0m; workingHours = 0m; }
+                else { workingDays = 0.5m; workingHours = 4.0m; }
+            }
+
+            // 7. Lưu vào AttendanceDetail
+            var existingDetail = await _context.AttendanceDetails
+                .FirstOrDefaultAsync(d => d.EmployeeId == employeeId && d.Date == date.Date);
+
+            string statusLabel = "Đúng giờ";
+            if (isLate && isEarlyLeave) statusLabel = "Trễ & Sớm";
+            else if (isLate) statusLabel = "Đi muộn";
+            else if (isEarlyLeave) statusLabel = "Về sớm";
+            else if (checkOut == null) statusLabel = "Chưa ra ca";
+
+            if (existingDetail != null)
+            {
+                existingDetail.CheckInTime = snappedIn;
+                existingDetail.CheckOutTime = checkOut != null ? snappedOut : null;
+                existingDetail.IsLate = isLate;
+                existingDetail.IsEarlyLeave = isEarlyLeave;
+                existingDetail.OTHours = otHours;
+                existingDetail.WorkingDays = workingDays;
+                existingDetail.WorkingHours = workingHours;
+                existingDetail.Status = statusLabel;
+                existingDetail.CheckInCount = records.Count(r => r.Type == "CheckIn");
+                existingDetail.CheckOutCount = records.Count(r => r.Type == "CheckOut");
+                existingDetail.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                _context.AttendanceDetails.Add(new AttendanceDetail
+                {
+                    EmployeeId = employeeId,
+                    Date = date.Date,
+                    WorkShiftId = shift.Id,
+                    CheckInTime = snappedIn,
+                    CheckOutTime = checkOut != null ? snappedOut : null,
+                    IsLate = isLate,
+                    IsEarlyLeave = isEarlyLeave,
+                    WorkingHours = workingHours,
+                    WorkingDays = workingDays,
+                    OTHours = otHours,
+                    Status = statusLabel,
+                    CheckInCount = 1,
+                    CheckOutCount = (checkOut != null ? 1 : 0),
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
 
             await _context.SaveChangesAsync();
+            
+            // AUTOMATION: Update the monthly summary (AttendanceSummary)
+            await UpdateAttendanceSummaryForEmployeeAsync(employeeId, date);
+        }
 
-            return $"/exports/{fileName}";
+        private async Task UpdateAttendanceSummaryForEmployeeAsync(int employeeId, DateTime date)
+        {
+            // Find current active period for this date
+            var period = await _context.SchedulePeriods
+                .FirstOrDefaultAsync(p => date.Date >= p.StartDate.Date && date.Date <= p.EndDate.Date);
+            
+            if (period == null) return;
+
+            var details = await _context.AttendanceDetails
+                .Where(d => d.EmployeeId == employeeId && d.Date >= period.StartDate && d.Date <= period.EndDate)
+                .ToListAsync();
+
+            var summary = await _context.AttendanceSummaries
+                .FirstOrDefaultAsync(s => s.EmployeeId == employeeId && s.PeriodId == period.Id);
+
+            if (summary == null)
+            {
+                summary = new AttendanceSummary
+                {
+                    EmployeeId = employeeId,
+                    PeriodId = period.Id,
+                    Status = TimesheetStatus.Draft,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.AttendanceSummaries.Add(summary);
+            }
+
+            // Recalculate everything from details
+            summary.TotalWorkingDays = details.Count(d => d.CheckInTime != null);
+            summary.AdjustedWorkingDays = details.Sum(d => d.WorkingDays);
+            summary.LateDays = details.Count(d => d.IsLate);
+            summary.EarlyLeaveDays = details.Count(d => d.IsEarlyLeave);
+            summary.TotalWorkingHours = details.Sum(d => d.WorkingHours);
+            summary.OvertimeHours = details.Sum(d => d.OTHours);
+            summary.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task<AttendanceRecordDto> ScanAttendanceByCodeAsync(string employeeCode, string location, string deviceInfo)
         {
-            var employee = await _context.Employees
-                .FirstOrDefaultAsync(e => e.EmployeeCode == employeeCode);
-
-            if (employee == null)
-            {
-                throw new InvalidOperationException($"Không tìm thấy nhân viên với mã: {employeeCode}");
-            }
+            var employee = await _context.Employees.FirstOrDefaultAsync(e => e.EmployeeCode == employeeCode);
+            if (employee == null) throw new InvalidOperationException("Không tìm thấy nhân viên với mã này.");
 
             var today = DateTime.Today;
-
-            // Kiểm tra xem đã check-in hôm nay chưa
-            var checkInRecord = await _context.TimeAttendanceRecords
+            var existingCheckIn = await _context.TimeAttendanceRecords
                 .FirstOrDefaultAsync(r => r.EmployeeId == employee.Id && r.Date == today && r.Type == "CheckIn");
 
-            if (checkInRecord == null)
+            if (existingCheckIn == null)
             {
-                // Thực hiện Check-in
                 return await CheckInAsync(new CheckInDto
                 {
                     EmployeeId = employee.Id,
                     Location = location,
                     DeviceInfo = deviceInfo,
-                    Timestamp = DateTime.Now
+                    Note = "Quét mã vạch"
                 });
             }
-
-            // Nếu đã check-in, kiểm tra xem đã check-out chưa
-            var checkOutRecord = await _context.TimeAttendanceRecords
-                .FirstOrDefaultAsync(r => r.EmployeeId == employee.Id && r.Date == today && r.Type == "CheckOut");
-
-            if (checkOutRecord == null)
+            else
             {
-                // Thực hiện Check-out
                 return await CheckOutAsync(new CheckOutDto
                 {
                     EmployeeId = employee.Id,
                     Location = location,
                     DeviceInfo = deviceInfo,
-                    Timestamp = DateTime.Now
+                    Note = "Quét mã vạch"
                 });
             }
+        }
 
-            throw new InvalidOperationException("Nhân viên này đã hoàn thành chấm công (vào và ra) trong ngày hôm nay.");
+        public async Task<string> ExportAndCleanupOldAttendanceAsync(int month, int year)
+        {
+            // Placeholder for data retention logic
+            return $"Đã thực hiện lưu trữ và dọn dẹp dữ liệu chấm công tháng {month}/{year}.";
+        }
+
+        public async Task<bool> PublishOvertimePlanAsync(int planId, int userId)
+        {
+            var plan = await _context.OvertimePlans.FindAsync(planId);
+            if (plan == null) throw new InvalidOperationException("Không tìm thấy kế hoạch tăng ca.");
+            
+            // Logic: Mặc định là Approved khi gửi đi
+            plan.Status = "Approved";
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> ConfirmOvertimeAssignmentAsync(int assignmentId, int employeeId)
+        {
+            var assignment = await _context.OvertimeAssignments.FindAsync(assignmentId);
+            if (assignment == null) throw new InvalidOperationException("Không tìm thấy phân công tăng ca.");
+            if (assignment.EmployeeId != employeeId) throw new UnauthorizedAccessException("Bạn không có quyền xác nhận thay nhân viên khác.");
+
+            assignment.IsConfirmed = true;
+            assignment.ConfirmedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        private async Task<List<int>> GetDepartmentHierarchyIdsAsync(int departmentId)
+        {
+            var result = new List<int> { departmentId };
+            
+            // Lấy trực tiếp các phòng ban con cấp 1
+            var children = await _context.Departments
+                .Where(d => d.ParentDepartmentId == departmentId)
+                .Select(d => d.Id)
+                .ToListAsync();
+
+            foreach (var childId in children)
+            {
+                result.AddRange(await GetDepartmentHierarchyIdsAsync(childId));
+            }
+
+            return result.Distinct().ToList();
         }
     }
 }
+

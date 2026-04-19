@@ -7,8 +7,7 @@ import { getPrimaryRole } from '../layout/Sidebar';
 
 export default function SchedulingMatrix({ user, onBack }) {
     const roles = user?.roles || [];
-    const primaryRole = getPrimaryRole(roles);
-    const isDepartmentHead = primaryRole === 'DepartmentHead';
+    const isSupervisor = roles.some(r => ['TeamLeader', 'DepartmentHead', 'Admin'].includes(r));
 
     const [myTeam, setMyTeam] = useState(null);
     const [teamError, setTeamError] = useState(null);
@@ -24,7 +23,7 @@ export default function SchedulingMatrix({ user, onBack }) {
     const [isEditing, setIsEditing] = useState(false);
     const [pendingChanges, setPendingChanges] = useState({});
 
-    const [viewMode, setViewMode] = useState(isDepartmentHead ? 'employee' : 'dept');
+    const [viewMode, setViewMode] = useState(isSupervisor ? 'employee' : 'dept');
     const [selectedEmployees, setSelectedEmployees] = useState([]);
     const [bulkShiftId, setBulkShiftId] = useState('');
     const [bulkFromDate, setBulkFromDate] = useState('');
@@ -70,7 +69,7 @@ export default function SchedulingMatrix({ user, onBack }) {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                if (isDepartmentHead) {
+                if (isSupervisor) {
                     const currentDeptId = user.departmentId || user.DepartmentId;
                     if (!currentDeptId) {
                         setTeamError("Bạn chưa được gán bộ phận hoặc lỗi thông tin tài khoản.");
@@ -126,13 +125,13 @@ export default function SchedulingMatrix({ user, onBack }) {
                 }
             } catch (error) {
                 console.error("Error fetching scheduling data:", error);
-                if (isDepartmentHead) setTeamError('Không tìm thấy bộ phận được giao. Vui lòng liên hệ admin.');
+                if (isSupervisor) setTeamError('Không tìm thấy bộ phận được giao. Vui lòng liên hệ admin.');
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [isDepartmentHead]);
+    }, [isSupervisor]);
 
     useEffect(() => {
         if (selectedPeriod) {
@@ -171,7 +170,7 @@ export default function SchedulingMatrix({ user, onBack }) {
     const loadMatrix = async () => {
         setLoading(true);
         try {
-            const data = await schedulingService.getMatrix(selectedPeriod, isDepartmentHead ? null : selectedDept);
+            const data = await schedulingService.getMatrix(selectedPeriod, isSupervisor ? null : selectedDept);
             setMatrixData(data);
             setPendingChanges({});
             setSelectedEmployees([]);
@@ -186,7 +185,7 @@ export default function SchedulingMatrix({ user, onBack }) {
         if (e.target.checked) {
             const visibleEmployees = matrixData
                 .filter(row => row.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
-                .filter(row => !isDepartmentHead || !(row.positionName && row.positionName.toLowerCase().includes('trưởng phòng')))
+                .filter(row => !isSupervisor || !(row.positionName && (row.positionName.toLowerCase().includes('trưởng phòng') || row.positionName.toLowerCase().includes('tổ trưởng'))))
                 .map(e => e.employeeId);
             setSelectedEmployees(visibleEmployees);
         } else {
@@ -316,7 +315,7 @@ export default function SchedulingMatrix({ user, onBack }) {
     const handleAutoSchedule = async () => {
         setAutoError('');
         setAutoResult(null);
-        const deptId = isDepartmentHead ? (departments[0]?.id) : (selectedDept ? Number(selectedDept) : null);
+        const deptId = isSupervisor ? (departments[0]?.id) : (selectedDept ? Number(selectedDept) : null);
         if (!deptId) { setAutoError('Vui lòng chọn phòng ban.'); return; }
         if (!autoShift1 || !autoShift2 || !autoShift3) { setAutoError('Vui lòng chọn đủ Ca 1, Ca 2 và Ca 3.'); return; }
         if (!autoCycleStart) { setAutoError('Vui lòng nhập ngày bắt đầu xếp ca.'); return; }
@@ -365,7 +364,7 @@ export default function SchedulingMatrix({ user, onBack }) {
                 await schedulingService.copyPrevious({
                     sourcePeriodId,
                     targetPeriodId: selectedPeriod,
-                    departmentId: isDepartmentHead ? null : (selectedDept || null)
+                    departmentId: isSupervisor ? null : (selectedDept || null)
                 });
                 await loadMatrix();
                 alert("Sao chép thành công!");
@@ -446,7 +445,7 @@ export default function SchedulingMatrix({ user, onBack }) {
                     </div>
                     
                     <div style={{ display: 'flex', gap: '5px' }}>
-                        {!isDepartmentHead && (
+                        {!isSupervisor && (
                             <select className="ef-select" value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} style={{ width: '180px' }}>
                                 <option value="">-- Tất cả phòng ban --</option>
                                 {departments.map(d => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
@@ -472,6 +471,27 @@ export default function SchedulingMatrix({ user, onBack }) {
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                     {/* <button onClick={() => setShowAutoPanel(!showAutoPanel)} className="ef-btn">⚡ XẾP CA TỰ ĐỘNG</button> */}
+                    {roles.includes('Admin') && (
+                        <button 
+                            onClick={async () => {
+                                if (!window.confirm(`Hệ thống sẽ thiết lập lại lịch ca TOÀN BỘ NHÂN VIÊN năm ${selectedYear} dựa trên quy tắc:\n- Nhân viên: Lịch HC\n- Công nhân PRD-ASS: Xoay ca hàng tuần.\n\nTiếp tục?`)) return;
+                                setLoading(true);
+                                try {
+                                    const res = await schedulingService.globalAutoSchedule({ year: selectedYear, overwrite: true });
+                                    alert(res.message);
+                                    await loadMatrix();
+                                } catch (err) {
+                                    alert(err.response?.data?.message || err.message || "Lỗi khi thiết lập lại lịch ca.");
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }} 
+                            className="ef-btn" 
+                            style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fee2e2' }}
+                        >
+                            🔄 THIẾT LẬP LẠI TOÀN HỆ THỐNG
+                        </button>
+                    )}
                     {onBack && <button onClick={onBack} className="ef-btn">Đóng</button>}
                 </div>
             </div>
@@ -545,7 +565,7 @@ export default function SchedulingMatrix({ user, onBack }) {
                         <tr>
                             <th className="c" style={{ width: '40px', position: 'sticky', left: 0, zIndex: 10, background: '#f5f5f5', borderRight: '1px solid #d0d0d0' }}>#</th>
                             <th style={{ width: '200px', position: 'sticky', left: '40px', zIndex: 10, background: '#f5f5f5', borderRight: '1px solid #d0d0d0' }}>Nhân Viên</th>
-                            {!isDepartmentHead && <th style={{ width: '150px' }}>Phòng Ban</th>}
+                            {!isSupervisor && <th style={{ width: '150px' }}>Phòng Ban</th>}
                             <th style={{ width: '150px' }}>Chức Danh</th>
                             
                             {days.map((date, idx) => (
@@ -563,7 +583,7 @@ export default function SchedulingMatrix({ user, onBack }) {
                             <tr><td colSpan={days.length + 5} className="ef-empty">Chưa có dữ liệu lịch làm việc.</td></tr>
                         ) : matrixData
                                 .filter(row => row.fullName.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .filter(row => !isDepartmentHead || !(row.positionName && row.positionName.toLowerCase().includes('trưởng phòng')))
+                                .filter(row => !isSupervisor || !(row.positionName && (row.positionName.toLowerCase().includes('trưởng phòng') || row.positionName.toLowerCase().includes('tổ trưởng'))))
                                 .map((row, idx) => (
                             <tr key={idx}>
                                 <td className="c" style={{ position: 'sticky', left: 0, zIndex: 5, background: '#fff', borderRight: '1px solid #eaeaea' }}>
@@ -573,7 +593,7 @@ export default function SchedulingMatrix({ user, onBack }) {
                                     <div style={{ fontWeight: 'bold', fontSize: '12px' }}>{row.fullName}</div>
                                     <div style={{ fontSize: '10px', color: '#888' }}>{row.employeeCode}</div>
                                 </td>
-                                {!isDepartmentHead && (
+                                {!isSupervisor && (
                                     <td style={{ fontSize: '11px' }}>{row.departmentName}</td>
                                 )}
                                 <td style={{ fontSize: '11px' }}>{row.positionName}</td>

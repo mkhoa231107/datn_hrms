@@ -179,7 +179,7 @@ export default function SignatureModal({ onClose, onConfirm }) {
                       <RefreshCw size={14} /> LÀM MỚI
                     </button>
                     <div className="absolute top-3 left-3 pointer-events-none opacity-40 text-[10px] font-bold text-slate-400 border border-slate-200 px-2 py-1 bg-slate-50">
-                      VÙNG KÝ TÊN BÊN B
+                      VÙNG KÝ TÊN
                     </div>
                   </div>
                 ) : (

@@ -1,86 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Calendar, Signature } from 'lucide-react';
 import { api } from '../../api';
-import shiftChangeService from '../../services/shiftChangeService';
+import shiftSwapService from '../../services/shiftSwapService';
+import ShiftSwapRequestModal from './ShiftSwapRequestModal';
+import ShiftSwapRequestDetail from './ShiftSwapRequestDetail';
 import toast from 'react-hot-toast';
 
-export default function ShiftChangeRequest({ onBack }) {
-    const [requests, setRequests] = useState([]);
-    const [shifts, setShifts] = useState([]);
+export default function ShiftChangeRequest({ user, onBack }) {
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-
-    const [formData, setFormData] = useState({
-        requestedShiftId: '',
-        startDate: '',
-        endDate: '',
-        reason: ''
-    });
+    const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+    const [viewingSwapId, setViewingSwapId] = useState(null);
+    const [swapRequests, setSwapRequests] = useState([]);
 
     useEffect(() => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        setFormData(prev => ({ ...prev, startDate: tomorrow.toISOString().split('T')[0], endDate: tomorrow.toISOString().split('T')[0] }));
-        
         fetchData();
     }, []);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [reqs, shfs] = await Promise.all([
-                shiftChangeService.getMyRequests(),
-                api.get('/workshifts')
-            ]);
-            setRequests(reqs);
-            setShifts(shfs.data || []);
-            if (shfs.data && shfs.data.length > 0) {
-                setFormData(prev => ({ ...prev, requestedShiftId: shfs.data[0].id }));
-            }
+            const swaps = await shiftSwapService.getMyRequests();
+            setSwapRequests(swaps);
         } catch (err) {
-            toast.error('Lỗi khi tải dữ liệu');
+            toast.error('Lỗi khi tải dữ liệu hoán đổi ca');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        
-        if (!formData.requestedShiftId || !formData.startDate || !formData.endDate || !formData.reason) {
-            toast.error('Vui lòng điền đầy đủ thông tin');
-            return;
-        }
-
-        if (new Date(formData.startDate) > new Date(formData.endDate)) {
-            toast.error('Ngày bắt đầu không thể lớn hơn ngày kết thúc');
-            return;
-        }
-
-        setSubmitting(true);
-        try {
-            await shiftChangeService.createRequest({
-                requestedShiftId: parseInt(formData.requestedShiftId),
-                startDate: formData.startDate,
-                endDate: formData.endDate,
-                reason: formData.reason
-            });
-            toast.success('Gửi đơn xin đổi ca thành công');
-            setFormData(prev => ({ ...prev, reason: '' }));
-            fetchData();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Lỗi gửi yêu cầu');
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'Pending': return 'bg-amber-100 text-amber-700';
-            case 'Approved': return 'bg-emerald-100 text-emerald-700';
-            case 'Rejected': return 'bg-red-100 text-red-700';
-            default: return 'bg-slate-100 text-slate-700';
         }
     };
 
@@ -89,143 +33,107 @@ export default function ShiftChangeRequest({ onBack }) {
             <div className="ef-toolbar print:hidden" style={{ justifyContent: 'space-between' }}>
                 <div className="ef-toolbar-title">
                     <RefreshCw size={16} style={{ color: '#1a56db' }} />
-                    <strong style={{ fontSize: '14px', textTransform: 'uppercase' }}>Đơn Xin Đổi Ca Làm Việc</strong>
+                    <strong style={{ fontSize: '14px', textTransform: 'uppercase' }}>
+                        Hoán Đổi Ca Làm Việc Tự Nguyện
+                    </strong>
                 </div>
-                {onBack && <button onClick={onBack} className="ef-btn">Đóng</button>}
+                <div className="flex gap-2">
+                    {onBack && <button onClick={onBack} className="ef-btn">Đóng</button>}
+                </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '20px', padding: '15px' }}>
-                
-                {/* FORM XIN ĐỔI CA */}
-                <div style={{ flex: 1 }}>
-                    <div className="ef-section-title">Tạo Đơn Xin Đổi Ca</div>
-                    <form onSubmit={handleSubmit} className="ef-table-wrap">
-                        <table className="ef-table no-top-border">
-                            <tbody>
-                                <tr>
-                                    <th style={{ width: '30%' }}>Ca muốn đổi sang *</th>
-                                    <td>
-                                        <select 
-                                            className="ef-input" 
-                                            style={{ width: '100%' }}
-                                            value={formData.requestedShiftId}
-                                            onChange={e => setFormData({...formData, requestedShiftId: e.target.value})}
-                                            required
-                                        >
-                                            {shifts.map(s => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.shiftName} ({s.startTime.substring(0,5)} - {s.endTime.substring(0,5)})
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Từ ngày *</th>
-                                    <td>
-                                        <input 
-                                            type="date" 
-                                            className="ef-input" 
-                                            required
-                                            value={formData.startDate}
-                                            onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                                            style={{ width: '100%' }}
-                                        />
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Đến ngày *</th>
-                                    <td>
-                                        <input 
-                                            type="date" 
-                                            className="ef-input" 
-                                            required
-                                            value={formData.endDate}
-                                            min={formData.startDate}
-                                            onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                                            style={{ width: '100%' }}
-                                        />
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Lý do đổi ca *</th>
-                                    <td>
-                                        <textarea 
-                                            className="ef-input" 
-                                            rows="3"
-                                            required
-                                            placeholder="Ghi rõ lý do bạn muốn đổi ca..."
-                                            value={formData.reason}
-                                            onChange={(e) => setFormData({...formData, reason: e.target.value})}
-                                            style={{ width: '100%', resize: 'vertical' }}
-                                        ></textarea>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        <div style={{ padding: '15px 20px', textAlign: 'right', backgroundColor: '#f9f9f9', borderTop: '1px solid #0056b3' }}>
-                            <button 
-                                type="submit" 
-                                disabled={submitting} 
-                                style={{ backgroundColor: '#0056b3', color: '#fff', border: 'none', padding: '6px 20px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-                                {submitting ? 'ĐANG GỬI...' : 'GỬI ĐƠN'}
-                            </button>
+            {viewingSwapId ? (
+                <ShiftSwapRequestDetail 
+                    requestId={viewingSwapId} 
+                    onBack={() => { setViewingSwapId(null); fetchData(); }} 
+                    user={user}
+                />
+            ) : (
+                <div className="p-4">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="text-sm font-bold uppercase text-slate-500 flex items-center gap-2">
+                            <Calendar size={18} /> Lịch sử hoán đổi ca giữa các nhân viên
                         </div>
-                    </form>
-                </div>
+                        <button 
+                            onClick={() => setIsSwapModalOpen(true)}
+                            className="bg-purple-700 text-white px-6 py-2 rounded shadow-lg font-bold uppercase text-xs hover:bg-purple-800 transition-all active:scale-95"
+                        >
+                            + Tạo đơn hoán đổi ca tự nguyện
+                        </button>
+                    </div>
 
-                {/* LỊCH SỬ FORM */}
-                <div style={{ flex: 1.5, minWidth: '400px' }}>
-                    <div className="ef-section-title" style={{ marginTop: '0' }}>Lịch Sử Đơn Đổi Ca</div>
-                    <div className="ef-table-wrap" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                        <table className="ef-table no-top-border">
-                            <thead>
-                                <tr>
-                                    <th>Ngày Gửi</th>
-                                    <th>Nội Dung</th>
-                                    <th className="c" style={{ width: '100px' }}>Trạng Thái</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr><td colSpan="3" className="c p-4 text-slate-500 italic">Đang tải dữ liệu...</td></tr>
-                                ) : requests.length === 0 ? (
-                                    <tr><td colSpan="3" className="c p-4 text-slate-500">Chưa có lịch sử gửi đơn.</td></tr>
-                                ) : (
-                                    requests.map(req => (
-                                        <tr key={req.id}>
-                                            <td>
-                                                <div className="font-bold">{new Date(req.createdAt).toLocaleDateString('vi-VN')}</div>
-                                                <div className="text-[11px] text-slate-500">{new Date(req.createdAt).toLocaleTimeString('vi-VN')}</div>
-                                            </td>
-                                            <td>
-                                                <div className="text-sm border border-dashed border-slate-300 p-2 rounded bg-slate-50 mb-1">
-                                                    Từ ca: <strong>{req.currentShiftName}</strong> ➔ <strong>{req.requestedShiftName}</strong>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {loading ? (
+                             <div className="col-span-full border border-dashed border-slate-200 rounded-xl p-8 text-center text-slate-400">
+                                Đang tải dữ liệu...
+                             </div>
+                        ) : swapRequests.length === 0 ? (
+                            <div className="col-span-full border-2 border-dashed border-slate-200 rounded-xl p-12 text-center text-slate-400">
+                                <p className="font-bold uppercase tracking-widest mb-2">Chưa có dữ liệu hoán đổi</p>
+                                <p className="text-xs">Bạn có thể tạo yêu cầu hoán đổi ca tự nguyện với đồng nghiệp cùng bộ phận.</p>
+                            </div>
+                        ) : (
+                            swapRequests.map(swap => (
+                                <div 
+                                    key={swap.id} 
+                                    onClick={() => setViewingSwapId(swap.id)}
+                                    className="bg-white border border-slate-200 rounded-lg shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col"
+                                >
+                                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                        <span className="text-[10px] font-bold uppercase text-slate-400">Đơn #{swap.id}</span>
+                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase 
+                                            ${swap.status === 'Approved' ? 'bg-green-100 text-green-700' : 
+                                              swap.status === 'Rejected' ? 'bg-red-100 text-red-700' : 
+                                              swap.status === 'Cancelled' ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-700'}`}>
+                                            {swap.status === 'PendingPartner' ? 'Chờ đối tác' : 
+                                             swap.status === 'PendingManager' ? 'Chờ quản lý' : 
+                                             swap.status === 'PendingHR' ? 'Chờ nhân sự' : 
+                                             swap.status === 'Approved' ? 'Đã duyệt' : 
+                                             swap.status === 'Rejected' ? 'Từ chối' : 
+                                             swap.status === 'Cancelled' ? 'Đã hủy' : swap.status}
+                                        </span>
+                                    </div>
+                                    <div className="p-4 flex-1">
+                                        {(() => {
+                                            // So sánh employeeBId (employee ID) với employeeId trong user object (từ /auth/me)
+                                            const myEmpId = user?.employeeId ?? user?.EmployeeId;
+                                            const isMyTurn = myEmpId && parseInt(myEmpId) === parseInt(swap.employeeBId)
+                                                           && swap.status === 'PendingPartner';
+                                            return isMyTurn ? (
+                                                <div className="mb-3 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-md text-[10px] font-bold uppercase flex items-center gap-2 border border-amber-200 animate-pulse">
+                                                    <Signature size={12} /> Chờ bạn xác nhận (Bên B)
                                                 </div>
-                                                <div className="text-[12px] font-bold text-slate-700">
-                                                    Áp dụng: {new Date(req.startDate).toLocaleDateString('vi-VN')} - {new Date(req.endDate).toLocaleDateString('vi-VN')}
-                                                </div>
-                                                <div className="text-[12px] italic mt-1 text-slate-600">Lý do: {req.reason}</div>
-                                                {req.rejectReason && (
-                                                    <div className="text-[11px] text-red-600 font-medium mt-1 bg-red-50 p-1 border border-red-100">
-                                                        Lý do từ chối: {req.rejectReason}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="c">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold ${getStatusColor(req.status)}`}>
-                                                    {req.statusLabel}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                                            ) : null;
+                                        })()}
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="text-center flex-1">
+                                                <div className="font-bold text-sm text-slate-800">{swap.employeeA?.fullName?.split(' ').pop()}</div>
+                                                <div className="text-[9px] text-slate-400 font-bold uppercase">Bên A</div>
+                                            </div>
+                                            <div className="px-4 text-purple-400 group-hover:scale-110 transition-transform">⇄</div>
+                                            <div className="text-center flex-1">
+                                                <div className="font-bold text-sm text-slate-800">{swap.employeeB?.fullName?.split(' ').pop()}</div>
+                                                <div className="text-[9px] text-slate-400 font-bold uppercase">Bên B</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-[11px] bg-slate-50 p-2 rounded text-center mb-3 text-slate-600 border border-slate-100">
+                                            {new Date(swap.startDate).toLocaleDateString('vi-VN')} - {new Date(swap.endDate).toLocaleDateString('vi-VN')}
+                                        </div>
+                                        <div className="text-[11px] text-slate-500 line-clamp-1 italic mb-2"> Lý do: {swap.reason}</div>
+                                        <div className="text-[10px] text-right font-bold text-slate-300">{new Date(swap.createdAt).toLocaleString('vi-VN')}</div>
+                                    </div>
+                                </div>
+                            ))
+                        )}
                     </div>
                 </div>
-
-            </div>
+            )}
+            
+            <ShiftSwapRequestModal 
+                isOpen={isSwapModalOpen} 
+                onClose={() => setIsSwapModalOpen(false)} 
+                onRefresh={fetchData} 
+            />
         </div>
     );
 }

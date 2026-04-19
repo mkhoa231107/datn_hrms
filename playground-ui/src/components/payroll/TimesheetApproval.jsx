@@ -14,9 +14,9 @@ export default function TimesheetApproval({ user, onBack }) {
 
     const roles     = user?.roles || [];
     const isAdmin   = roles.includes('Admin');
-    const isHrAdmin = roles.includes('HrAdmin');
-    const isManager = roles.includes('DepartmentManager');
     const isHead    = roles.includes('DepartmentHead');
+    const isLead    = roles.includes('TeamLeader');
+    const isManager = isAdmin; // Only Admin can finalize all company timesheets
 
     useEffect(() => { fetchPeriods(); }, []);
 
@@ -38,7 +38,7 @@ export default function TimesheetApproval({ user, onBack }) {
         if (!periodId || !user) return;
         
         let deptId = user.departmentId;
-        if (isAdmin || isHrAdmin) {
+        if (isAdmin) {
             deptId = showAll ? 0 : (user.departmentId || 0);
         }
 
@@ -110,11 +110,17 @@ export default function TimesheetApproval({ user, onBack }) {
         if (isManager) {
             if (s.isAdmin) return false;
             if (s.status === 'PendingManagerApproval') return true;
+            // Admin/DeptMgr can also approve Head/Lead stuff if they want, but usually it follows hierarchy
+            if (s.status === 'PendingHeadApproval' || s.status === 'Draft') return true;
         }
         
         if (isHead) {
             if (s.isAdmin) return false;
             if (s.status === 'Draft' || s.status === 'PendingHeadApproval') return true;
+        }
+
+        if (isLead) {
+            if (s.status === 'Draft') return true;
         }
         return false;
     };

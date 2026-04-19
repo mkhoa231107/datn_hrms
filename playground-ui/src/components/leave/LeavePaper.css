@@ -1,0 +1,337 @@
+.leave-paper-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 1000;
+  padding: 40px 20px;
+  overflow-y: auto;
+  backdrop-filter: blur(4px);
+}
+
+.leave-paper-container {
+  background: #fff;
+  background-image: 
+    linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-color: #fdfdfb; /* Aged paper color */
+  
+  width: 100%;
+  max-width: 800px;
+  padding: 60px 80px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  font-family: 'Times New Roman', Times, serif;
+  color: #1a1a1a;
+  position: relative;
+  min-height: 1000px;
+  border: 1px solid #e5e7eb;
+  animation: paperSlideUp 0.4s ease-out;
+}
+
+@keyframes paperSlideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.leave-paper-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.leave-paper-nation {
+  font-weight: bold;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  letter-spacing: 1px;
+}
+
+.leave-paper-motto {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+}
+
+.leave-paper-border {
+  width: 200px;
+  height: 2px;
+  background: #000;
+  margin: 0 auto 40px;
+}
+
+.leave-paper-title {
+  font-weight: bold;
+  font-size: 2rem;
+  margin: 40px 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.leave-paper-recipient {
+  text-align: center;
+  margin-bottom: 40px;
+  font-style: italic;
+  font-size: 1.2rem;
+  line-height: 1.6;
+}
+
+.leave-paper-body {
+  text-align: justify;
+  font-size: 1.2rem;
+  line-height: 1.8;
+}
+
+.leave-paper-row {
+  margin-bottom: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+
+.leave-paper-label {
+  min-width: 160px;
+}
+
+.leave-paper-input {
+  border: none;
+  border-bottom: 1px dotted #333;
+  flex: 1;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: inherit;
+  background: transparent;
+  outline: none;
+  color: #000;
+}
+
+.leave-paper-select {
+  border: 1px solid #d1d5db;
+  padding: 8px 12px;
+  font-family: inherit;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+
+.leave-paper-textarea {
+  width: 100%;
+  min-height: 120px;
+  border: 1px solid #d1d5db;
+  padding: 15px;
+  font-family: inherit;
+  font-size: 1.1rem;
+  margin-top: 15px;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+}
+
+.leave-paper-signatures {
+  margin-top: 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  text-align: center;
+}
+
+.sig-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.sig-title {
+  font-weight: bold;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
+
+.sig-canvas-wrap {
+  border: 1px dashed #9ca3af;
+  background: #fff;
+  cursor: crosshair;
+  border-radius: 4px;
+  padding: 5px;
+}
+
+.sig-image-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.sig-image {
+  max-width: 200px;
+  max-height: 100px;
+  filter: contrast(1.2) brightness(0.9); /* Make digital sig look more like ink */
+}
+
+.leave-paper-footer {
+  margin-top: 60px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  border-top: 2px solid #e5e7eb;
+  padding-top: 30px;
+}
+
+.paper-btn {
+  padding: 12px 28px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  cursor: pointer;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paper-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.paper-btn-primary {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+.paper-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.paper-btn-secondary {
+  background: #fff;
+  color: #374151;
+}
+
+.paper-btn-secondary:hover {
+    background: #f9fafb;
+}
+
+.paper-btn-danger {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+
+.paper-btn-print {
+    background: #059669;
+    color: #fff;
+    border-color: #059669;
+}
+
+.paper-btn-print:hover {
+    background: #047857;
+}
+
+/* PRINT STYLES */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .leave-paper-overlay {
+        position: static;
+        background: none;
+        padding: 0;
+        display: block;
+    }
+    .leave-paper-container, .leave-paper-container * {
+        visibility: visible;
+    }
+    .leave-paper-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        box-shadow: none;
+        border: none;
+        width: 100%;
+        max-width: none;
+        padding: 0;
+        background: transparent;
+    }
+    .leave-paper-footer, .sig-canvas-wrap button, .leave-paper-select {
+        display: none !important;
+    }
+    .leave-paper-input {
+        border-bottom: 1px dotted #000 !important;
+    }
+}
+
+.leave-balance-info {
+    font-size: 0.95rem;
+    color: #1e40af;
+    font-style: italic;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.leave-balance-info strong {
+    color: #1d4ed8;
+    font-size: 1.05rem;
+}
+
+.leave-paper-row.info-row {
+    background: rgba(30, 64, 175, 0.05);
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 3px solid #1e40af;
+}
+
+.leave-paper-row.warning-row {
+    background: rgba(239, 68, 68, 0.05);
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 3px solid #ef4444;
+}
+
+/* ATTACHMENT UPLOAD ZONE */
+.attachment-upload-zone {
+    width: 100%;
+    margin-top: 5px;
+}
+
+.attachment-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #d1d5db;
+    border-radius: 8px;
+    padding: 20px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.attachment-label:hover {
+    border-color: #2563eb;
+    background: #f8fafc;
+    color: #2563eb;
+}
+
+.attachment-view-zone {
+    margin-top: 5px;
+    text-align: center;
+    background: #fff;
+    padding: 10px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+

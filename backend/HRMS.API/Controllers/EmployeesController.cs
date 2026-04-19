@@ -7,6 +7,9 @@ using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Linq;
 using System;
+using System.IO;
+using System.Collections.Generic;
+using Microsoft.AspNetCore.Http;
 
 namespace HRMS.API.Controllers
 {
@@ -37,7 +40,7 @@ namespace HRMS.API.Controllers
             return Ok(new { count, employees });
         }
 
-        private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+        private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
 
         private void ValidateDepartmentAccess(int targetDeptId)
         {
@@ -149,7 +152,7 @@ namespace HRMS.API.Controllers
 
         // GET: api/employees
         [HttpGet]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader,Employee")]
         public async Task<IActionResult> GetAll([FromQuery] int? departmentId = null)
         {
             return await GetManagedUsers(departmentId);
@@ -157,7 +160,7 @@ namespace HRMS.API.Controllers
 
         // GET: api/employees/managed-users
         [HttpGet("managed-users")]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader,Employee")]
         public async Task<IActionResult> GetManagedUsers([FromQuery] int? requestedDeptId = null)
         {
             try
@@ -208,7 +211,8 @@ namespace HRMS.API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
-        // POST: api/employees/{id}/photo  [Upload employee profile photo (3x4/4x6)]
+
+        // POST: api/employees/{id}/photo
         [HttpPost("{id}/photo")]
         [Authorize(Roles = "Admin,DepartmentManager")]
         public async Task<IActionResult> UploadPhoto(int id, IFormFile photo)
@@ -228,7 +232,6 @@ namespace HRMS.API.Controllers
                 var employee = await _context.Employees.FindAsync(id);
                 if (employee == null) return NotFound(new { message = "Không tìm thấy nhân viên." });
 
-                // Save to wwwroot/uploads/employees/
                 var uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "employees");
                 Directory.CreateDirectory(uploadDir);
 
@@ -239,7 +242,6 @@ namespace HRMS.API.Controllers
                 using (var stream = new FileStream(filePath, FileMode.Create))
                     await photo.CopyToAsync(stream);
 
-                // Delete old photo if exists
                 if (!string.IsNullOrEmpty(employee.Avatar))
                 {
                     var oldPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot",
@@ -260,7 +262,7 @@ namespace HRMS.API.Controllers
             }
         }
 
-        // POST: api/employees/{id}/face-descriptor  [Save face descriptor extracted from photo by AI]
+        // POST: api/employees/{id}/face-descriptor
         [HttpPost("{id}/face-descriptor")]
         [Authorize(Roles = "Admin,DepartmentManager")]
         public async Task<IActionResult> SaveFaceDescriptor(int id, [FromBody] FaceDescriptorDto dto)
@@ -280,7 +282,7 @@ namespace HRMS.API.Controllers
             }
         }
 
-        // GET: api/employees/face-descriptors  [All authenticated users — needed for client-side matching]
+        // GET: api/employees/face-descriptors
         [HttpGet("face-descriptors")]
         public async Task<IActionResult> GetFaceDescriptors()
         {
@@ -296,7 +298,7 @@ namespace HRMS.API.Controllers
         }
 
         // GET: api/employees/proxy-image?url={url}
-        [AllowAnonymous] // Allow viewing images without auth if needed, or [Authorize] to restrict
+        [AllowAnonymous]
         [HttpGet("proxy-image")]
         public async Task<IActionResult> ProxyImage([FromQuery] string url)
         {
@@ -324,6 +326,6 @@ namespace HRMS.API.Controllers
 
     public class FaceDescriptorDto
     {
-        public string Descriptor { get; set; } = string.Empty; // JSON string of Float32Array
+        public string Descriptor { get; set; } = string.Empty;
     }
 }

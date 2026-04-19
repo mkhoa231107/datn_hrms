@@ -19,7 +19,7 @@ namespace HRMS.Infrastructure.Services
             _context = context;
         }
 
-        public async Task<IEnumerable<UserWithRolesDto>> GetAllUsersAsync(string searchTerm = null)
+        public async Task<IEnumerable<UserWithRolesDto>> GetAllUsersAsync(string? searchTerm = null)
         {
             var query = _context.Users
                 .Include(u => u.UserRoles)

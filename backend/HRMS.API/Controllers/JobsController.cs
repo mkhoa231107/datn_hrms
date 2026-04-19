@@ -21,7 +21,7 @@ namespace HRMS.API.Controllers
             _jobService = jobService;
         }
 
-        private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+        private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "0");
 
         [HttpPost]
         [Authorize(Roles = "Admin")]

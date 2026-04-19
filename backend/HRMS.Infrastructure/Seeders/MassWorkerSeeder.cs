@@ -1,3 +1,4 @@
+using HRMS.Domain.Entities;
 using HRMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
@@ -18,172 +19,269 @@ namespace HRMS.Infrastructure.Seeders
         {
             Console.WriteLine("🏭 Starting Mass Seeding (PRD-ASS-001 to 151)...");
 
-            // 1. Get Prerequisites
-            var deptId = await context.Departments.Where(d => d.DepartmentCode == "PRD-ASS").Select(d => d.Id).FirstOrDefaultAsync();
-            var workerPosId = await context.Positions.Where(p => p.PositionCode == "PRD-ASS-STAFF").Select(p => p.Id).FirstOrDefaultAsync();
-            var mgrPosId = await context.Positions.Where(p => p.PositionCode == "PRD-ASS-MGR").Select(p => p.Id).FirstOrDefaultAsync();
+            // 1. Get Prerequisites (Check or Create)
             var orgId = await context.Organizations.Select(o => o.Id).FirstOrDefaultAsync();
-            var s1 = await context.WorkShifts.Where(s => s.ShiftCode == "S1").Select(s => s.Id).FirstOrDefaultAsync();
-            var c1 = await context.WorkShifts.Where(s => s.ShiftCode == "C1").Select(s => s.Id).FirstOrDefaultAsync();
-            var d1 = await context.WorkShifts.Where(s => s.ShiftCode == "D1").Select(s => s.Id).FirstOrDefaultAsync();
-
-            if (deptId == 0 || workerPosId == 0 || mgrPosId == 0 || s1 == 0 || c1 == 0 || d1 == 0) return;
-
-            // 2. Comprehensive Cleanup (CN- and PRD-ASS- junk)
-            Console.WriteLine("🧹 Cleaning up BOTH CN- and PRD-ASS- junk data... (Timeout: 5m)");
-            using (var conn = new SqlConnection(connectionString))
+            var dept = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "PRD-ASS");
+            if (dept == null)
             {
-                await conn.OpenAsync();
-                var cleanupSql = @"
-                    CREATE TABLE #T (EId INT, UId INT);
-                    INSERT INTO #T (EId, UId)
-                    SELECT e.Id, e.UserId FROM Employees e 
-                    WHERE e.EmployeeCode LIKE 'CN-%' 
-                       OR e.EmployeeCode LIKE 'PRD-ASS-0%' 
-                       OR e.EmployeeCode LIKE 'PRD-ASS-1[0-5]%';
-
-                    DELETE FROM WorkSchedules WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM EmployeeContracts WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM LeaveBalances WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM LeaveRequests WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM AttendanceSummaries WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM AttendanceDetails WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM PayrollRecords WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM EmployeeInsurances WHERE EmployeeId IN (SELECT EId FROM #T);
-                    DELETE FROM EmployeeBankAccounts WHERE EmployeeId IN (SELECT EId FROM #T);
-                    
-                    UPDATE Departments SET ManagerId = NULL WHERE ManagerId IN (SELECT EId FROM #T);
-                    UPDATE Employees SET ManagerId = NULL WHERE ManagerId IN (SELECT EId FROM #T);
-
-                    DELETE FROM Employees WHERE Id IN (SELECT EId FROM #T);
-                    DELETE FROM UserRoles WHERE UserId IN (SELECT UId FROM #T WHERE UId IS NOT NULL) OR UserId IN (SELECT Id FROM Users WHERE Username LIKE 'worker_%');
-                    DELETE FROM Users WHERE Id IN (SELECT UId FROM #T WHERE UId IS NOT NULL) OR Username LIKE 'worker_%';
-
-                    DECLARE @MU INT = ISNULL((SELECT MAX(Id) FROM Users), 0); DBCC CHECKIDENT ('Users', RESeed, @MU);
-                    DECLARE @ME INT = ISNULL((SELECT MAX(Id) FROM Employees), 0); DBCC CHECKIDENT ('Employees', RESeed, @ME);
-                    DROP TABLE #T;";
-                using (var cmd = new SqlCommand(cleanupSql, conn)) 
-                {
-                    cmd.CommandTimeout = 300;
-                    await cmd.ExecuteNonQueryAsync();
-                }
+                var prdParent = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "PRD");
+                dept = new Department { 
+                    DepartmentName = "Xưởng lắp ráp (PRD-ASS)", 
+                    DepartmentCode = "PRD-ASS", 
+                    OrganizationId = orgId,
+                    ParentDepartmentId = prdParent?.Id,
+                    IsActive = true
+                };
+                context.Departments.Add(dept);
+                await context.SaveChangesAsync();
             }
+            int deptId = dept.Id;
+
+            // Ensure Positions exist
+            var posMgr = await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "PRD-MGR");
+            if (posMgr == null) {
+                posMgr = new Position { PositionName = "Trưởng phòng sản xuất", PositionCode = "PRD-MGR", DepartmentId = deptId, IsActive = true };
+                context.Positions.Add(posMgr);
+            }
+            var posWorker = await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "PRD-ASS-W");
+            if (posWorker == null) {
+                posWorker = new Position { PositionName = "Công nhân xưởng lắp ráp", PositionCode = "PRD-ASS-W", DepartmentId = deptId, IsActive = true };
+                context.Positions.Add(posWorker);
+            }
+            await context.SaveChangesAsync();
+            
+            int mgrPosId = posMgr.Id;
+            int workerPosId = posWorker.Id;
+
+            var shifts = await context.WorkShifts.ToListAsync();
+            int s1 = shifts.FirstOrDefault(s => s.ShiftCode == "S1")?.Id ?? 0;
+            int c1 = shifts.FirstOrDefault(s => s.ShiftCode == "C1")?.Id ?? 0;
+            int d1 = shifts.FirstOrDefault(s => s.ShiftCode == "D1")?.Id ?? 0;
+            
+            if (s1 == 0 || c1 == 0 || d1 == 0)
+            {
+                Console.WriteLine("⚠️ WorkShifts (S1, C1, D1) not found. Skipping Mass Seed.");
+                return;
+            }
+
+            // 2. Skip seeding if data already exists to preserve testing data
+            if (await context.Employees.AnyAsync(e => e.EmployeeCode == "PRD-ASS-001"))
+            {
+                Console.WriteLine("⏩ PRD-ASS workers already exist. Skipping seeding to preserve your test data.");
+                return;
+            }
+
+            // 2. Fetch prerequisites (No cleanup to preserve persistence)
+            context.ChangeTracker.Clear();
+            dept = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "PRD-ASS");
+            if (dept == null) return; // Should not happen if cleanup is correct
+            orgId = await context.Organizations.Select(o => o.Id).FirstOrDefaultAsync();
+            mgrPosId = (await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "PRD-MGR"))?.Id ?? 0;
+            workerPosId = (await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "PRD-ASS-W"))?.Id ?? 0;
+            shifts = await context.WorkShifts.ToListAsync();
+            s1 = shifts.FirstOrDefault(s => s.ShiftCode == "S1")?.Id ?? 0;
+            c1 = shifts.FirstOrDefault(s => s.ShiftCode == "C1")?.Id ?? 0;
+            d1 = shifts.FirstOrDefault(s => s.ShiftCode == "D1")?.Id ?? 0;
+            
+            if (s1 == 0 || c1 == 0 || d1 == 0) return;
 
             // 3. Seed 151 Personnel (001: Mgr, 002-151: Workers)
-            Console.WriteLine("🔍 Seeding 151 PRD-ASS personnel... (This may take a minute)");
             string hash = BCrypt.Net.BCrypt.HashPassword("123456");
-            Random rng = new Random();
-
-            using (var conn = new SqlConnection(connectionString))
+            using (var trans = await context.Database.BeginTransactionAsync())
             {
-                await conn.OpenAsync();
-                using (var trans = conn.BeginTransaction())
+                try
                 {
-                    try
+                    var employeeRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Employee");
+                    
+                    for (int i = 1; i <= 151; i++)
                     {
-                        for (int i = 1; i <= 151; i++)
+                        string code = $"PRD-ASS-{i:D3}";
+                        string username = $"prd_ass_{i:D2}";
+                        string email = $"{username}@techvn.com";
+                        // Use index i for deterministic names instead of Random
+                        string fullName = $"{Surnames[i % Surnames.Length]} {MiddleNames[i % MiddleNames.Length]} {FirstNames[i % FirstNames.Length]}";
+                        
+                        int currentPosId = (i == 1) ? mgrPosId : workerPosId;
+                        decimal salary = (i == 1) ? 22000000 : 7000000;
+                        DateTime dob = new DateTime(1985 + (i % 20), (i % 12) + 1, (i % 27) + 1);
+
+                        // 1. Create User
+                        var user = new User
                         {
-                            string code = $"PRD-ASS-{i:D3}";
-                            string username = $"worker_ass_{i:D3}";
-                            string fullName = $"{Surnames[rng.Next(Surnames.Length)]} {MiddleNames[rng.Next(MiddleNames.Length)]} {FirstNames[rng.Next(FirstNames.Length)]}";
-                            int currentPosId = (i == 1) ? mgrPosId : workerPosId;
-                            decimal salary = (i == 1) ? 22000000 : 7000000;
-                            DateTime dob = new DateTime(rng.Next(1980, 2005), rng.Next(1, 13), rng.Next(1, 28));
+                            Username = username,
+                            PasswordHash = hash,
+                            Email = email,
+                            FullName = fullName,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        context.Users.Add(user);
+                        await context.SaveChangesAsync();
 
-                            // User
-                            var uCmd = new SqlCommand(@"INSERT INTO Users (Username, PasswordHash, Email, FullName, IsActive, CreatedAt) VALUES (@u, @p, @e, @f, 1, GETUTCDATE()); SELECT SCOPE_IDENTITY();", conn, trans);
-                            uCmd.CommandTimeout = 300;
-                            uCmd.Parameters.AddWithValue("@u", username); uCmd.Parameters.AddWithValue("@p", hash); uCmd.Parameters.AddWithValue("@e", $"{username}@techvn.com"); uCmd.Parameters.AddWithValue("@f", fullName);
-                            var uid = Convert.ToInt32(await uCmd.ExecuteScalarAsync());
-
-                            // Employee
-                            var eCmd = new SqlCommand(@"INSERT INTO Employees (EmployeeCode, FullName, Gender, Email, JoinDate, [Status], OrganizationId, DepartmentId, PositionId, UserId, CreatedAt, IsActive, DateOfBirth, PlaceOfBirth, PlaceOfOrigin, UpdatedAt)
-                                VALUES (@c, @f, N'Nam', @e, '2026-01-01', 2, @oid, @did, @pid, @uid, GETUTCDATE(), 1, @dob, N'Hà Nội', N'Hà Nội', GETUTCDATE()); SELECT SCOPE_IDENTITY();", conn, trans);
-                            eCmd.CommandTimeout = 300;
-                            eCmd.Parameters.AddWithValue("@c", code); eCmd.Parameters.AddWithValue("@f", fullName); eCmd.Parameters.AddWithValue("@e", $"{username}@techvn.com"); eCmd.Parameters.AddWithValue("@oid", orgId);
-                            eCmd.Parameters.AddWithValue("@did", deptId); eCmd.Parameters.AddWithValue("@pid", currentPosId); eCmd.Parameters.AddWithValue("@uid", uid); eCmd.Parameters.AddWithValue("@dob", dob);
-                            var eid = Convert.ToInt32(await eCmd.ExecuteScalarAsync());
-
-                            // Contract
-                            var cCmd = new SqlCommand(@"INSERT INTO EmployeeContracts (EmployeeId, ContractNumber, ContractType, StartDate, EndDate, BasicSalary, IsActive, Status, CreatedAt, ShiftId, TargetDepartmentId, TargetPositionId, UpdatedAt)
-                                VALUES (@eid, @cn, 2, '2026-01-01', '2027-01-01', @sal, 1, 5, GETUTCDATE(), @sid, @did, @pid, GETUTCDATE())", conn, trans);
-                            cCmd.CommandTimeout = 300;
-                            cCmd.Parameters.AddWithValue("@eid", eid); cCmd.Parameters.AddWithValue("@cn", $"HDLD/2026/{code}"); cCmd.Parameters.AddWithValue("@sal", salary); 
-                            cCmd.Parameters.AddWithValue("@sid", s1); cCmd.Parameters.AddWithValue("@did", deptId); cCmd.Parameters.AddWithValue("@pid", currentPosId);
-                            await cCmd.ExecuteNonQueryAsync();
-
-                            if (i == 1) // Set as Dept Manager
-                            {
-                                var mCmd = new SqlCommand("UPDATE Departments SET ManagerId = @eid WHERE Id = @did", conn, trans);
-                                mCmd.CommandTimeout = 300;
-                                mCmd.Parameters.AddWithValue("@eid", eid); mCmd.Parameters.AddWithValue("@did", deptId);
-                                await mCmd.ExecuteNonQueryAsync();
-                            }
-
-                            if (i % 20 == 0) Console.WriteLine($"   -> Processed {i}/151...");
+                        // 2. Assign Role
+                        if (employeeRole != null)
+                        {
+                            context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = employeeRole.Id, AssignedAt = DateTime.UtcNow });
                         }
-                        trans.Commit();
-                        Console.WriteLine("✅ 151 Personnel created and committed.");
+
+                        // 3. Create Employee
+                        var emp = new Employee
+                        {
+                            EmployeeCode = code,
+                            FullName = fullName,
+                            Gender = "Nam",
+                            Email = email,
+                            JoinDate = new DateTime(2026, 1, 1),
+                            Status = Domain.Enums.EmployeeStatus.Active,
+                            OrganizationId = orgId,
+                            DepartmentId = deptId,
+                            PositionId = currentPosId,
+                            UserId = user.Id,
+                            CreatedAt = DateTime.UtcNow,
+                            IsActive = true,
+                            DateOfBirth = dob,
+                            PlaceOfBirth = "Hà Nội",
+                            PlaceOfOrigin = "Hà Nội",
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        context.Employees.Add(emp);
+                        await context.SaveChangesAsync();
+
+                        // 4. Create Contract
+                        var contract = new EmployeeContract
+                        {
+                            EmployeeId = emp.Id,
+                            ContractNumber = $"HDLD/2026/{code}",
+                            ContractType = Domain.Enums.ContractType.FixedTerm,
+                            StartDate = new DateTime(2026, 1, 1),
+                            EndDate = new DateTime(2027, 1, 1),
+                            BasicSalary = salary,
+                            IsActive = true,
+                            Status = Domain.Enums.ContractStatus.Active,
+                            CreatedAt = DateTime.UtcNow,
+                            ShiftId = s1,
+                            TargetDepartmentId = deptId,
+                            TargetPositionId = currentPosId,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        context.EmployeeContracts.Add(contract);
+
+                        if (i == 1) // Set as Dept Manager
+                        {
+                            dept.ManagerId = emp.Id;
+                        }
+
+                        if (i % 20 == 0) Console.WriteLine($"   -> Processed {i}/151...");
                     }
-                    catch { trans.Rollback(); throw; }
+                    await context.SaveChangesAsync();
+                    await trans.CommitAsync();
+                    Console.WriteLine("✅ 151 Personnel created and committed.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error seeding personnel: {ex.Message}");
+                    if (ex.InnerException != null) Console.WriteLine($"   Inner: {ex.InnerException.Message}");
+                    await trans.RollbackAsync();
+                    throw;
                 }
             }
 
-            // 4. Generate Rotating Schedules (April 2026)
-            Console.WriteLine("📅 Generating Weekly Rotating Schedules for PRD-ASS workers...");
+            // 4. Generate Rotating Schedules (Full Year 2026)
+            Console.WriteLine("📅 Generating Weekly Rotating Schedules for PRD-ASS workers (Full Year 2026)...");
             context.ChangeTracker.Clear();
             
-            var periodApril = await context.SchedulePeriods.AsNoTracking().FirstOrDefaultAsync(p => p.PeriodName.Contains("04/2026"));
-            if (periodApril == null) return;
+            var periods2026 = await context.SchedulePeriods.AsNoTracking()
+                .Where(p => p.StartDate.Year == 2026)
+                .OrderBy(p => p.StartDate)
+                .ToListAsync();
 
-            var workers = await context.Employees.AsNoTracking()
-                .Where(e => e.EmployeeCode.StartsWith("PRD-ASS-") && e.EmployeeCode != "PRD-ASS-001")
+            if (!periods2026.Any()) return;
+
+            var allEmployees = await context.Employees.AsNoTracking()
+                .Include(e => e.Position)
+                .Where(e => e.EmployeeCode.StartsWith("PRD-ASS-") || e.EmployeeCode.StartsWith("CN-"))
                 .OrderBy(e => e.EmployeeCode)
                 .ToListAsync();
 
-            using (var conn = new SqlConnection(connectionString))
+            using (var trans = await context.Database.BeginTransactionAsync())
             {
-                await conn.OpenAsync();
-                using (var trans = conn.BeginTransaction())
+                try
                 {
-                    try
+                    int[] shiftIds = { s1, c1, d1 }; // S1, C1, D1
+                    var hcShiftId = await context.WorkShifts.Where(s => s.ShiftCode == "HC").Select(s => s.Id).FirstOrDefaultAsync();
+                    int count = 0;
+
+                    foreach (var emp in allEmployees)
                     {
-                        int[] shiftIds = { s1, c1, d1 };
-                        int count = 0;
-
-                        foreach (var emp in workers)
+                        bool isWorker = emp.EmployeeCode.StartsWith("PRD-ASS-") && emp.EmployeeCode != "PRD-ASS-001";
+                        int initialGroup = 0;
+                        
+                        if (isWorker)
                         {
-                            if (!emp.EmployeeCode.StartsWith("PRD-ASS-")) continue;
-                            
                             string numPart = emp.EmployeeCode.Replace("PRD-ASS-", "");
-                            if (!int.TryParse(numPart, out int workerNum)) continue;
-                            
-                            int initialGroup = ((workerNum - 2) / 50) % 3;
+                            if (int.TryParse(numPart, out int workerNum))
+                            {
+                                initialGroup = ((workerNum - 2) / 50) % 3; // Group 0 (002-051), 1 (052-101), 2 (102-151)
+                            }
+                        }
 
-                            for (DateTime date = periodApril.StartDate; date <= periodApril.EndDate; date = date.AddDays(1))
+                        var schedulesToInsert = new List<WorkSchedule>();
+                        foreach (var period in periods2026)
+                        {
+                            for (DateTime date = period.StartDate; date <= period.EndDate; date = date.AddDays(1))
                             {
                                 if (date.DayOfWeek == DayOfWeek.Sunday) continue;
-                                int weekNum = (date.DayOfYear + 6) / 7;
-                                int shiftIndex = (initialGroup + weekNum) % 3;
-                                
-                                using (var insCmd = new SqlCommand(@"INSERT INTO WorkSchedules (EmployeeId, WorkingDate, WorkShiftId, PeriodId, Note, CreatedAt, UpdatedAt)
-                                    VALUES (@eid, @d, @sid, @pid, N'Xoay ca tự động', GETUTCDATE(), GETUTCDATE())", conn, trans))
+
+                                int assignedShiftId;
+                                string note;
+
+                                if (isWorker)
                                 {
-                                    insCmd.CommandTimeout = 300;
-                                    insCmd.Parameters.AddWithValue("@eid", emp.Id); insCmd.Parameters.AddWithValue("@d", date);
-                                    insCmd.Parameters.AddWithValue("@sid", shiftIds[shiftIndex]); insCmd.Parameters.AddWithValue("@pid", periodApril.Id);
-                                    await insCmd.ExecuteNonQueryAsync();
+                                    int weekNum = System.Globalization.ISOWeek.GetWeekOfYear(date);
+                                    int shiftIndex = (initialGroup + weekNum - 1) % 3;
+                                    assignedShiftId = shiftIds[shiftIndex];
+                                    note = $"Xoay ca tự động (Nhóm {initialGroup + 1}, Tuần {weekNum})";
                                 }
+                                else
+                                {
+                                    assignedShiftId = emp.Position?.DefaultShiftId ?? hcShiftId;
+                                    note = "Lịch làm việc cố định";
+                                }
+
+                                schedulesToInsert.Add(new WorkSchedule
+                                {
+                                    EmployeeId = emp.Id,
+                                    WorkingDate = date,
+                                    WorkShiftId = assignedShiftId,
+                                    PeriodId = period.Id,
+                                    Note = note,
+                                    CreatedAt = DateTime.UtcNow,
+                                    UpdatedAt = DateTime.UtcNow
+                                });
                             }
-                            count++;
-                            if (count % 30 == 0) Console.WriteLine($"   -> Scheduled {count}/{workers.Count} workers...");
                         }
-                        trans.Commit();
+
+                        // Batch insert schedules for this employee
+                        if (schedulesToInsert.Any())
+                        {
+                            context.WorkSchedules.AddRange(schedulesToInsert);
+                            await context.SaveChangesAsync();
+                            context.ChangeTracker.Clear(); // Clear memory
+                        }
+
+                        count++;
+                        if (count % 20 == 0) Console.WriteLine($"   -> Scheduled {count}/{allEmployees.Count} personnel...");
                     }
-                    catch { trans.Rollback(); throw; }
+                    await trans.CommitAsync();
+                }
+                catch (Exception ex) 
+                { 
+                    Console.WriteLine($"❌ Error in scheduling loop: {ex.Message}");
+                    await trans.RollbackAsync(); 
+                    throw; 
                 }
             }
-            Console.WriteLine("✅ Mass Seeding complete for 151 PRD-ASS personnel (1 Manager + 150 Workers)!");
+            Console.WriteLine($"✅ Full Year 2026 Schedule generated for {allEmployees.Count} personnel!");
         }
     }
 }

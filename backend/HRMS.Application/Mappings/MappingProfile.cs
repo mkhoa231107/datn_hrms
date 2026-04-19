@@ -24,7 +24,12 @@ namespace HRMS.Application.Mappings
                     opt => opt.MapFrom(src => src.UserRoles.Select(ur => ur.Role.RoleName).ToArray()))
                 .ForMember(dest => dest.DepartmentId, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.DepartmentId : (int?)null))
                 .ForMember(dest => dest.DepartmentCode, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Department != null) ? src.Employee.Department.DepartmentCode : null))
-                .ForMember(dest => dest.EmployeeId, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.Id : (int?)null));
+                .ForMember(dest => dest.DepartmentName, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Department != null) ? src.Employee.Department.DepartmentName : null))
+                .ForMember(dest => dest.EmployeeId, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.Id : (int?)null))
+                .ForMember(dest => dest.EmployeeCode, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.EmployeeCode : null))
+                .ForMember(dest => dest.PositionName, opt => opt.MapFrom(src => (src.Employee != null && src.Employee.Position != null) ? src.Employee.Position.PositionName : null))
+                .ForMember(dest => dest.Phone, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.Phone : null))
+                .ForMember(dest => dest.Signature, opt => opt.MapFrom(src => src.Employee != null ? src.Employee.Signature : null));
 
             // CONTRACT MAPPINGS
             CreateMap<ContractCreateDto, EmployeeContract>()
@@ -59,6 +64,7 @@ namespace HRMS.Application.Mappings
                 .ForMember(dest => dest.PositionBaseSalaryMax, opt => opt.MapFrom(src => src.Position.BaseSalaryMax))
                 .ForMember(dest => dest.PositionDefaultShiftId, opt => opt.MapFrom(src => src.Position.DefaultShiftId))
                 .ForMember(dest => dest.ShiftName, opt => opt.MapFrom(src => src.Shift != null ? src.Shift.ShiftName : null))
+                .ForMember(dest => dest.Signature, opt => opt.MapFrom(src => src.Signature))
                 .ForMember(dest => dest.CurrentContract, opt => opt.Ignore()); // Sẽ được xử lý trong Service nếu cần
 
             CreateMap<EmployeeContract, EmployeeContractDto>()

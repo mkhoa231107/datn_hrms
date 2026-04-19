@@ -9,14 +9,14 @@ import {
 
 export default function DeptActivities({ user, onBack }) {
     const roles = user?.roles || [];
-    const isTeamLeader = roles.includes('TeamLeader') && !roles.includes('DepartmentManager') && !roles.includes('Admin');
-    const label = isTeamLeader ? 'Tổ' : 'Phòng ban';
+    const isTeamLeader = roles.includes('TeamLeader');
+    const label = isTeamLeader ? 'Tổ' : (roles.includes('DepartmentHead') || roles.includes('DepartmentManager') ? 'Phòng ban' : 'Đơn vị');
 
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState('All');
-    const [activeDeptTab, setActiveDeptTab] = useState('Tổ Lương Thưởng');
+    const [activeDeptTab, setActiveDeptTab] = useState('All');
     const [selectedLog, setSelectedLog] = useState(null);
 
     useEffect(() => { fetchLogs(); }, []);
@@ -42,9 +42,7 @@ export default function DeptActivities({ user, onBack }) {
                     let processedLog = { ...l };
                     const name = l.userFullName || '';
                     if (name.includes('Lê Thị Thảo')) processedLog.userDepartmentName = 'Tổ Lương Thưởng';
-                    if (name.includes('Hoàng Anh Hồng') || name.includes('Minh') || name.includes('Bùi Thu Hồng')) {
-                        processedLog.userDepartmentName = 'Tổ Tuyển Dụng';
-                    }
+                    
                     othersLogs.push(processedLog);
                 }
             });
@@ -79,7 +77,7 @@ export default function DeptActivities({ user, onBack }) {
     };
 
     const filteredLogs = logs.filter(log => {
-        const matchesTab = log.userDepartmentName?.toLowerCase().includes(activeDeptTab.toLowerCase());
+        const matchesTab = activeDeptTab === 'All' || log.userDepartmentName?.toLowerCase().includes(activeDeptTab.toLowerCase());
         const matchesSearch =
             log.userFullName?.toLowerCase().includes(search.toLowerCase()) ||
             log.action.toLowerCase().includes(search.toLowerCase()) ||
@@ -89,6 +87,7 @@ export default function DeptActivities({ user, onBack }) {
     });
 
     const entityTypes = ['All', ...new Set(logs.map(l => l.entityType))];
+    const deptTabs = ['All', ...new Set(logs.map(l => l.userDepartmentName).filter(Boolean))];
 
     return (
         <div className="ef-wrap">
@@ -106,8 +105,8 @@ export default function DeptActivities({ user, onBack }) {
             {/* Department Tabs */}
             <div className="ef-toolbar print:hidden" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', minHeight: '44px' }}>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                    {['Tổ Lương Thưởng', 'Tổ Tuyển Dụng'].map(deptName => {
-                        const count = logs.filter(l => l.userDepartmentName?.toLowerCase().includes(deptName.toLowerCase())).length;
+                    {deptTabs.map(deptName => {
+                        const count = logs.filter(l => deptName === 'All' ? true : l.userDepartmentName?.toLowerCase().includes(deptName.toLowerCase())).length;
                         const isActive = activeDeptTab === deptName;
                         return (
                             <button

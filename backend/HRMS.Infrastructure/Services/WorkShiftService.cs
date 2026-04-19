@@ -96,7 +96,7 @@ namespace HRMS.Infrastructure.Services
                 .Include(d => d.WorkShift)
                 .FirstOrDefaultAsync(d => d.DepartmentId == deptId);
                 
-            return defaultShift != null ? _mapper.Map<WorkShiftDto>(defaultShift.WorkShift) : null;
+            return defaultShift != null ? _mapper.Map<WorkShiftDto>(defaultShift.WorkShift) : null!;
         }
     }
 }

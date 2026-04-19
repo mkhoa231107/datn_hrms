@@ -3,8 +3,11 @@ namespace HRMS.Domain.Enums
     public enum RoleType
     {
         Employee,
-        DepartmentManager,
+        TeamLeader,
         DepartmentHead,
+        CnbSpecialist,
+        Admin,
         Candidate
     }
 }
+

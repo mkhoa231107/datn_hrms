@@ -12,7 +12,7 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
     const [subDepts, setSubDepts] = useState([]);
     const [barcodeEmp, setBarcodeEmp] = useState(null); // { code, name, department }
 
-    const isScopedManager = (user?.roles?.includes('DepartmentManager') || user?.roles?.includes('DepartmentHead')) && !user?.roles?.includes('Admin');
+    const isScopedManager = (user?.roles?.includes('TeamLeader') || user?.roles?.includes('DepartmentHead')) && !user?.roles?.includes('Admin');
 
     useEffect(() => {
         if (isScopedManager && user?.departmentId) {
@@ -36,13 +36,9 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
                 setSubDepts(subs);
                 
                 if (isScopedManager) {
-                    const recruitmentDept = subs.find(d => 
-                        d.departmentName.toLowerCase().includes('tuyển dụng') || 
-                        d.departmentName.toLowerCase().includes('recruitment')
-                    ) || subs[0] || deptData.find(d => d.id === user.departmentId);
-                    
-                    if (recruitmentDept) {
-                        setSelectedDeptId(recruitmentDept.id);
+                    const defaultDept = subs[0] || deptData.find(d => d.id === user.departmentId);
+                    if (defaultDept) {
+                        setSelectedDeptId(defaultDept.id);
                     }
                 }
             }

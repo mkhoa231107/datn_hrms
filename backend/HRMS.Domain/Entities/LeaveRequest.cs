@@ -16,11 +16,19 @@ namespace HRMS.Domain.Entities
         public DateTime ToDate { get; set; }        // Ngày kết thúc nghỉ
         public double TotalDays { get; set; }       // Tổng số ngày nghỉ
         public string? Reason { get; set; }         // Lý do xin nghỉ
+        
+        // Contact & Context Info for formal document
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? JobTitle { get; set; }       // Requester's title at time of request
 
         public LeaveStatus Status { get; set; } = LeaveStatus.Pending;
 
-        // Approval Info
+        // Approval Info & Signatures
         public int? ApproverId { get; set; }        // EmployeeId của người duyệt
+        public string? RequesterSignature { get; set; } // Base64 signature
+        public string? ApproverSignature { get; set; } // Base64 signature
+        public string? AttachmentUrl { get; set; }   // Path to medical cert / proof
         public string? ApproverNote { get; set; }   // Ghi chú khi duyệt/từ chối
         public DateTime? ApprovedAt { get; set; }
 

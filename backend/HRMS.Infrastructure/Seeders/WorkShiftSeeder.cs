@@ -14,47 +14,66 @@ namespace HRMS.Infrastructure.Seeders
             var org = await context.Organizations.FirstOrDefaultAsync();
             if (org == null) return;
 
-            if (!await context.WorkShifts.AnyAsync())
+            var shiftDefs = new[] {
+                (Code: "HC", Name: "Hành chính", Start: new TimeSpan(8, 0, 0), End: new TimeSpan(17, 30, 0), Break: 90, Overnight: false),
+                (Code: "S1", Name: "Ca 1",     Start: new TimeSpan(6, 0, 0), End: new TimeSpan(14, 0, 0), Break: 30, Overnight: false),
+                (Code: "C1", Name: "Ca 2",     Start: new TimeSpan(14, 0, 0), End: new TimeSpan(22, 0, 0), Break: 30, Overnight: false),
+                (Code: "D1", Name: "Ca 3",       Start: new TimeSpan(22, 0, 0), End: new TimeSpan(6, 0, 0), Break: 30, Overnight: true)
+            };
+
+            // 1. Cleanup: Handle dependencies and remove non-standard shifts
+            var allShifts = await context.WorkShifts.ToListAsync();
+            var standardCodes = new[] { "HC", "S1", "C1", "D1" };
+            var hcShift = allShifts.FirstOrDefault(s => s.ShiftCode == "HC");
+
+            foreach (var s in allShifts)
             {
-                var shifts = new List<WorkShift>
+                if (!standardCodes.Contains(s.ShiftCode))
                 {
-                    new WorkShift { 
-                        ShiftName = "Hành chính", 
-                        ShiftCode = "HC", 
-                        StartTime = new TimeSpan(8, 0, 0), 
-                        EndTime = new TimeSpan(17, 30, 0), 
-                        BreakMinutes = 90, 
-                        OrganizationId = org.Id 
-                    },
-                    new WorkShift { 
-                        ShiftName = "Ca Sáng", 
-                        ShiftCode = "S1", 
-                        StartTime = new TimeSpan(6, 0, 0), 
-                        EndTime = new TimeSpan(14, 0, 0), 
-                        BreakMinutes = 30, 
-                        OrganizationId = org.Id 
-                    },
-                    new WorkShift { 
-                        ShiftName = "Ca Chiều", 
-                        ShiftCode = "C1", 
-                        StartTime = new TimeSpan(14, 0, 0), 
-                        EndTime = new TimeSpan(22, 0, 0), 
-                        BreakMinutes = 30, 
-                        OrganizationId = org.Id 
-                    },
-                    new WorkShift { 
-                        ShiftName = "Ca Đêm", 
-                        ShiftCode = "D1", 
-                        StartTime = new TimeSpan(22, 0, 0), 
-                        EndTime = new TimeSpan(6, 0, 0), 
-                        BreakMinutes = 30, 
-                        IsOvernight = true,
-                        OrganizationId = org.Id 
+                    // Update ShiftTemplateDetails to use HC shift instead of deleting them to avoid FK errors
+                    var templates = await context.ShiftTemplateDetails.Where(std => std.WorkShiftId == s.Id).ToListAsync();
+                    if (hcShift != null)
+                    {
+                        foreach (var t in templates) t.WorkShiftId = hcShift.Id;
                     }
-                };
-                context.WorkShifts.AddRange(shifts);
-                await context.SaveChangesAsync();
+                    else
+                    {
+                        context.ShiftTemplateDetails.RemoveRange(templates);
+                    }
+
+                    // Also cleanup WorkSchedules using this shift
+                    var schedules = await context.WorkSchedules.Where(ws => ws.WorkShiftId == s.Id).ToListAsync();
+                    context.WorkSchedules.RemoveRange(schedules);
+
+                    context.WorkShifts.Remove(s);
+                }
             }
+            await context.SaveChangesAsync();
+
+            // 2. Ensure standard shifts exist with correct names
+            foreach (var (code, name, start, end, breakMin, overnight) in shiftDefs)
+            {
+                var existing = await context.WorkShifts.FirstOrDefaultAsync(s => s.ShiftCode == code);
+                if (existing == null)
+                {
+                    context.WorkShifts.Add(new WorkShift { 
+                        ShiftName = name, 
+                        ShiftCode = code, 
+                        StartTime = start, 
+                        EndTime = end, 
+                        BreakMinutes = breakMin, 
+                        IsOvernight = overnight,
+                        OrganizationId = org.Id 
+                    });
+                }
+                else 
+                {
+                    existing.ShiftName = name; // Update name to Ca 1, Ca 2, Ca 3
+                    existing.StartTime = start;
+                    existing.EndTime = end;
+                }
+            }
+            await context.SaveChangesAsync();
 
             // Ensure 2026 periods exists regardless of whether other periods exist
             if (!await context.SchedulePeriods.AnyAsync(p => p.StartDate.Year == 2026))

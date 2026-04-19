@@ -20,7 +20,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAllUsers([FromQuery] string search)
+        public async Task<IActionResult> GetAllUsers([FromQuery] string? search)
         {
             try
             {

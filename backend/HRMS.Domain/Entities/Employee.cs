@@ -71,6 +71,7 @@ namespace HRMS.Domain.Entities
         // Payroll Information
         public int NumberOfDependents { get; set; } = 0; // Số người phụ thuộc
         public decimal? InsuranceSalary { get; set; }    // Mức lương đóng bảo hiểm (nếu khác Gross)
+        public string? Signature { get; set; }       // Digital signature Base64
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }

@@ -31,12 +31,14 @@ namespace HRMS.Application.Interfaces
         Task<int> ApproveAllTimesheetsAsync(int departmentId, int periodId, int approverId, bool isHead = false, bool isManager = false, bool isAdmin = false);
         Task<int> GenerateSummariesAsync(int periodId);
 
-        // Overtime Management (Refactored to Request-base)
-        Task<OvertimeRequestDto> SubmitOvertimeRequestAsync(int employeeId, CreateOvertimeRequestDto dto);
-        Task<bool> ReviewOvertimeRequestAsync(int requestId, int approverId, string status, string note);
-        Task<List<OvertimeRequestDto>> GetMyOvertimeRequestsAsync(int employeeId);
-        Task<List<OvertimeRequestDto>> GetOvertimeToApproveAsync(int departmentId);
-        Task<List<OvertimeRequestDto>> GetOvertimeRequestsByDepartmentAsync(int departmentId);
+        // --- New Overtime Management Workflow ---
+        Task<OvertimePlanDto> CreateOvertimePlanAsync(CreateOvertimePlanDto dto, int creatorUserId);
+        Task<List<OvertimePlanDto>> GetOvertimePlansAsync(int? departmentId, int? month, int? year);
+        Task<bool> BulkAssignOvertimeAsync(BulkAssignOvertimeDto dto, int assignerUserId);
+        Task<List<OvertimeAssignmentDto>> GetMyOvertimeAssignmentsAsync(int employeeId, DateTime fromDate, DateTime toDate);
+        Task<AttendanceGridDto> GetOvertimeAssignmentGridAsync(int departmentId, int month, int year);
+        Task<bool> PublishOvertimePlanAsync(int planId, int userId);
+        Task<bool> ConfirmOvertimeAssignmentAsync(int assignmentId, int employeeId);
 
         // Data Retention
         Task<string> ExportAndCleanupOldAttendanceAsync(int month, int year);

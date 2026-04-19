@@ -1,3 +1,4 @@
+using HRMS.Application.Interfaces;
 using HRMS.Domain.Enums;
 using HRMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -34,11 +35,8 @@ namespace HRMS.API.Workers
                 }
                 catch (Exception ex)
                 {
-                    // Use a very simple string to avoid formatting/serialization issues in the logger
                     Console.WriteLine($"⚠️ [CRITICAL] ContractStatusWorker Error: {ex.Message}");
                     try { _logger.LogError("ContractStatusWorker encountered a processing error."); } catch { }
-                    
-                    // Delay slightly longer on error to avoid spamming logs/CPU if DB is down
                     await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
                     continue;
                 }
@@ -49,8 +47,6 @@ namespace HRMS.API.Workers
                 var delay = nextMidnight - now;
                 
                 _logger.LogInformation("Contract Status Worker is sleeping until {NextMidnight}.", nextMidnight);
-                
-                // CancellationToken is monitored during Task.Delay
                 await Task.Delay(delay, stoppingToken);
             }
         }
@@ -59,11 +55,14 @@ namespace HRMS.API.Workers
         {
             using var scope = _serviceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<HRMSDbContext>();
+            var scheduleService = scope.ServiceProvider.GetRequiredService<IWorkScheduleService>();
             var today = DateTime.UtcNow.Date;
             
             _logger.LogInformation("Processing contracts for date: {Today}", today);
 
-            // 1. WaitingSign -> Active (Neu Today >= StartDate)
+            // ─────────────────────────────────────────────────────────────────
+            // 1. WaitingSign → Active (if today >= StartDate and employee signed)
+            // ─────────────────────────────────────────────────────────────────
             var waitingContracts = await dbContext.EmployeeContracts
                 .Where(c => c.Status == ContractStatus.WaitingSign && c.EmployeeSignedAt != null)
                 .ToListAsync(stoppingToken);
@@ -78,7 +77,9 @@ namespace HRMS.API.Workers
                 }
             }
 
-            // 2. Active -> Expired (Neu Today > EndDate)
+            // ─────────────────────────────────────────────────────────────────
+            // 2. Active → Expired (if today > EndDate)
+            // ─────────────────────────────────────────────────────────────────
             var activeContracts = await dbContext.EmployeeContracts
                 .Where(c => c.Status == ContractStatus.Active && c.EndDate != null)
                 .ToListAsync(stoppingToken);
@@ -86,7 +87,7 @@ namespace HRMS.API.Workers
             int expiredCount = 0;
             foreach (var contract in activeContracts)
             {
-                if (today > contract.EndDate.Value.Date)
+                if (contract.EndDate.HasValue && today > contract.EndDate.Value.Date)
                 {
                     contract.Status = ContractStatus.Expired;
                     expiredCount++;
@@ -101,6 +102,37 @@ namespace HRMS.API.Workers
             else
             {
                 _logger.LogInformation("No contracts needed status update.");
+            }
+
+            // ─────────────────────────────────────────────────────────────────
+            // 3. AUTO GENERATE SCHEDULE FROM CONTRACT
+            //    - Run for current year (and next year starting from Oct each year)
+            //    - Only creates missing WorkSchedule records (overwrite=false)
+            //    - This means xếp ca is fully automatic — no manual action needed
+            // ─────────────────────────────────────────────────────────────────
+            try
+            {
+                var currentYear = today.Year;
+
+                // Generate for current year
+                var result = await scheduleService.GenerateFromContractAsync(null, currentYear, overwrite: false);
+                if (result.ScheduledDays > 0)
+                    _logger.LogInformation("Auto-schedule from contract: {Msg}", result.Message);
+                else
+                    _logger.LogInformation("Auto-schedule: no new schedule days needed for {Year}.", currentYear);
+
+                // From October onwards, pre-generate next year's schedule
+                if (today.Month >= 10)
+                {
+                    var nextYearResult = await scheduleService.GenerateFromContractAsync(null, currentYear + 1, overwrite: false);
+                    if (nextYearResult.ScheduledDays > 0)
+                        _logger.LogInformation("Auto-schedule next year from contract: {Msg}", nextYearResult.Message);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Non-critical: log but don't crash the worker
+                Console.WriteLine($"[ContractStatusWorker] Auto-schedule warning: {ex.Message}");
             }
         }
     }

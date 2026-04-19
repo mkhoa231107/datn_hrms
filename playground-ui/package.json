@@ -15,9 +15,11 @@
     "face-api.js": "^0.22.2",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^0.563.0",
+    "prop-types": "^15.8.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hot-toast": "^2.4.1",
+    "react-signature-canvas": "1.0.6",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

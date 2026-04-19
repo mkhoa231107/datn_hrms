@@ -84,6 +84,7 @@ export default function NotificationDropdown({ user, onClose }) {
             if (title.includes('TỪ CHỐI')) return <XCircle className="w-5 h-5 text-red-600" />;
             return <AlertCircle className="w-5 h-5 text-indigo-600" />;
         }
+        if (type === 'ShiftSwap') return <Calendar className="w-5 h-5 text-purple-600" />;
         return <Bell className="w-5 h-5 text-slate-600" />;
     };
 
@@ -99,6 +100,7 @@ export default function NotificationDropdown({ user, onClose }) {
             if (title.includes('TỪ CHỐI')) return 'bg-red-50';
             return 'bg-indigo-50';
         }
+        if (type === 'ShiftSwap') return 'bg-purple-50';
         return 'bg-slate-50';
     };
 
@@ -194,9 +196,10 @@ export default function NotificationDropdown({ user, onClose }) {
                                                 <span className={`text-[10px] font-bold uppercase border px-2 py-0.5 ${
                                                     notif.type === 'Overtime' ? 'bg-[#f0f7ff] text-[#1a56db] border-[#1a56db]/30' : 
                                                     notif.type === 'Leave' ? 'bg-[#fef9c3] text-[#a16207] border-[#a16207]/30' : 
+                                                    notif.type === 'ShiftSwap' ? 'bg-[#f5f3ff] text-[#7c3aed] border-[#7c3aed]/30' :
                                                     'bg-[#f5f3ff] text-[#4f46e5] border-[#4f46e5]/30'
                                                 }`}>
-                                                    {notif.type === 'Overtime' ? 'Tăng ca' : notif.type === 'Leave' ? 'Nghỉ phép' : 'Điều chỉnh'}
+                                                    {notif.type === 'Overtime' ? 'Tăng ca' : notif.type === 'Leave' ? 'Nghỉ phép' : notif.type === 'ShiftSwap' ? 'Đổi ca' : 'Điều chỉnh'}
                                                 </span>
                                             </div>
                                         </div>

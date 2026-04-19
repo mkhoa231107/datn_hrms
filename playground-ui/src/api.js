@@ -1,12 +1,27 @@
 import axios from 'axios';
 
-const API_BASE = "http://localhost:5052/api";
+// --- CHẾ ĐỘ TEST LOCAL ---
+export const BASE_URL = "http://localhost:5052"; 
+
+// --- CHẾ ĐỘ PRODUCTION (KHI UP LÊN HOST) ---
+// export const BASE_URL = "https://api.hrms.io.vn"; 
+
+const API_BASE = `${BASE_URL}/api`;
 
 export const api = axios.create({
   baseURL: API_BASE,
 });
+/**
+ * Helper để lấy URL ảnh nhân viên chuẩn xác
+ * Cách dùng trong Component: <img src={getEmployeeImageUrl(emp.imagePath)} />
+ */
+export const getEmployeeImageUrl = (imagePath) => {
+  if (!imagePath) return "/default-avatar.png"; // Đường dẫn ảnh mặc định trong thư mục public của React
+  if (imagePath.startsWith('http')) return imagePath;
+  return `${BASE_URL}/uploads/employees/${imagePath}`;
+};
 
-// Add token to requests
+// Tự động gắn Token vào header của mọi request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -15,16 +30,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor to handle errors properly
+// Xử lý phản hồi và bắt lỗi tập trung
 api.interceptors.response.use(
-  (response) => response, // Pass through successful responses
+  (response) => response,
   (error) => {
-    // Preserve the error structure so components can access error.response.data.message
-    if (error.response && error.response.data) {
-      // Backend error structure: { success: false, message: "..." }
-      console.log('API Error:', error.response.data);
+    // Nếu lỗi 401 (Hết hạn token hoặc chưa đăng nhập)
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('token');
+      // Tùy chọn: window.location.href = '/login';
     }
-    return Promise.reject(error); // Re-throw to let components handle it
+    
+    if (error.response && error.response.data) {
+      console.error('API Error:', error.response.data);
+    }
+    return Promise.reject(error);
   }
 );
 
@@ -105,23 +124,7 @@ export const positionService = {
   }
 };
 
-export const hrRecruitmentService = {
-  acceptApplication: async (id) => {
-    const res = await api.post(`/HRRecruitment/applications/${id}/accept`);
-    return res.data;
-  },
-};
 
-export const jobCriteriaService = {
-  getByJobId: async (jobId) => {
-    const res = await api.get(`/JobCriteria/job/${jobId}`);
-    return res.data;
-  },
-  upsert: async (data) => {
-    const res = await api.post('/JobCriteria', data);
-    return res.data;
-  }
-};
 
 export const schedulingService = {
   getShifts: async () => {
@@ -129,7 +132,7 @@ export const schedulingService = {
     return res.data;
   },
   getTemplates: async () => {
-    const res = await api.get('/workschedules/templates'); // I need to implement this controller action
+    const res = await api.get('/workschedules/templates');
     return res.data;
   },
   getPeriods: async () => {
@@ -171,6 +174,10 @@ export const schedulingService = {
   autoScheduleDept: async (data) => {
     const res = await api.post('/workschedules/auto-schedule-dept', data);
     return res.data;
+  },
+  globalAutoSchedule: async (data) => {
+    const res = await api.post('/workschedules/global-auto-schedule', data);
+    return res.data;
   }
 };
 
@@ -207,8 +214,8 @@ export const leaveService = {
     const res = await api.get('/leave/history');
     return res.data;
   },
-  approveRequest: async (id, note) => {
-    const res = await api.post(`/leave/request/${id}/approve`, { note });
+  approveRequest: async (id, note, approverSignature) => {
+    const res = await api.post(`/leave/request/${id}/approve`, { note, approverSignature });
     return res.data;
   },
   rejectRequest: async (id, note) => {
@@ -230,29 +237,39 @@ export const attendanceService = {
     const res = await api.post('/attendance/check-out', data);
     return res.data;
   },
-  // Overtime Methods
-  submitOvertimeRequest: async (data) => {
-    const res = await api.post('/attendance/overtime/request', data);
-    return res.data;
-  },
-  reviewOvertimeRequest: async (data) => {
-    const res = await api.post('/attendance/overtime/review', data);
-    return res.data;
-  },
-  getMyOvertime: async () => {
-    const res = await api.get('/attendance/my-overtime');
-    return res.data;
-  },
-  getPendingOvertime: async (deptId) => {
-    const res = await api.get(`/attendance/overtime/pending/${deptId}`);
-    return res.data;
-  },
-  getDepartmentOvertime: async (deptId) => {
-    const res = await api.get(`/attendance/department/${deptId}/overtime`);
-    return res.data;
-  },
   scanBarcode: async (employeeCode) => {
     const res = await api.post('/attendance/scan-barcode', { employeeCode });
+    return res.data;
+  }
+};
+
+export const overtimeService = {
+  createPlan: async (data) => {
+    const res = await api.post('/overtimemanagement/plans', data);
+    return res.data;
+  },
+  getPlans: async (params) => {
+    const res = await api.get('/overtimemanagement/plans', { params });
+    return res.data;
+  },
+  bulkAssign: async (data) => {
+    const res = await api.post('/overtimemanagement/assignments/bulk', data);
+    return res.data;
+  },
+  getAssignmentGrid: async (departmentId, month, year) => {
+    const res = await api.get(`/overtimemanagement/assignments/grid?departmentId=${departmentId}&month=${month}&year=${year}`);
+    return res.data;
+  },
+  getMySchedule: async (fromDate, toDate) => {
+    const res = await api.get(`/overtimemanagement/my-schedule?fromDate=${fromDate}&toDate=${toDate}`);
+    return res.data;
+  },
+  publishPlan: async (id) => {
+    const res = await api.post(`/overtimemanagement/plans/${id}/publish`);
+    return res.data;
+  },
+  confirmAssignment: async (id) => {
+    const res = await api.post(`/overtimemanagement/assignments/${id}/confirm`);
     return res.data;
   }
 };

@@ -123,5 +123,52 @@ namespace HRMS.API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        /// <summary>
+        /// Sinh lịch làm việc từ ca làm ghi trong hợp đồng đang hiệu lực.
+        /// Nếu employeeId null thì áp dụng cho tất cả; overwrite=true để ghi đè lịch cũ (ngoại trừ ngày đang trong đơn đổi ca).
+        /// </summary>
+        [Authorize(Roles = "Admin,HrAdmin,DepartmentManager")]
+        [HttpPost("generate-from-contract")]
+        public async Task<IActionResult> GenerateFromContract([FromBody] GenerateFromContractDto dto)
+        {
+            try
+            {
+                var result = await _scheduleService.GenerateFromContractAsync(dto.EmployeeId, dto.Year, dto.Overwrite);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Thiết lập lại toàn bộ lịch ca hệ thống (Nhân viên -> HC, PRD-ASS Worker -> Xoay ca).
+        /// </summary>
+        [Authorize(Roles = "Admin,HrAdmin")]
+        [HttpPost("global-auto-schedule")]
+        public async Task<IActionResult> GlobalAutoSchedule([FromBody] GenerateFromContractDto dto)
+        {
+            try
+            {
+                var result = await _scheduleService.GenerateGlobalAutoScheduleAsync(dto.Year, dto.Overwrite);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+        
+        [HttpGet("my-schedule")]
+        public async Task<IActionResult> GetMyScheduleByDate(DateTime date)
+        {
+            var empId = int.Parse(User.FindFirst("EmployeeId")?.Value ?? "0");
+            if (empId == 0) return Unauthorized();
+            
+            var schedule = await _scheduleService.GetByDateAsync(empId, date);
+            return Ok(schedule);
+        }
     }
 }

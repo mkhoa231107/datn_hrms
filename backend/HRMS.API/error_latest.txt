@@ -1,11 +1,6 @@
 Level 0: SqlException
-Message: Invalid column name 'OtherAllowance'.
-Invalid column name 'PetrolAllowance'.
-Invalid column name 'PhoneAllowance'.
-Invalid column name 'PositionAllowance'.
-Invalid column name 'SalesSalary'.
-Stack:    at Microsoft.Data.SqlClient.SqlCommand.<>c.<ExecuteDbDataReaderAsync>b__209_0(Task`1 result)
-   at System.Threading.Tasks.ContinuationResultTaskFromResultTask`2.InnerInvoke()
+Message: Invalid object name 'ShiftSwapRequests'.
+Stack:    at System.Threading.Tasks.ContinuationResultTaskFromResultTask`2.InnerInvoke()
    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
 --- End of stack trace from previous location ---
    at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)
@@ -18,8 +13,8 @@ Stack:    at Microsoft.Data.SqlClient.SqlCommand.<>c.<ExecuteDbDataReaderAsync>b
    at Microsoft.EntityFrameworkCore.Query.Internal.SingleQueryingEnumerable`1.AsyncEnumerator.MoveNextAsync()
    at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
    at Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync[TSource](IQueryable`1 source, CancellationToken cancellationToken)
-   at HRMS.Infrastructure.Services.PayrollService.GetPayrollRecordsAsync(Int32 periodId) in C:\Users\Acer\OneDrive\文档\datn_3-main\backend\HRMS.Infrastructure\Services\PayrollService.cs:line 342
-   at HRMS.API.Controllers.PayrollController.GetRecords(Int32 periodId) in C:\Users\Acer\OneDrive\文档\datn_3-main\backend\HRMS.API\Controllers\PayrollController.cs:line 127
+   at HRMS.Infrastructure.Services.ShiftSwapRequestService.GetByEmployeeIdAsync(Int32 employeeId) in C:\Users\Acer\OneDrive\文档\datn_3-main\backend\HRMS.Infrastructure\Services\ShiftSwapRequestService.cs:line 52
+   at HRMS.API.Controllers.ShiftSwapRequestsController.GetMyRequests() in C:\Users\Acer\OneDrive\文档\datn_3-main\backend\HRMS.API\Controllers\ShiftSwapRequestsController.cs:line 36
    at Microsoft.AspNetCore.Mvc.Infrastructure.ActionMethodExecutor.TaskOfIActionResultExecutor.Execute(ActionContext actionContext, IActionResultTypeMapper mapper, ObjectMethodExecutor executor, Object controller, Object[] arguments)
    at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeActionMethodAsync>g__Awaited|12_0(ControllerActionInvoker invoker, ValueTask`1 actionResultValueTask)
    at Microsoft.AspNetCore.Mvc.Infrastructure.ControllerActionInvoker.<InvokeNextActionFilterAsync>g__Awaited|10_0(ControllerActionInvoker invoker, Task lastTask, State next, Scope scope, Object state, Boolean isCompleted)

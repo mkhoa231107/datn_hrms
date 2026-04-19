@@ -7,44 +7,42 @@ import NotificationDropdown from './NotificationDropdown';
 export function getNavItems(primaryRole) {
     const allItems = {
         // Personal items (all internal roles)
-        me:               { id: 'me',               label: 'Hồ sơ',              roles: ['Admin','DepartmentManager','DepartmentHead','Employee','HrAdmin'] },
-        attendance:       { id: 'attendance',        label: 'Chấm công',          roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
-        leave:            { id: 'leave',             label: 'Đơn từ & Nghỉ phép', roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
-        'my-schedule':    { id: 'my-schedule',       label: 'Lịch ca',            roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
-        'shift-change':   { id: 'shift-change',      label: 'Xin đổi ca',         roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
-        'my-payslip':     { id: 'my-payslip',        label: 'Bảng lương',         roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
-        'my-contract':    { id: 'my-contract',       label: 'Hợp đồng',           roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
-        'my-insurance':   { id: 'my-insurance',      label: 'Bảo hiểm',           roles: ['Admin','DepartmentManager','DepartmentHead','Employee'] },
+        me:               { id: 'me',               label: 'Hồ sơ',              roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+        attendance:       { id: 'attendance',        label: 'Chấm công',          roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+        leave:            { id: 'leave',             label: 'Đơn từ & Nghỉ phép', roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+        'my-schedule':    { id: 'my-schedule',       label: 'Lịch ca',            roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+        'shift-change':   { id: 'shift-change',      label: 'Xin đổi ca',         roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+        'my-payslip':     { id: 'my-payslip',        label: 'Bảng lương',         roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+        'my-contract':    { id: 'my-contract',       label: 'Hợp đồng',           roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+        'my-insurance':   { id: 'my-insurance',      label: 'Bảo hiểm',           roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
 
-        // Department Head
-        'team-attendance':{ id: 'team-attendance',   label: 'Tăng ca Bộ phận',    roles: ['DepartmentHead','Admin'] },
-        'team-schedule':  { id: 'team-schedule',     label: 'Lịch làm việc BP',     roles: ['DepartmentHead','Admin'] },
-        'team-shift-approvals': { id: 'team-shift-approvals', label: 'Duyệt đổi ca BP', roles: ['DepartmentHead','Admin'] },
-        'team-leaves':    { id: 'team-leaves',       label: 'Duyệt đơn BP',       roles: ['DepartmentHead','Admin'] },
-        'team-timesheets':{ 
-            id: 'team-timesheets',   
-            label: primaryRole === 'DepartmentManager' ? 'Chốt công BP' : 'Duyệt công BP',      
-            roles: ['DepartmentHead','DepartmentManager','Admin'] 
-        },
 
-        // Department Manager
-        employees:        { id: 'employees',         label: 'Nhân viên',           roles: ['DepartmentManager','Admin','HrAdmin'] },
-        'dept-leaves':    { id: 'dept-leaves',       label: 'Duyệt đơn PB',       roles: ['DepartmentManager','Admin'] },
-        'dept-activities':{ id: 'dept-activities',   label: 'Hoạt động PB',       roles: ['DepartmentManager','Admin'] },
+        // Team Management (Tổ trưởng / Trưởng bộ phận)
+        'ot-assignment':  { id: 'ot-assignment',     label: 'Tăng ca',            roles: ['TeamLeader','DepartmentHead','Admin'] },
+        'team-schedule':  { id: 'team-schedule',     label: 'Xếp ca',             roles: ['TeamLeader','Admin'] },
+        'team-leaves':    { id: 'team-leaves',       label: 'Duyệt đơn',          roles: ['TeamLeader','Admin'] },
+        'team-timesheets':{ id: 'team-timesheets',   label: 'Chốt công',          roles: ['TeamLeader','DepartmentHead','DepartmentManager','Admin'] },
 
-        // Admin
-        'admin-contracts':{ id: 'admin-contracts',   label: 'Quản lý HĐLĐ',      roles: ['Admin','DepartmentManager'] },
-        'payroll-processing':{ id: 'payroll-processing', label: 'Lương',          roles: ['Admin', 'DepartmentHead'] },
-        'insurance-management':{ id: 'insurance-management', label: 'Bảo hiểm',   roles: ['Admin','DepartmentManager','DepartmentHead'] },
-        'attendance-management':{ id: 'attendance-management', label: 'Quản lý chấm công', roles: ['Admin','HrAdmin'] },
+        // Management (Trưởng phòng)
+        'ot-planning':    { id: 'ot-planning',       label: 'Kế hoạch OT',        roles: ['DepartmentManager','Admin'] },
+        employees:        { id: 'employees',         label: 'Nhân viên',           roles: ['DepartmentHead','DepartmentManager','Admin'] },
+        'dept-activities':{ id: 'dept-activities',   label: 'Hoạt động PB',       roles: ['DepartmentHead','DepartmentManager','Admin'] },
+        'dept-leaves':    { id: 'dept-leaves',       label: 'Duyệt đơn BP',       roles: ['DepartmentManager','DepartmentHead','Admin'] },
+
+        // Admin / HR Specialists
+
+        'admin-contracts':{ id: 'admin-contracts',   label: 'Quản lý HĐLĐ',      roles: ['Admin'] },
+        'payroll-processing':{ id: 'payroll-processing', label: 'Lương',          roles: ['Admin', 'DepartmentManager', 'DepartmentHead'] },
+        'insurance-management':{ id: 'insurance-management', label: 'Bảo hiểm',   roles: ['Admin'] },
+        'attendance-management':{ id: 'attendance-management', label: 'Quản lý chấm công', roles: ['Admin'] },
     };
 
     const ORDER = {
         Admin:             ['me','employees','admin-contracts','payroll-processing','insurance-management','attendance-management'],
-        DepartmentManager: ['me','employees','dept-leaves','dept-activities','team-timesheets','admin-contracts'],
-        DepartmentHead:    ['me','leave','team-schedule','team-shift-approvals','team-leaves','team-timesheets', 'payroll-processing'],
+        DepartmentManager: ['me','employees','ot-planning','dept-leaves','dept-activities','team-timesheets','payroll-processing'],
+        DepartmentHead:    ['me','employees','ot-assignment','dept-leaves','dept-activities','team-timesheets'],
+        TeamLeader:        ['me','leave','ot-assignment','team-schedule','team-leaves','team-timesheets'],
         Employee:          ['me','attendance','leave','my-schedule','shift-change','my-payslip','my-contract','my-insurance'],
-        HrAdmin:           ['me','employees'],
     };
 
     const ids = ORDER[primaryRole] || ORDER.Employee;
@@ -65,7 +63,7 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab, onT
         // Special case: Payroll is only for Admin (view) and C&B Dept Head (manage)
         if (item.id === 'payroll-processing') {
             if (primaryRole === 'Admin') return true;
-            if (primaryRole === 'DepartmentHead' && user?.departmentId === 7) return true;
+            if ((primaryRole === 'DepartmentHead' || primaryRole === 'DepartmentManager') && user?.departmentId === 7) return true;
             return false;
         }
         return true;
@@ -95,10 +93,10 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab, onT
     const groupMap = {
         me: 'Cá nhân', attendance: 'Cá nhân', leave: 'Cá nhân',
         'my-schedule': 'Cá nhân', 'my-payslip': 'Cá nhân', 'my-contract': 'Cá nhân', 'my-insurance': 'Cá nhân',
-        'team-attendance': 'Bộ phận', 'team-schedule': 'Bộ phận',
-        'team-leaves': 'Bộ phận', 'team-timesheets': 'Bộ phận',
-        employees: 'Phòng ban', 'dept-leaves': 'Phòng ban', 'dept-activities': 'Phòng ban',
-        'admin-contracts': 'Quản trị', 'admin-recruitment': 'Quản trị',
+        'ot-assignment': 'Quản lý', 'team-schedule': 'Quản lý',
+        'team-leaves': 'Quản lý', 'team-timesheets': 'Quản lý',
+        'ot-planning': 'Điều hành', employees: 'Điều hành', 'dept-leaves': 'Điều hành', 'dept-activities': 'Điều hành',
+        'admin-contracts': 'Quản trị', 
         'payroll-processing': 'Quản trị', 'insurance-management': 'Quản trị',
         'attendance-management': 'Quản trị',
     };

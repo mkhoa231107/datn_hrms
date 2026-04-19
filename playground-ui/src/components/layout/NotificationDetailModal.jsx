@@ -89,7 +89,19 @@ export default function NotificationDetailModal({ notification, onClose }) {
                     >
                         Đóng
                     </button>
-                    {/* Optional Action Button if needed in future */}
+                    {notification.type === 'ShiftSwap' && (
+                        <button 
+                            onClick={() => {
+                                // We'll need a way to navigate to the swap detail
+                                // For now, we can use a custom event or a prop-based approach
+                                window.location.href = `/requests/swap/${notification.relatedId}`;
+                                onClose();
+                            }}
+                            className="px-4 py-1.5 bg-[#1a56db] text-white font-bold text-[12px] uppercase tracking-widest hover:bg-[#1e429f] transition-all active:scale-95 shadow-sm"
+                        >
+                            Xem chi tiết đơn
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

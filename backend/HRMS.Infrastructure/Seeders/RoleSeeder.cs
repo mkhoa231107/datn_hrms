@@ -14,10 +14,12 @@ namespace HRMS.Infrastructure.Seeders
         {
             var rolesToSeed = new List<(string Name, string Description)>
             {
-                ("Admin",            "Quản trị viên - Quản lý user, hợp đồng, hệ thống"),
-                ("Employee",         "Nhân viên - Người lao động"),
-                ("DepartmentManager","Trưởng phòng - Quản lý phòng ban, chốt công, duyệt đơn dài hạn"),
-                ("DepartmentHead",   "Trưởng bộ phận - Xếp ca, duyệt đơn bộ phận, giám sát chấm công"),
+                ("Admin",            "Quản trị viên - Toàn quyền hệ thống"),
+                ("DepartmentManager", "Trưởng phòng - Quản lý nhân sự và ngân sách phòng ban"),
+                ("DepartmentHead",    "Trưởng bộ phận - Quản lý hoạt động và công của bộ phận/tổ"),
+                ("TeamLeader",       "Tổ trưởng - Điều phối ca làm việc và tăng ca đội nhóm"),
+                ("CnbSpecialist",    "Chuyên viên C&B - Tính toán lương, chốt bảng công"),
+                ("Employee",         "Nhân viên - Xem lịch, nhận thông báo, chấm công"),
                 ("Candidate",        "Ứng viên - Người tìm việc")
             };
 
@@ -40,39 +42,20 @@ namespace HRMS.Infrastructure.Seeders
                 }
             }
 
-            // Remove old TeamLeader role if it was renamed
-            var oldTLRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "TeamLeader");
-            if (oldTLRole != null)
-            {
-                var newRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentHead");
-                if (newRole != null)
-                {
-                    var oldMappings = await context.UserRoles
-                        .Where(ur => ur.RoleId == oldTLRole.Id).ToListAsync();
-                    foreach (var mapping in oldMappings)
-                    {
-                        if (!await context.UserRoles.AnyAsync(ur => ur.UserId == mapping.UserId && ur.RoleId == newRole.Id))
-                            context.UserRoles.Add(new UserRole { UserId = mapping.UserId, RoleId = newRole.Id, AssignedAt = System.DateTime.UtcNow, CreatedAt = System.DateTime.UtcNow });
-                    }
-                    context.UserRoles.RemoveRange(oldMappings);
-                }
-                context.Roles.Remove(oldTLRole);
-            }
-            
-            // Remove CnbSpecialist role
-            var cnbRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "CnbSpecialist");
-            if (cnbRole != null)
-            {
-                var roleMappings = await context.UserRoles.Where(ur => ur.RoleId == cnbRole.Id).ToListAsync();
-                context.UserRoles.RemoveRange(roleMappings);
-                context.Roles.Remove(cnbRole);
-            }
+            if (context.ChangeTracker.HasChanges())
+                await context.SaveChangesAsync();
 
-            // Remove HrAdmin role
+            // Clean up HrAdmin if it exists
             var hrAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "HrAdmin");
             if (hrAdminRole != null)
             {
                 var roleMappings = await context.UserRoles.Where(ur => ur.RoleId == hrAdminRole.Id).ToListAsync();
+                var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Admin");
+                foreach (var mapping in roleMappings)
+                {
+                    if (!await context.UserRoles.AnyAsync(ur => ur.UserId == mapping.UserId && ur.RoleId == adminRole.Id))
+                        context.UserRoles.Add(new UserRole { UserId = mapping.UserId, RoleId = adminRole.Id, AssignedAt = System.DateTime.UtcNow, CreatedAt = System.DateTime.UtcNow });
+                }
                 context.UserRoles.RemoveRange(roleMappings);
                 context.Roles.Remove(hrAdminRole);
             }
@@ -80,5 +63,6 @@ namespace HRMS.Infrastructure.Seeders
             if (context.ChangeTracker.HasChanges())
                 await context.SaveChangesAsync();
         }
+
     }
 }

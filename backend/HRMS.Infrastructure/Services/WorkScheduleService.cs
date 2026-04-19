@@ -2,6 +2,7 @@ using AutoMapper;
 using HRMS.Application.DTOs.Scheduling;
 using HRMS.Application.Interfaces;
 using HRMS.Domain.Entities;
+using HRMS.Domain.Enums;
 using HRMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -593,6 +594,326 @@ namespace HRMS.Infrastructure.Services
                 Message = $"Xếp ca thành công cho {employeeIds.Count} nhân viên, {scheduled} ngày công trong năm {dto.Year}." +
                           (skipped > 0 ? $" Bỏ qua {skipped} ngày đã có sẵn ca." : "") +
                           (lockedCount > 0 ? $" Bỏ qua {lockedCount} kỳ đã bị khóa." : "")
+            };
+        }
+
+        /// <summary>
+        /// Sinh tự động WorkSchedule cho toàn năm từ ca làm việc ghi trong hợp đồng đang hiệu lực.
+        /// Đây là nguồn sự thật cơ bản — đơn đổi ca sẽ ghi đè tạm thời, sau đó được khôi phục.
+        /// </summary>
+        public async Task<AutoScheduleResultDto> GenerateFromContractAsync(int? employeeId, int year, bool overwrite)
+        {
+            // 1. Lấy danh sách nhân viên cần xử lý
+            var employeesQuery = _context.Employees
+                .Include(e => e.Contracts)
+                .AsQueryable();
+
+            if (employeeId.HasValue)
+                employeesQuery = employeesQuery.Where(e => e.Id == employeeId.Value);
+
+            var employees = await employeesQuery.ToListAsync();
+
+            // 2. Lấy tất cả kỳ công trong năm
+            var periodsInYear = await _context.SchedulePeriods
+                .Where(p => p.StartDate.Year <= year && p.EndDate.Year >= year)
+                .OrderBy(p => p.StartDate)
+                .ToListAsync();
+
+            var yearStart = new DateTime(year, 1, 1).Date;
+            var yearEnd = new DateTime(year, 12, 31).Date;
+
+            int totalScheduled = 0, totalSkipped = 0, processedEmployees = 0;
+
+            foreach (var emp in employees)
+            {
+                // 3. Tìm hợp đồng đang active có ghi ca làm
+                var activeContract = emp.Contracts
+                    .Where(c => c.Status == ContractStatus.Active && c.ShiftId.HasValue)
+                    .OrderByDescending(c => c.StartDate)
+                    .FirstOrDefault();
+
+                if (activeContract == null || !activeContract.ShiftId.HasValue)
+                {
+                    // Không có hợp đồng active với ca làm, bỏ qua
+                    continue;
+                }
+
+                var contractShiftId = activeContract.ShiftId.Value;
+                processedEmployees++;
+
+                foreach (var period in periodsInYear)
+                {
+                    if (period.IsLocked) continue;
+
+                    var pStart = period.StartDate.Date > yearStart ? period.StartDate.Date : yearStart;
+                    var pEnd = period.EndDate.Date < yearEnd ? period.EndDate.Date : yearEnd;
+                    if (pStart > pEnd) continue;
+
+                    // Lấy toàn bộ schedule hiện có của nhân viên trong khoảng thời gian này
+                    var existingSchedules = await _context.WorkSchedules
+                        .Where(s => s.EmployeeId == emp.Id && s.WorkingDate >= pStart && s.WorkingDate <= pEnd)
+                        .ToListAsync();
+
+                    for (var date = pStart; date <= pEnd; date = date.AddDays(1))
+                    {
+                        // Chủ nhật luôn là ngày nghỉ
+                        if (date.DayOfWeek == DayOfWeek.Sunday) continue;
+
+                        var existing = existingSchedules.FirstOrDefault(s => s.WorkingDate.Date == date.Date);
+
+                        if (existing != null)
+                        {
+                            // Nếu đã có lịch và không được phép ghi đè → skip
+                            // NHƯNG: Nếu Note ghi là "Đổi ca" (tức đang trong đơn đổi ca), KHÔNG ghi đè
+                            if (!overwrite || (existing.Note != null && existing.Note.Contains("Đổi ca")))
+                            {
+                                totalSkipped++;
+                                continue;
+                            }
+
+                            existing.WorkShiftId = contractShiftId;
+                            existing.UpdatedAt = DateTime.UtcNow;
+                            existing.Note = "Từ hợp đồng";
+                            totalScheduled++;
+                        }
+                        else
+                        {
+                            _context.WorkSchedules.Add(new WorkSchedule
+                            {
+                                EmployeeId = emp.Id,
+                                WorkShiftId = contractShiftId,
+                                WorkingDate = date,
+                                PeriodId = period.Id,
+                                Note = "Từ hợp đồng",
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            });
+                            totalScheduled++;
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            return new AutoScheduleResultDto
+            {
+                ScheduledDays = totalScheduled,
+                ScheduledEmployees = processedEmployees,
+                SkippedDays = totalSkipped,
+                Message = $"Đã tạo lịch từ hợp đồng cho {processedEmployees} nhân viên, {totalScheduled} ngày trong năm {year}." +
+                          (totalSkipped > 0 ? $" Bỏ qua {totalSkipped} ngày (đang trong đơn đổi ca hoặc đã có lịch)." : "")
+            };
+        }
+
+        /// <summary>
+        /// Khôi phục ca làm gốc (từ hợp đồng) cho các đơn đổi ca đã hết hạn.
+        /// Chạy định kỳ mỗi ngày qua ContractScheduleWorker.
+        /// </summary>
+        public async Task<int> RestoreExpiredShiftChangesAsync()
+        {
+            var today = DateTime.Today;
+
+            // Lấy các đơn đổi ca đã Approved và đã hết hạn (EndDate < hôm nay)
+            var expiredRequests = await _context.ShiftChangeRequests
+                .Include(r => r.Employee)
+                    .ThenInclude(e => e.Contracts)
+                .Where(r => r.Status == ShiftChangeRequestStatus.Approved && r.EndDate.Date < today)
+                .ToListAsync();
+
+            int restored = 0;
+
+            foreach (var request in expiredRequests)
+            {
+                var emp = request.Employee;
+
+                // Tìm ca gốc từ hợp đồng active
+                var activeContract = emp.Contracts
+                    .Where(c => c.Status == ContractStatus.Active && c.ShiftId.HasValue)
+                    .OrderByDescending(c => c.StartDate)
+                    .FirstOrDefault();
+
+                if (activeContract == null || !activeContract.ShiftId.HasValue) continue;
+
+                var originalShiftId = activeContract.ShiftId.Value;
+
+                // Khôi phục WorkSchedule trong đoạn [StartDate, EndDate] của đơn
+                // Chỉ khôi phục những ngày có Note chứa "Đổi ca" (do đơn này tạo ra)
+                var schedulesToRestore = await _context.WorkSchedules
+                    .Where(s => s.EmployeeId == emp.Id
+                             && s.WorkingDate >= request.StartDate.Date
+                             && s.WorkingDate <= request.EndDate.Date
+                             && s.Note != null && s.Note.Contains($"Đổi ca (Đơn #{request.Id})"))
+                    .ToListAsync();
+
+                foreach (var schedule in schedulesToRestore)
+                {
+                    schedule.WorkShiftId = originalShiftId;
+                    schedule.Note = "Khôi phục từ hợp đồng";
+                    schedule.UpdatedAt = DateTime.UtcNow;
+                    restored++;
+                }
+
+                // Đánh dấu đơn là đã được restore (dùng Completed thay vì Approved để không xử lý lại)
+                request.Status = ShiftChangeRequestStatus.Completed;
+            }
+
+            await _context.SaveChangesAsync();
+            return restored;
+        }
+
+        public async Task<AutoScheduleResultDto> GenerateGlobalAutoScheduleAsync(int year, bool overwrite)
+        {
+            // 1. Get Prerequisites
+            var shifts = await _context.WorkShifts.AsNoTracking().ToListAsync();
+            var hcShift = shifts.FirstOrDefault(s => s.ShiftCode == "HC") ?? shifts.FirstOrDefault();
+            var s1 = shifts.FirstOrDefault(s => s.ShiftCode == "S1");
+            var c1 = shifts.FirstOrDefault(s => s.ShiftCode == "C1");
+            var d1 = shifts.FirstOrDefault(s => s.ShiftCode == "D1");
+
+            if (hcShift == null || s1 == null || c1 == null || d1 == null)
+                throw new InvalidOperationException("Thiếu danh mục ca làm việc (HC, S1, C1, D1). Vui lòng kiểm tra lại cấu hình ca.");
+
+            int[] rotatingShiftIds = { s1.Id, c1.Id, d1.Id };
+
+            // 2. Get All Employees with relevant info
+            var employees = await _context.Employees
+                .Include(e => e.Department)
+                .Include(e => e.Position)
+                .Where(e => e.IsActive)
+                .OrderBy(e => e.EmployeeCode)
+                .ToListAsync();
+
+            // 3. Get all SchedulePeriods in the target year
+            var periodsInYear = await _context.SchedulePeriods
+                .Where(p => p.StartDate.Year <= year && p.EndDate.Year >= year)
+                .OrderBy(p => p.StartDate)
+                .ToListAsync();
+
+            if (!periodsInYear.Any())
+                throw new InvalidOperationException($"Không tìm thấy kỳ công nào cho năm {year}. Vui lòng tạo kỳ công trước.");
+
+            int totalScheduled = 0, totalSkipped = 0;
+            var yearStart = new DateTime(year, 1, 1).Date;
+            var yearEnd = new DateTime(year, 12, 31).Date;
+
+            Console.WriteLine($"[GLOBAL_AUTO] Starting for {employees.Count} employees. Year: {year}.");
+
+            foreach (var period in periodsInYear)
+            {
+                if (period.IsLocked) continue;
+
+                var pStart = period.StartDate.Date > yearStart ? period.StartDate.Date : yearStart;
+                var pEnd = period.EndDate.Date < yearEnd ? period.EndDate.Date : yearEnd;
+                if (pStart > pEnd) continue;
+
+                var existingSchedules = await _context.WorkSchedules
+                    .Where(s => s.WorkingDate >= pStart && s.WorkingDate <= pEnd)
+                    .ToListAsync();
+
+                foreach (var emp in employees)
+                {
+                    // Cải tiến logic nhận diện: Dựa vào EmployeeCode để xác định công nhân xưởng lắp ráp
+                    // Các mã PRD-ASS-002 đến PRD-ASS-151 là công nhân xoay ca.
+                    // PRD-ASS-001 là Quản lý xưởng (thường làm HC).
+                    bool isPrdWorker = emp.EmployeeCode.StartsWith("PRD-ASS-") && emp.EmployeeCode != "PRD-ASS-001";
+                    int initialGroup = 0;
+
+                    if (isPrdWorker)
+                    {
+                        // Logic matching MassWorkerSeeder: Group 0 (002-051), 1 (052-101), 2 (102-151)
+                        string numPart = emp.EmployeeCode.Replace("PRD-ASS-", "");
+                        if (int.TryParse(numPart, out int workerNum))
+                        {
+                            initialGroup = ((workerNum - 2) / 50) % 3;
+                        }
+                    }
+
+                    for (var date = pStart; date <= pEnd; date = date.AddDays(1))
+                    {
+                        // Sunday is always OFF
+                        if (date.DayOfWeek == DayOfWeek.Sunday) continue;
+
+                        int assignedShiftId;
+                        string note;
+
+                        if (isPrdWorker)
+                        {
+                            int weekNum = System.Globalization.ISOWeek.GetWeekOfYear(date);
+                            int shiftIndex = (initialGroup + weekNum - 1) % 3;
+                            assignedShiftId = rotatingShiftIds[shiftIndex];
+                            note = $"Xoay ca tự động (Nhóm {initialGroup + 1}, Tuần {weekNum})";
+                        }
+                        else
+                        {
+                            assignedShiftId = emp.Position?.DefaultShiftId ?? hcShift.Id;
+                            note = "Lịch hành chính cố định";
+                        }
+
+                        var existing = existingSchedules.FirstOrDefault(s => s.EmployeeId == emp.Id && s.WorkingDate.Date == date.Date);
+
+                        if (existing != null)
+                        {
+                            // Skip if not overwrite OR if it's a manual shift change
+                            if (!overwrite || (existing.Note != null && existing.Note.Contains("Đổi ca")))
+                            {
+                                totalSkipped++;
+                                continue;
+                            }
+
+                            existing.WorkShiftId = assignedShiftId;
+                            existing.Note = note;
+                            existing.UpdatedAt = DateTime.UtcNow;
+                            totalScheduled++;
+                        }
+                        else
+                        {
+                            _context.WorkSchedules.Add(new WorkSchedule
+                            {
+                                EmployeeId = emp.Id,
+                                WorkShiftId = assignedShiftId,
+                                WorkingDate = date,
+                                PeriodId = period.Id,
+                                Note = note,
+                                CreatedAt = DateTime.UtcNow,
+                                UpdatedAt = DateTime.UtcNow
+                            });
+                            totalScheduled++;
+                        }
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                // Clear tracker to avoid memory issues for large organizations
+                _context.ChangeTracker.Clear();
+            }
+
+            return new AutoScheduleResultDto
+            {
+                ScheduledDays = totalScheduled,
+                ScheduledEmployees = employees.Count,
+                SkippedDays = totalSkipped,
+                Message = $"Thiết lập lại lịch ca thành công cho {employees.Count} nhân viên trong năm {year}. " +
+                          $"Tổng cộng {totalScheduled} ngày công được cập nhật/tạo mới." +
+                          (totalSkipped > 0 ? $" Bỏ qua {totalSkipped} ngày (do đã có lịch hoặc đang trong đơn đổi ca)." : "")
+            };
+        }
+
+        public async Task<WorkScheduleDayDto> GetByDateAsync(int employeeId, DateTime date)
+        {
+            var schedule = await _context.WorkSchedules
+                .Include(s => s.WorkShift)
+                .Include(s => s.Period)
+                .FirstOrDefaultAsync(s => s.EmployeeId == employeeId && s.WorkingDate.Date == date.Date);
+
+            if (schedule == null) return null;
+
+            return new WorkScheduleDayDto
+            {
+                Date = schedule.WorkingDate,
+                ShiftId = schedule.WorkShiftId,
+                ShiftCode = schedule.WorkShift != null ? schedule.WorkShift.ShiftCode : "OFF",
+                IsLocked = schedule.Period?.IsLocked ?? false
             };
         }
     }
