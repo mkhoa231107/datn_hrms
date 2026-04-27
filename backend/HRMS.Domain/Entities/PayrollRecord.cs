@@ -25,11 +25,13 @@ namespace HRMS.Domain.Entities
         public decimal PositionAllowance { get; set; }   // PC Vị trí
         public decimal PetrolAllowance { get; set; }     // PC Xăng xe
         public decimal PhoneAllowance { get; set; }      // PC Điện thoại
+        public decimal HousingAllowance { get; set; }    // PC Nhà ở
+        public decimal MealAllowance { get; set; }       // PC Ăn ca
         public decimal SalesSalary { get; set; }         // Lương doanh số
         public decimal OtherAllowance { get; set; }      // Phụ cấp khác
         
         [NotMapped]
-        public decimal TotalAllowances => PositionAllowance + PetrolAllowance + PhoneAllowance + OtherAllowance;
+        public decimal TotalAllowances => PositionAllowance + PetrolAllowance + PhoneAllowance + HousingAllowance + MealAllowance + OtherAllowance;
         public decimal Bonus { get; set; }               // Thưởng phát sinh
         
         [NotMapped]
@@ -41,10 +43,11 @@ namespace HRMS.Domain.Entities
         public decimal UnemploymentInsurance { get; set; }
         
         public decimal PersonalIncomeTax { get; set; }
+        public decimal MealDeduction { get; set; }   // Tiền ăn trừ vào lương
         public decimal OtherDeductions { get; set; } // Phạt/Khác
         
         [NotMapped]
-        public decimal TotalDeductions => SocialInsurance + HealthInsurance + UnemploymentInsurance + PersonalIncomeTax + OtherDeductions;
+        public decimal TotalDeductions => SocialInsurance + HealthInsurance + UnemploymentInsurance + PersonalIncomeTax + MealDeduction + OtherDeductions;
         
         public decimal NetSalary { get; set; }      // Gross - TotalDeductions
         

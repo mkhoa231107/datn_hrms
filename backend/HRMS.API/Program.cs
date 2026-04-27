@@ -164,7 +164,7 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<HRMSDbContext>();
-        // context.Database.Migrate(); // Auto-migration if needed
+        context.Database.Migrate(); // Auto-migration if needed
         await DbInitializer.InitializeAsync(context);
         Console.WriteLine("✅ Database initialized and seeded successfully.");
     }

@@ -50,6 +50,14 @@ namespace HRMS.Domain.Entities
         public Position Position { get; set; }
 
         public decimal BasicSalary { get; set; }    // Lương cơ bản hiện tại (đồng bộ từ hợp đồng)
+        public decimal Coefficient { get; set; } = 1.0m; // Hệ số lương (Nếu > 0 sẽ ghi đè chức vụ)
+        
+        // Allowance Overrides (Nếu có giá trị sẽ ghi đè cấu hình chức vụ)
+        public decimal? MealAllowance { get; set; }
+        public decimal? PhoneAllowance { get; set; }
+        public decimal? PetrolAllowance { get; set; }
+        public decimal? HousingAllowance { get; set; }
+        
         public int? ShiftId { get; set; }           // Ca làm việc cố định hiện tại (đồng bộ từ hợp đồng)
         public WorkShift? Shift { get; set; }
         

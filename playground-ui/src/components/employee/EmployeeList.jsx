@@ -12,7 +12,7 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
     const [subDepts, setSubDepts] = useState([]);
     const [barcodeEmp, setBarcodeEmp] = useState(null); // { code, name, department }
 
-    const isScopedManager = (user?.roles?.includes('TeamLeader') || user?.roles?.includes('DepartmentHead')) && !user?.roles?.includes('Admin');
+    const isScopedManager = (user?.roles?.includes('TeamLeader') || user?.roles?.includes('DepartmentHead')) && !user?.roles?.includes('Admin') && !user?.roles?.includes('CnbSpecialist');
 
     useEffect(() => {
         if (isScopedManager && user?.departmentId) {

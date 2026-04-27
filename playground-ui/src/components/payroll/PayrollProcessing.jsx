@@ -31,7 +31,7 @@ export default function PayrollProcessing({ user }) {
     // Only the C&B Department Head (Dept 7) can calculate/re-calculate or lock payroll.
     // Admin role is restricted to view-only as per requirements.
     const canManageValue = (user?.roles?.includes('DepartmentHead') || user?.roles?.includes('DepartmentManager')) && user?.departmentId === 7;
-    const canManage = canManageValue || user?.roles?.includes('Admin');
+    const canManage = canManageValue || user?.roles?.includes('Admin') || user?.roles?.includes('Accountant') || user?.roles?.includes('CnbSpecialist');
 
     // View: 'select' = chọn + nhân viên, 'result' = bảng kết quả
     const [view, setView] = useState('select');
@@ -90,7 +90,7 @@ export default function PayrollProcessing({ user }) {
             }
             setPayrollPeriod(pp);
             
-            // For Admin, if they have already selected a department, reload results
+            // For non-privileged viewers, if they have already selected a department, reload results
             if (!canManage && selectedDept && pp) {
                 handleViewHistoryWithPeriod(pp, selectedDept.id);
             }
@@ -128,7 +128,7 @@ export default function PayrollProcessing({ user }) {
             const emps = res.data?.data || [];
             setEmployees(emps);
             
-            // For Admin, if they select a department, automatically try to load the result
+            // For non-privileged viewers, if they select a department, automatically try to load the result
             if (!canManage && payrollPeriod) {
                 handleViewHistoryWithPeriod(payrollPeriod, id);
             }
@@ -139,9 +139,12 @@ export default function PayrollProcessing({ user }) {
         }
     };
 
+    const approvedEmployees = employees.filter(e => e.hasApprovedTimesheet);
+    const allApprovedSelected = approvedEmployees.length > 0 && approvedEmployees.every(e => selectedIds.includes(e.employeeId));
+
     const toggleAll = () => {
-        if (selectedIds.length === employees.length) setSelectedIds([]);
-        else setSelectedIds(employees.map(e => e.employeeId));
+        if (allApprovedSelected) setSelectedIds([]);
+        else setSelectedIds(approvedEmployees.map(e => e.employeeId));
     };
 
     const toggleOne = (id) => setSelectedIds(prev =>
@@ -238,8 +241,8 @@ export default function PayrollProcessing({ user }) {
             return;
         }
         
-        // Define CSV headers
-        const headers = ['STT', 'Mã NV', 'Họ tên', 'Phòng ban', 'Chức danh', 'Lương công', 'Tăng ca', 'Bảo hiểm', 'Thực lĩnh'];
+        // Define CSV headers (FDS Standard)
+        const headers = ['STT', 'Mã NV', 'Họ tên', 'Phòng ban', 'Chức danh', 'Hệ số', 'Ngày công', 'Lương CB', 'Tăng ca', 'Phụ cấp', 'Tổng thu nhập', 'Bảo hiểm', 'Thuế TNCN', 'Thực lĩnh'];
         
         // Map records to CSV rows
         const rows = records.map((r, idx) => {
@@ -250,9 +253,14 @@ export default function PayrollProcessing({ user }) {
                 `"${r.employeeName}"`,
                 `"${r.departmentName}"`,
                 `"${r.positionName || ''}"`,
+                r.coefficient || 0,
+                r.actualWorkingDays || 0,
                 r.actualWorkingSalary,
                 r.overtimePay,
+                r.totalAllowances || 0,
+                r.grossSalary || 0,
                 bh,
+                r.personalIncomeTax || 0,
                 r.netSalary
             ].join(',');
         });
@@ -275,7 +283,7 @@ export default function PayrollProcessing({ user }) {
     };
 
     const isLocked = payrollPeriod?.status === 'Locked';
-    const allSelected = employees.length > 0 && selectedIds.length === employees.length;
+    const allSelected = allApprovedSelected;
 
     // Totals
     const totalLtg = records.reduce((s, r) => s + (r.actualWorkingSalary || 0), 0);
@@ -499,12 +507,19 @@ export default function PayrollProcessing({ user }) {
                             <thead>
                                 <tr>
                                     <th className="c" style={{ width: '38px' }}>
-                                        <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                                        <input type="checkbox" checked={allSelected} onChange={() => {
+                                            if (allSelected) {
+                                                setSelectedIds([]);
+                                            } else {
+                                                setSelectedIds(employees.filter(e => e.hasApprovedTimesheet).map(e => e.employeeId));
+                                            }
+                                        }} />
                                     </th>
                                     <th style={{ width: '40px' }} className="c">STT</th>
                                     <th style={{ width: '110px' }}>Mã NV</th>
                                     <th>Họ tên</th>
                                     <th>Chức danh</th>
+                                    <th className="c" style={{ width: '80px' }}>Hệ số</th>
                                     <th className="r" style={{ width: '130px' }}>Lương CB</th>
                                     <th className="c" style={{ width: '90px' }}>Ngày công</th>
                                     <th className="c" style={{ width: '90px' }}>Giờ OT</th>
@@ -529,6 +544,7 @@ export default function PayrollProcessing({ user }) {
                                             <td className="p-3 text-xs font-mono font-bold text-slate-600">{emp.employeeCode}</td>
                                             <td className="p-3 font-semibold text-slate-800">{emp.fullName}</td>
                                             <td className="p-3 text-xs text-slate-500">{emp.positionName}</td>
+                                            <td className="p-3 text-center font-bold text-indigo-600">{emp.coefficient ?? '—'}</td>
                                             <td className="p-3 text-right text-slate-700">{fmt(emp.basicSalary)}</td>
                                             <td className="p-3 text-center font-semibold text-slate-700">{fmtNum(emp.actualWorkingDays)}</td>
                                             <td className="p-3 text-center text-slate-600">{fmtNum(emp.overtimeHours)}h</td>
@@ -637,13 +653,18 @@ export default function PayrollProcessing({ user }) {
                 <table className="ef-table" style={{ borderTop: 'none', minWidth: '760px' }}>
                     <thead>
                         <tr>
-                            <th className="c" style={{ width: '44px' }}>STT</th>
-                            <th style={{ width: '110px' }}>Mã NV</th>
-                            <th>Họ tên</th>
-                            <th className="r" style={{ width: '150px' }}>Lương công</th>
-                            <th className="r" style={{ width: '130px' }}>Tăng ca</th>
-                            <th className="r" style={{ width: '140px' }}>Bảo hiểm</th>
-                            <th className="r" style={{ width: '160px', background: '#f8fafc' }}>Thực lĩnh</th>
+                            <th className="c" style={{ width: '40px' }}>STT</th>
+                            <th style={{ width: '90px' }}>Mã NV</th>
+                            <th>Họ tên / Chức danh</th>
+                            <th className="c" style={{ width: '60px' }}>Hệ số</th>
+                            <th className="c" style={{ width: '80px' }}>Ngày công</th>
+                            <th className="r" style={{ width: '120px' }}>Lương CB</th>
+                            <th className="r" style={{ width: '100px' }}>Tăng ca</th>
+                            <th className="r" style={{ width: '100px' }}>Phụ cấp</th>
+                            <th className="r" style={{ width: '120px' }}>Tổng thu nhập</th>
+                            <th className="r" style={{ width: '100px' }}>Bảo hiểm</th>
+                            <th className="r" style={{ width: '100px' }}>Thuế TNCN</th>
+                            <th className="r" style={{ width: '130px', background: '#f8fafc' }}>Thực lĩnh</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -651,17 +672,22 @@ export default function PayrollProcessing({ user }) {
                             const bh = (r.socialInsurance || 0) + (r.healthInsurance || 0) + (r.unemploymentInsurance || 0);
                             return (
                                 <tr key={r.id} className="hover:bg-slate-50 transition">
-                                    <td className="p-3 text-xs text-slate-400 text-center">{idx + 1}</td>
-                                    <td className="p-3 text-xs font-mono text-slate-500">{r.employeeCode}</td>
-                                    <td className="p-3">
-                                        <div className="font-semibold text-slate-800">{r.employeeName}</div>
-                                        <div className="text-xs text-slate-400">{r.departmentName}</div>
+                                    <td className="p-2 text-[11px] text-slate-400 text-center">{idx + 1}</td>
+                                    <td className="p-2 text-[11px] font-mono text-slate-500">{r.employeeCode}</td>
+                                    <td className="p-2">
+                                        <div className="font-semibold text-slate-800 text-xs">{r.employeeName}</div>
+                                        <div className="text-[10px] text-slate-400">{r.positionName}</div>
                                     </td>
-                                    <td className="p-3 text-right text-slate-600">{fmt(r.actualWorkingSalary)}</td>
-                                    <td className="p-3 text-right text-slate-600">{fmt(r.overtimePay)}</td>
-                                    <td className="p-3 text-right text-slate-500 text-sm">({fmt(bh)})</td>
-                                    <td className="p-3 text-right bg-slate-50">
-                                        <span className="font-bold text-slate-900">{fmt(r.netSalary)}</span>
+                                    <td className="p-2 text-center text-xs font-semibold text-slate-600 bg-slate-50">{r.coefficient}</td>
+                                    <td className="p-2 text-center text-xs text-slate-600">{r.actualWorkingDays}</td>
+                                    <td className="p-2 text-right text-xs text-slate-600">{fmt(r.actualWorkingSalary)}</td>
+                                    <td className="p-2 text-right text-xs text-slate-600">{fmt(r.overtimePay)}</td>
+                                    <td className="p-2 text-right text-xs text-slate-600">{fmt(r.totalAllowances)}</td>
+                                    <td className="p-2 text-right text-xs font-semibold text-slate-700 bg-slate-50">{fmt(r.grossSalary)}</td>
+                                    <td className="p-2 text-right text-xs text-rose-500">({fmt(bh)})</td>
+                                    <td className="p-2 text-right text-xs text-rose-500">{fmt(r.personalIncomeTax || 0)}</td>
+                                    <td className="p-2 text-right bg-emerald-50/50">
+                                        <span className="font-bold text-emerald-700 text-sm">{fmt(r.netSalary)}</span>
                                     </td>
                                 </tr>
                             );
@@ -669,12 +695,15 @@ export default function PayrollProcessing({ user }) {
                     </tbody>
                     <tfoot>
                         <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                            <td colSpan={3} className="p-3 text-sm font-semibold text-slate-500 text-right">Tổng cộng</td>
-                            <td className="p-3 text-right font-semibold text-slate-700">{fmt(totalLtg)}</td>
-                            <td className="p-3 text-right font-semibold text-slate-700">{fmt(totalLot)}</td>
-                            <td className="p-3 text-right font-semibold text-slate-500">({fmt(totalBh)})</td>
-                            <td className="p-3 text-right bg-slate-50">
-                                <span className="font-bold text-slate-900 text-base">{fmt(totalNet)}</span>
+                            <td colSpan={5} className="p-3 text-sm font-semibold text-slate-500 text-right">Tổng cộng</td>
+                            <td className="p-3 text-right text-xs font-semibold text-slate-700">{fmt(records.reduce((s, r) => s + r.actualWorkingSalary, 0))}</td>
+                            <td className="p-3 text-right text-xs font-semibold text-slate-700">{fmt(totalLot)}</td>
+                            <td className="p-3 text-right text-xs font-semibold text-slate-700">{fmt(records.reduce((s, r) => s + r.totalAllowances, 0))}</td>
+                            <td className="p-3 text-right text-xs font-bold text-slate-800">{fmt(records.reduce((s, r) => s + r.grossSalary, 0))}</td>
+                            <td className="p-3 text-right text-xs font-semibold text-rose-600">({fmt(totalBh)})</td>
+                            <td className="p-3 text-right text-xs font-semibold text-rose-600">({fmt(records.reduce((s, r) => s + r.personalIncomeTax, 0))})</td>
+                            <td className="p-3 text-right bg-emerald-100/50">
+                                <span className="font-bold text-emerald-800 text-base">{fmt(totalNet)}</span>
                             </td>
                         </tr>
                     </tfoot>

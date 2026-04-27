@@ -21,7 +21,7 @@ namespace HRMS.API.Controllers
 
         // Read: all management roles + employees can see department list
         [HttpGet]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,Employee")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,Employee,Accountant,CnbSpecialist")]
         public async Task<IActionResult> GetAll()
         {
             var result = await _departmentService.GetAllDepartmentsAsync();
@@ -29,7 +29,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,Employee")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,Employee,Accountant,CnbSpecialist")]
         public async Task<IActionResult> GetById(int id)
         {
             try

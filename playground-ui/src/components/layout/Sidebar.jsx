@@ -11,12 +11,13 @@ export const ROLE_META = {
     Admin: { label: 'Quản trị viên', color: 'bg-rose-500', light: 'bg-rose-50 text-rose-700 border border-rose-200' },
     DepartmentManager: { label: 'Trưởng phòng', color: 'bg-indigo-600', light: 'bg-indigo-50 text-indigo-700 border border-indigo-200' },
     DepartmentHead: { label: 'Trưởng bộ phận', color: 'bg-amber-500', light: 'bg-amber-50 text-amber-700 border border-amber-200' },
-    TeamLeader: { label: 'Tổ trưởng', color: 'bg-orange-500', light: 'bg-orange-50 text-orange-700 border border-orange-200' },
+    Accountant: { label: 'Kế toán', color: 'bg-emerald-600', light: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+    CnbSpecialist: { label: 'Chuyên viên C&B', color: 'bg-teal-500', light: 'bg-teal-50 text-teal-700 border border-teal-200' },
     Employee: { label: 'Nhân viên / Công nhân', color: 'bg-slate-500', light: 'bg-slate-50 text-slate-700 border border-slate-200' },
 };
 
 export function getPrimaryRole(roles = []) {
-    const PRIORITY = ['Admin', 'DepartmentManager', 'DepartmentHead', 'TeamLeader', 'Employee'];
+    const PRIORITY = ['Admin', 'Accountant', 'CnbSpecialist', 'DepartmentManager', 'DepartmentHead', 'Employee'];
     return PRIORITY.find(r => roles.includes(r)) || 'Employee';
 }
 
@@ -28,54 +29,62 @@ function getMenuItems(primaryRole) {
     const isAdmin = primaryRole === 'Admin';
     const isDeptMgr = primaryRole === 'DepartmentManager';
     const isDeptHead = primaryRole === 'DepartmentHead';
-    const isTeamLead = primaryRole === 'TeamLeader';
 
     const MENUS = {
         personal: {
             label: 'Cá nhân',
             items: [
-                { id: 'me', label: 'Hồ sơ của tôi', icon: UserCircle, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager', 'Admin'] },
-                { id: 'attendance', label: 'Chấm công', icon: Clock, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
-                { id: 'my-ot-schedule', label: 'Lịch tăng ca', icon: Calendar, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
-                { id: 'leave', label: 'Đơn từ & Nghỉ phép', icon: Umbrella, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
-                { id: 'my-contract', label: 'Hợp đồng lao động', icon: FileSpreadsheet, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
-                { id: 'my-payslip', label: 'Bảng lương', icon: DollarSign, showFor: ['Employee', 'TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
+                { id: 'me', label: 'Hồ sơ của tôi', icon: UserCircle, showFor: ['Employee', 'DepartmentHead', 'DepartmentManager', 'Admin', 'Accountant', 'CnbSpecialist'] },
+                { id: 'attendance', label: 'Chấm công', icon: Clock, showFor: ['Employee', 'DepartmentHead', 'DepartmentManager', 'Accountant', 'CnbSpecialist'] },
+                { id: 'my-ot-schedule', label: 'Lịch tăng ca', icon: Calendar, showFor: ['Employee', 'DepartmentHead', 'DepartmentManager', 'Accountant', 'CnbSpecialist'] },
+                { id: 'leave', label: 'Đơn từ & Nghỉ phép', icon: Umbrella, showFor: ['Employee', 'DepartmentHead', 'DepartmentManager', 'Accountant', 'CnbSpecialist'] },
+                { id: 'my-contract', label: 'Hợp đồng lao động', icon: FileSpreadsheet, showFor: ['Employee', 'DepartmentHead', 'DepartmentManager', 'Accountant', 'CnbSpecialist'] },
+                { id: 'my-payslip', label: 'Bảng lương', icon: DollarSign, showFor: ['Employee', 'DepartmentHead', 'DepartmentManager', 'Accountant', 'CnbSpecialist'] },
             ]
         },
         // ─── Team Leader (Tổ trưởng) ─────────────────────────
         team: {
             label: 'Quản lý Bộ phận',
             items: [
-                { id: 'ot-assignment', label: 'Đề cử Tăng ca', icon: Calendar, showFor: ['TeamLeader', 'DepartmentHead', 'Admin'] },
-                { id: 'team-timesheets', label: 'Công bộ phận', icon: Activity, showFor: ['TeamLeader', 'DepartmentHead', 'DepartmentManager'] },
-                { id: 'team-schedule', label: 'Xếp ca bộ phận', icon: Calendar, showFor: ['TeamLeader'] },
-                { id: 'team-leaves', label: 'Duyệt đơn bộ phận', icon: CheckSquare, showFor: ['TeamLeader'] },
+                { id: 'ot-assignment', label: 'Đề cử Tăng ca', icon: Calendar, showFor: ['DepartmentHead'] },
+                { id: 'team-timesheets', label: 'Công bộ phận', icon: Activity, showFor: ['DepartmentManager', 'Admin'] },
+                { id: 'team-schedule', label: 'Xếp ca bộ phận', icon: Calendar, showFor: ['DepartmentHead', 'Admin'] },
+                { id: 'team-leaves', label: 'Duyệt đơn bộ phận', icon: CheckSquare, showFor: ['DepartmentHead', 'DepartmentManager', 'Admin'] },
             ]
         },
         // ─── Management (Trưởng phòng / Trưởng bộ phận) ───────────────────
         management: {
             label: 'Quản lý Điều hành',
             items: [
-                { id: 'ot-planning', label: 'Kế hoạch OT tháng', icon: BarChart2, showFor: ['DepartmentManager', 'Admin'] },
-                { id: 'employees', label: 'Nhân sự quản lý', icon: Users, showFor: ['DepartmentManager', 'DepartmentHead', 'Admin'] },
+                { id: 'ot-planning', label: 'Kế hoạch OT', icon: BarChart2, showFor: ['DepartmentManager', 'CnbSpecialist'] },
+                { id: 'employees', label: 'Nhân sự quản lý', icon: Users, showFor: ['DepartmentManager', 'DepartmentHead', 'CnbSpecialist'] },
                 { id: 'dept-activities', label: 'Báo cáo hoạt động', icon: Activity, showFor: ['DepartmentManager', 'DepartmentHead'] },
-                { id: 'dept-leaves', label: 'Phê duyệt nghỉ phép', icon: FileSpreadsheet, showFor: ['DepartmentManager', 'DepartmentHead'] },
+                { id: 'dept-leaves', label: 'Phê duyệt nghỉ phép', icon: FileSpreadsheet, showFor: ['DepartmentManager', 'DepartmentHead', 'CnbSpecialist'] },
             ]
         },
-        // ─── Admin / HR Management ─────────────────────────────
+        // ─── HR Management (C&B) ─────────────────────────────
         hr: {
-            label: 'Nhân sự & Tiền lương',
+            label: 'Nhân sự',
             items: [
-                { id: 'payroll-processing', label: 'Tính lương & Thuế', icon: DollarSign, showFor: ['Admin'] },
-                { id: 'attendance-management', label: 'Quản lý chấm công', icon: Activity, showFor: ['Admin'] },
-                { id: 'insurance-management', label: 'Bảo hiểm xã hội', icon: Shield, showFor: ['Admin'] },
-                { id: 'payroll-settings', label: 'Cấu hình lương', icon: Settings, showFor: ['Admin'] },
+                { id: 'attendance-management', label: 'Quản lý chấm công', icon: Activity, showFor: ['CnbSpecialist'] },
+                { id: 'insurance-management', label: 'Bảo hiểm xã hội', icon: Shield, showFor: ['CnbSpecialist'] },
+                { id: 'admin-contracts', label: 'Quản lý Hợp đồng', icon: FileSpreadsheet, showFor: ['CnbSpecialist'] },
+                { id: 'admin-roles', label: 'Quản lý Tài khoản', icon: UserPlus, showFor: ['CnbSpecialist'] },
             ]
         },
+        // ─── Payroll Management (C&B Specialist) ─────────────────────────────
+        payroll: {
+            label: 'Tiền lương',
+            items: [
+                { id: 'payroll-processing', label: 'Tính lương & Thuế', icon: DollarSign, showFor: ['CnbSpecialist', 'Admin'] },
+                { id: 'payroll-settings', label: 'Cấu hình lương', icon: Settings, showFor: ['CnbSpecialist', 'Admin'] },
+                { id: 'payroll-report', label: 'Báo cáo lương', icon: BarChart2, showFor: ['Accountant', 'CnbSpecialist', 'Admin'] },
+            ]
+        },
+        // ─── System Admin ─────────────────────────────
         admin: {
             label: 'Hệ thống',
             items: [
-                { id: 'admin-roles', label: 'Phân quyền User', icon: Shield, showFor: ['Admin'] },
                 { id: 'admin-system', label: 'Cấu hình tham số', icon: Settings, showFor: ['Admin'] },
                 { id: 'barcode-attendance', label: 'Điểm danh mã vạch', icon: Camera, showFor: ['Admin'] },
             ]

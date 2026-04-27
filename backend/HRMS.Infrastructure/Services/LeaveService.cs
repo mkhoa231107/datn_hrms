@@ -226,39 +226,44 @@ namespace HRMS.Infrastructure.Services
                 {
                     List<int> approverEmployeeIds = new List<int>();
 
-                    if (totalDays <= 3)
+                    // Roles of the requester to decide notification target
+                    var headRoleId = (await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentHead"))?.Id;
+                    var isRequesterHead = _context.UserRoles.Any(ur => ur.UserId == employee.UserId && ur.RoleId == headRoleId);
+
+                    if (totalDays <= 3 && !isRequesterHead)
                     {
-                        // Notify Department Heads of the same department
-                        var headRoleId = (await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentHead"))?.Id;
+                        // Notify Department Heads of the same department (excluding self)
                         if (headRoleId != null)
                         {
                             approverEmployeeIds = await _context.UserRoles
                                 .Where(ur => ur.RoleId == headRoleId)
                                 .Join(_context.Employees, ur => ur.UserId, e => e.UserId, (ur, e) => e)
-                                .Where(e => e.DepartmentId == employee.DepartmentId)
+                                .Where(e => e.DepartmentId == employee.DepartmentId && e.Id != employeeId)
                                 .Select(e => e.Id)
                                 .ToListAsync();
                         }
                     }
-                    else
+                    
+                    // If no head found OR is a head themselves OR is > 3 days -> notify Manager
+                    if (!approverEmployeeIds.Any() || totalDays > 3 || isRequesterHead)
                     {
                         // Notify Department Manager
-                        // Option 1: ManagerId of the department
-                        if (employee.Department?.ManagerId != null)
+                        if (employee.Department?.ManagerId != null && employee.Department.ManagerId != employeeId)
                         {
                             approverEmployeeIds.Add(employee.Department.ManagerId.Value);
                         }
                         
-                        // Option 2: Anyone with DepartmentManager role in the team hierarchy (fallback/redundancy)
+                        // Fallback: anyone with DepartmentManager role in the dept
                         var managerRoleId = (await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentManager"))?.Id;
-                        if (managerRoleId != null && !approverEmployeeIds.Any())
+                        if (managerRoleId != null)
                         {
-                            approverEmployeeIds.AddRange(await _context.UserRoles
+                            var mgrs = await _context.UserRoles
                                 .Where(ur => ur.RoleId == managerRoleId)
                                 .Join(_context.Employees, ur => ur.UserId, e => e.UserId, (ur, e) => e)
-                                .Where(e => e.DepartmentId == employee.DepartmentId || e.Id == employee.Department.ManagerId)
+                                .Where(e => (e.DepartmentId == employee.DepartmentId || e.Id == (employee.Department != null ? employee.Department.ManagerId : null)) && e.Id != employeeId)
                                 .Select(e => e.Id)
-                                .ToListAsync());
+                                .ToListAsync();
+                            approverEmployeeIds.AddRange(mgrs);
                         }
                     }
 

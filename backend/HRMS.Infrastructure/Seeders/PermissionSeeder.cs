@@ -45,6 +45,7 @@ namespace HRMS.Infrastructure.Seeders
                 ("attendance.view_department",   "Attendance", "ViewDepartment",  "Xem chấm công phòng ban"),
                 ("attendance.view_all",          "Attendance", "ViewAll",         "Xem chấm công toàn bộ"),
                 ("attendance.finalize",          "Attendance", "Finalize",        "Chốt công tháng (Trưởng phòng)"),
+                ("attendance.export",            "Attendance", "Export",          "Xuất bảng công (Excel)"),
 
                 // Đơn từ (Leave / OT / Shift Swap)
                 ("leave.create",               "Leave", "Create",           "Viết đơn (nghỉ phép, tăng ca, hoán ca,...)"),

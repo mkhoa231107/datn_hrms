@@ -35,6 +35,7 @@ namespace HRMS.Application.DTOs.Employees
         public string? PositionName { get; set; }
 
         public decimal BasicSalary { get; set; }
+        public decimal Coefficient { get; set; }
         public int? ShiftId { get; set; }
         public string? ShiftName { get; set; }
         

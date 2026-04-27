@@ -161,7 +161,7 @@ namespace HRMS.Infrastructure.Services
             }
 
             // HR role: xem đơn đang chờ xác nhận HR
-            bool isHR = roles.Contains("HR") || roles.Contains("Admin") || roles.Contains("CnbSpecialist");
+            bool isHR = roles.Contains("HR") || roles.Contains("Admin") || roles.Contains("CnbSpecialist") || roles.Contains("Accountant");
             if (!isHR)
             {
                 var approverDeptId = await _context.Employees
@@ -201,7 +201,7 @@ namespace HRMS.Infrastructure.Services
             var isManager = roles.Contains("DepartmentHead") || roles.Contains("DepartmentManager");
             
             // Check if HR
-            var isHR = roles.Contains("Admin") || roles.Contains("HR") || roles.Contains("CnbSpecialist");
+            var isHR = roles.Contains("Admin") || roles.Contains("HR") || roles.Contains("CnbSpecialist") || roles.Contains("Accountant");
             if (!isHR)
             {
                 var approverDeptId = await _context.Employees

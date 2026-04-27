@@ -14,9 +14,8 @@ export default function TimesheetApproval({ user, onBack }) {
 
     const roles     = user?.roles || [];
     const isAdmin   = roles.includes('Admin');
+    const isManager = roles.includes('DepartmentManager') || isAdmin;
     const isHead    = roles.includes('DepartmentHead');
-    const isLead    = roles.includes('TeamLeader');
-    const isManager = isAdmin; // Only Admin can finalize all company timesheets
 
     useEffect(() => { fetchPeriods(); }, []);
 
@@ -67,11 +66,11 @@ export default function TimesheetApproval({ user, onBack }) {
         if (!selectedPeriodId) return;
         const pendingItems = filteredSummaries.filter(canActOn);
         if (pendingItems.length === 0) { 
-            toast.error(isManager ? 'Không có nhân viên nào đã được Duyệt để Chốt' : 'Không có nhân viên cần duyệt'); 
+            toast.error('Không có nhân viên cần duyệt/chốt'); 
             return; 
         }
         
-        let actionLabel = isAdmin ? "Phê duyệt Tất Cả (Admin)" : (isManager ? "Chốt Công Nhóm" : "Duyệt Công Nhóm");
+        let actionLabel = isAdmin ? "Phê duyệt Tất Cả (Admin)" : "Chốt Công Nhóm";
         if (!window.confirm(`Bạn có chắc chắn [${actionLabel}] cho ${pendingItems.length} nhân viên?`)) return;
         
         setLoading(true);
@@ -103,25 +102,42 @@ export default function TimesheetApproval({ user, onBack }) {
         }
     };
 
+    const handleExport = async () => {
+        if (!selectedPeriodId) return;
+        const deptId = isAdmin && showAll ? 0 : (user?.departmentId || 0);
+        
+        setLoading(true);
+        try {
+            const response = await api.get(`/Attendance/department/${deptId}/export/${selectedPeriodId}`, {
+                responseType: 'blob'
+            });
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `BangCong_${deptId}_${selectedPeriodId}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            toast.success('Đang tải file Excel...');
+        } catch {
+            toast.error('Lỗi khi xuất file Excel');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const canActOn = (s) => {
         if (s.employeeId == user?.employeeId) return false;
         if (isAdmin) return s.status !== 'Approved' && s.status !== 'Rejected';
         
         if (isManager) {
             if (s.isAdmin) return false;
-            if (s.status === 'PendingManagerApproval') return true;
-            // Admin/DeptMgr can also approve Head/Lead stuff if they want, but usually it follows hierarchy
-            if (s.status === 'PendingHeadApproval' || s.status === 'Draft') return true;
+            // Manager can approve anything that is not already approved
+            return s.status !== 'Approved' && s.status !== 'Rejected';
         }
         
-        if (isHead) {
-            if (s.isAdmin) return false;
-            if (s.status === 'Draft' || s.status === 'PendingHeadApproval') return true;
-        }
-
-        if (isLead) {
-            if (s.status === 'Draft') return true;
-        }
+        // Head is no longer authorized for timesheet approval
         return false;
     };
 
@@ -181,11 +197,19 @@ export default function TimesheetApproval({ user, onBack }) {
                         TỔNG HỢP DỮ LIỆU
                     </button>
                     <button 
+                        onClick={handleExport} 
+                        disabled={loading || !selectedPeriodId} 
+                        className="ef-btn"
+                        style={{ backgroundColor: '#4f46e5', color: 'white', borderColor: '#4f46e5' }}
+                    >
+                        XUẤT EXCEL
+                    </button>
+                    <button 
                         onClick={handleApproveAll} 
                         disabled={loading || !selectedPeriodId} 
                         className="ef-btn ef-btn-primary"
                     >
-                        {isManager ? 'CHỐT CÔNG NHANH' : 'DUYỆT CÔNG NHANH'} ({pendingCount})
+                        CHỐT CÔNG NHANH ({pendingCount})
                     </button>
                     {onBack && (
                          <button onClick={onBack} className="ef-btn">Đóng</button>

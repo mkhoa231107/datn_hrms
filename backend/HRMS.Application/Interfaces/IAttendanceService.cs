@@ -45,5 +45,8 @@ namespace HRMS.Application.Interfaces
 
         // Barcode Scanning
         Task<AttendanceRecordDto> ScanAttendanceByCodeAsync(string employeeCode, string location, string deviceInfo);
+
+        // Export Excel
+        Task<byte[]> ExportTimesheetToExcelAsync(int departmentId, int periodId);
     }
 }

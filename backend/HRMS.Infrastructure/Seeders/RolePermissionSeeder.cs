@@ -22,9 +22,6 @@ namespace HRMS.Infrastructure.Seeders
 
             var newMappings = new List<RolePermission>();
 
-            // ====== Admin: Toàn quyền ======
-            AssignAllPermissions(roles, permissions, existingMappings, newMappings, "Admin");
-
 
             // ====== DepartmentManager: Trưởng phòng ======
             // Xem & quản lý phòng ban, chốt công, duyệt đơn dài hạn
@@ -34,7 +31,7 @@ namespace HRMS.Infrastructure.Seeders
                 "employee.view_department", "employee.view_own", "employee.update_own",
                 // Chấm công
                 "attendance.checkinout", "attendance.view_own",
-                "attendance.view_department", "attendance.finalize",
+                "attendance.view_department", "attendance.finalize", "attendance.export",
                 // Đơn từ (duyệt dài hạn)
                 "leave.create", "leave.approve_department",
                 // Lịch ca
@@ -45,13 +42,13 @@ namespace HRMS.Infrastructure.Seeders
             AssignPermissions(roles, permissions, existingMappings, newMappings, "DepartmentManager", deptMgrPermissions);
 
             // ====== DepartmentHead: Trưởng bộ phận ======
-            // Xếp ca, xem & giám sát chấm công bộ phận, duyệt đơn ngắn hạn
+            // Xếp ca, duyệt đơn ngắn hạn (Không có quyền chấm công nhóm)
             var deptHeadPermissions = new[]
             {
                 // Xem nhân viên bộ phận
                 "employee.view_team", "employee.view_own", "employee.update_own",
-                // Chấm công
-                "attendance.checkinout", "attendance.view_own", "attendance.view_team",
+                // Chấm công (Chỉ cá nhân)
+                "attendance.checkinout", "attendance.view_own",
                 // Đơn từ (duyệt ngắn hạn <= 3 ngày)
                 "leave.create", "leave.approve_team",
                 // Xếp ca cho bộ phận
@@ -71,6 +68,31 @@ namespace HRMS.Infrastructure.Seeders
                 "payroll.view_own"
             };
             AssignPermissions(roles, permissions, existingMappings, newMappings, "Employee", employeePermissions);
+
+            // ====== CnbSpecialist: Chuyên viên C&B (Quản lý lương & công) ======
+            var cnbPermissions = new[]
+            {
+                // Toàn quyền Payroll
+                "payroll.setup", "payroll.calculate", "payroll.export_report", 
+                "payroll.view_all", "payroll.view_own", "payroll.finalize",
+                // Quyền quản lý nhân sự & công để tính lương
+                "employee.view_all", "employee.view_department",
+                "attendance.view_all", "attendance.view_department",
+                "attendance.finalize",
+                // Đơn từ
+                "leave.create", "payroll.view_own"
+            };
+            AssignPermissions(roles, permissions, existingMappings, newMappings, "CnbSpecialist", cnbPermissions);
+
+            // ====== Accountant: Kế toán (Đối soát & Báo cáo) ======
+            var accountantPermissions = new[]
+            {
+                // Chỉ xem để đối soát thanh toán
+                "payroll.view_all", "payroll.view_own", "payroll.export_report",
+                "employee.view_all", "attendance.view_all",
+                "leave.create"
+            };
+            AssignPermissions(roles, permissions, existingMappings, newMappings, "Accountant", accountantPermissions);
 
             if (newMappings.Any())
             {

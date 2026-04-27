@@ -243,7 +243,7 @@ namespace HRMS.Infrastructure.Data
                 .HasOne(ec => ec.Shift)
                 .WithMany()
                 .HasForeignKey(ec => ec.ShiftId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Restrict);
 
             // ============================================
             // SHIFT CHANGE REQUEST CONFIGURATIONS

@@ -56,9 +56,6 @@ namespace HRMS.Infrastructure.Seeders
             // STEP 2: DEPARTMENTS (5)
             // ============================================
             var deptDefs = new[] {
-                ("ADM",   "Quản trị viên",    "Bộ phận quản trị hệ thống"),
-                ("HR",    "Phòng Nhân sự",    "Quản lý nhân sự, tuyển dụng"),
-                ("ACC",   "Phòng Kế toán",    "Quản lý tài chính, kế toán"),
                 ("SALES", "Phòng Kinh doanh", "Phát triển thị trường, bán hàng"),
                 ("MKT",   "Phòng Marketing",  "Marketing, truyền thông"),
                 ("PRD",   "Phòng Sản xuất",   "Sản xuất, kho bãi, QC"),

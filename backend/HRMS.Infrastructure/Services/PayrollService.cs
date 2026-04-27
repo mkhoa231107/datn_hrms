@@ -79,7 +79,7 @@ namespace HRMS.Infrastructure.Services
             var query = _context.Employees
                 .Include(e => e.Department)
                 .Include(e => e.Position)
-                .Where(e => e.IsActive && !e.Position.PositionName.Contains("Trưởng"))
+                .Where(e => e.IsActive)
                 .AsQueryable();
 
             if (departmentId.HasValue)
@@ -102,6 +102,11 @@ namespace HRMS.Infrastructure.Services
                                     e.Status == EmployeeStatus.Probation ? "Thử việc" : "Nghỉ việc",
                     Email = e.Email,
                     BasicSalary = e.BasicSalary,
+                    Coefficient = e.Coefficient > 0 ? e.Coefficient : (e.Position?.DefaultCoefficient ?? 1.0m),
+                    MealAllowance = e.MealAllowance,
+                    PhoneAllowance = e.PhoneAllowance,
+                    PetrolAllowance = e.PetrolAllowance,
+                    HousingAllowance = e.HousingAllowance,
                     InsuranceSalary = e.InsuranceSalary,
                     NumberOfDependents = e.NumberOfDependents
                 };
@@ -115,6 +120,7 @@ namespace HRMS.Infrastructure.Services
 
             employee.InsuranceSalary = dto.InsuranceSalary;
             employee.NumberOfDependents = dto.NumberOfDependents;
+            employee.Coefficient = dto.Coefficient;
             employee.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -174,17 +180,16 @@ namespace HRMS.Infrastructure.Services
                 .OrderByDescending(s => s.CreatedAt)
                 .FirstOrDefaultAsync() ?? new PayrollSetting(); // Fallback to defaults
 
-            // 1. Calculate Standard Working Days for the period (excluding Sundays)
+            // 1. Calculate Standard Working Days for the period (FDS Standard: fixed 26 days)
             var schedulePeriod = await _context.SchedulePeriods.FindAsync(period.SchedulePeriodId);
             if (schedulePeriod == null) throw new InvalidOperationException("Schedule Period not found");
             
-            int standardDays = GetStandardDays(schedulePeriod.StartDate, schedulePeriod.EndDate);
+            int standardDays = 26;
             var summaries = await _context.AttendanceSummaries
                 .Include(asum => asum.Employee)
                     .ThenInclude(e => e.Position)
                 .Where(asum => asum.PeriodId == period.SchedulePeriodId 
-                    && asum.Status == TimesheetStatus.Approved
-                    && !asum.Employee.Position.PositionName.Contains("Trưởng"))
+                    && asum.Status == TimesheetStatus.Approved)
                 .ToListAsync();
 
             if (!summaries.Any())
@@ -210,26 +215,32 @@ namespace HRMS.Infrastructure.Services
                     CreatedAt = DateTime.UtcNow
                 };
 
-                // A. Base Income
-                // Dùng AdjustedWorkingDays: đã bao gồm trừ penalty đi trễ/về sớm (0.5 ngày/vi phạm)
-                decimal adjustedDays = asum.AdjustedWorkingDays > 0
-                    ? asum.AdjustedWorkingDays
-                    : asum.TotalWorkingDays; // fallback nếu chưa có AdjustedWorkingDays
-                record.ActualWorkingSalary = (record.BasicSalary / standardDays) * Math.Min(adjustedDays, standardDays);
+                // A. Lương Cơ Bản & Ngày công tính lương (Theo chuẩn FDS)
+                decimal coefficient = emp.Coefficient > 0 ? emp.Coefficient : (emp.Position?.DefaultCoefficient ?? 1.0m);
+                decimal theoreticalSalary = coefficient * settings.RegionBaseSalary;
+                record.BasicSalary = theoreticalSalary;
+
+                // Ngày công thực tế (giới hạn tối đa 26 ngày theo FDS)
+                decimal adjustedDays = asum.AdjustedWorkingDays > 0 ? asum.AdjustedWorkingDays : asum.TotalWorkingDays;
+                if (adjustedDays > 26) adjustedDays = 26;
+                
+                // Lương tính theo ngày công (Làm tròn đến chục nghìn đồng theo FDS: ROUND(..., -4))
+                decimal rawActualSalary = (theoreticalSalary / standardDays) * adjustedDays;
+                record.ActualWorkingSalary = Math.Round(rawActualSalary / 10000m) * 10000m;
                 
                 // B. Overtime (Standard 150%)
-                decimal hourlyRate = (record.BasicSalary / standardDays / 8);
+                decimal hourlyRate = theoreticalSalary / standardDays / 8;
                 record.OvertimePay = hourlyRate * 1.5m * asum.OvertimeHours;
 
-                // C. Allowances (Simplified: Zero out all allowances)
-                record.PositionAllowance = 0;
-                record.PetrolAllowance = 0;
-                record.PhoneAllowance = 0;
-                record.OtherAllowance = 0; 
+                // C. Allowances (Lấy từ cấu hình chức vụ)
+                record.PositionAllowance = emp.Position?.DefaultMealAllowance ?? 0;
+                record.PhoneAllowance = emp.Position?.DefaultPhoneAllowance ?? 0;
+                record.PetrolAllowance = emp.Position?.DefaultPetrolAllowance ?? 0;
+                record.OtherAllowance = emp.Position?.DefaultHousingAllowance ?? 0; // Dùng cột Other cho Tiền Nhà
                 record.SalesSalary = 0;
 
                 // D. Insurance (Employee part)
-                decimal insuranceBase = emp.InsuranceSalary ?? record.BasicSalary;
+                decimal insuranceBase = (emp.InsuranceSalary > 0) ? emp.InsuranceSalary.Value : theoreticalSalary;
                 decimal siCap = settings.CommonBaseSalary * 20;
                 decimal uiCap = settings.RegionBaseSalary * 20;
 
@@ -240,14 +251,21 @@ namespace HRMS.Infrastructure.Services
                 record.HealthInsurance = siBaseFinal * (settings.HealthInsuranceRate / 100);
                 record.UnemploymentInsurance = uiBaseFinal * (settings.UnemploymentInsuranceRate / 100);
 
-                // E. Personal Income Tax (PIT) - Simplified: Zero out tax
-                record.PersonalIncomeTax = 0; 
+                // E. Personal Income Tax (PIT)
+                decimal totalIncome = record.ActualWorkingSalary + record.OvertimePay 
+                                    + record.PositionAllowance + record.PhoneAllowance 
+                                    + record.PetrolAllowance + record.OtherAllowance;
 
-                // F. Final Calculation (Simplified Net = ActualSalary + OT - Insurance)
+                decimal nonTaxableDeductions = record.SocialInsurance + record.HealthInsurance + record.UnemploymentInsurance;
+                decimal familyDeductions = settings.PersonalDeductionAmount + (emp.NumberOfDependents * settings.DependentDeductionAmount);
+
+                decimal taxableIncome = totalIncome - nonTaxableDeductions - familyDeductions;
+                record.PersonalIncomeTax = CalculatePIT(taxableIncome);
+
+                // F. Final Calculation
                 record.Bonus = 0;
                 record.OtherDeductions = 0;
-                record.NetSalary = record.ActualWorkingSalary + record.OvertimePay 
-                                 - (record.SocialInsurance + record.HealthInsurance + record.UnemploymentInsurance);
+                record.NetSalary = totalIncome - nonTaxableDeductions - record.PersonalIncomeTax - record.OtherDeductions + record.Bonus;
                 
                 _context.PayrollRecords.Add(record);
             }
@@ -354,9 +372,18 @@ namespace HRMS.Infrastructure.Services
                 EmployeeName = r.Employee?.FullName ?? "N/A",
                 DepartmentName = r.Employee?.Department?.DepartmentName ?? "N/A",
                 PositionName = r.Employee?.Position?.PositionName ?? "N/A",
+                Coefficient = r.Employee?.Coefficient > 0 ? r.Employee.Coefficient : (r.Employee?.Position?.DefaultCoefficient ?? 1.0m),
+                ActualWorkingDays = r.BasicSalary > 0 ? Math.Round((r.ActualWorkingSalary / r.BasicSalary) * 26m, 2) : 0,
                 BasicSalary = r.BasicSalary,
                 ActualWorkingSalary = r.ActualWorkingSalary,
                 OvertimePay = r.OvertimePay,
+                PositionAllowance = r.PositionAllowance,
+                PetrolAllowance = r.PetrolAllowance,
+                PhoneAllowance = r.PhoneAllowance,
+                HousingAllowance = r.HousingAllowance,
+                MealAllowance = r.MealAllowance,
+                OtherAllowance = r.OtherAllowance,
+                SalesSalary = r.SalesSalary,
                 TotalAllowances = r.TotalAllowances,
                 Bonus = r.Bonus,
                 GrossSalary = r.GrossSalary,
@@ -455,7 +482,7 @@ namespace HRMS.Infrastructure.Services
             var records = await _context.PayrollRecords
                 .Include(r => r.Employee)
                     .ThenInclude(e => e.Position)
-                .Where(r => r.PayrollPeriodId == periodId && !r.Employee.Position.PositionName.Contains("Trưởng"))
+                .Where(r => r.PayrollPeriodId == periodId)
                 .ToListAsync();
 
             foreach (var record in records)
@@ -527,7 +554,7 @@ namespace HRMS.Infrastructure.Services
             var employees = await _context.Employees
                 .Include(e => e.Department)
                 .Include(e => e.Position)
-                .Where(e => deptIds.Contains(e.DepartmentId) && e.IsActive && !e.Position.PositionName.Contains("Trưởng"))
+                .Where(e => deptIds.Contains(e.DepartmentId) && e.IsActive)
                 .ToListAsync();
 
             var empIds = employees.Select(e => e.Id).ToList();
@@ -550,10 +577,17 @@ namespace HRMS.Infrastructure.Services
                                     e.Status == EmployeeStatus.Probation ? "Thử việc" : "Nghỉ việc",
                     Email = e.Email,
                     BasicSalary = e.BasicSalary,
+                    Coefficient = e.Coefficient > 0 ? e.Coefficient : (e.Position?.DefaultCoefficient ?? 1.0m),
+                    MealAllowance = e.MealAllowance,
+                    PhoneAllowance = e.PhoneAllowance,
+                    PetrolAllowance = e.PetrolAllowance,
+                    HousingAllowance = e.HousingAllowance,
                     InsuranceSalary = e.InsuranceSalary,
                     NumberOfDependents = e.NumberOfDependents,
                     ActualWorkingDays = asum?.AdjustedWorkingDays ?? asum?.TotalWorkingDays ?? 0,
                     OvertimeHours = asum?.OvertimeHours ?? 0,
+                    PaidLeaveDays = asum?.PaidLeaveDays ?? 0,
+                    UnpaidLeaveDays = asum?.UnpaidLeaveDays ?? 0,
                     HasApprovedTimesheet = asum != null && asum.Status == TimesheetStatus.Approved
                 };
             });
@@ -589,7 +623,7 @@ namespace HRMS.Infrastructure.Services
 
             var employees = await _context.Employees
                 .Include(e => e.Position)
-                .Where(e => employeeIds.Contains(e.Id) && !e.Position.PositionName.Contains("Trưởng"))
+                .Where(e => employeeIds.Contains(e.Id))
                 .ToListAsync();
 
             foreach (var emp in employees)
@@ -609,36 +643,68 @@ namespace HRMS.Infrastructure.Services
                     otHours = asum.OvertimeHours;
                 }
 
-                // A. Lương thời gian (Ltg) = Lcb / Nchuẩn × Ntt
-                decimal ltg = standardDays > 0
-                    ? (basicSalary / standardDays) * Math.Min(adjustedWorkingDays, standardDays)
-                    : 0;
+                // [A] Base Income
+                decimal coefficient = emp.Coefficient > 0 ? emp.Coefficient : (emp.Position?.DefaultCoefficient ?? 1.0m);
+                decimal theoreticalSalary = coefficient * settings.RegionBaseSalary;
+                
+                standardDays = 26; // FDS standard
+                if (adjustedWorkingDays > standardDays) adjustedWorkingDays = standardDays;
+                
+                decimal rawActualSalary = (theoreticalSalary / standardDays) * adjustedWorkingDays;
+                decimal actualWorkingSalary = Math.Round(rawActualSalary / 10000m) * 10000m;
+                
+                // [B] Overtime
+                decimal hourlyRate = theoreticalSalary / standardDays / 8;
+                decimal overtimePay = hourlyRate * 1.5m * otHours;
 
-                // B. Lương tăng ca (Lot) = (Lcb / Nchuẩn / 8) × Hot × OTgiờ  [Hot = 1.5]
-                decimal hourlyRate = standardDays > 0 ? basicSalary / standardDays / 8 : 0;
-                decimal lot = hourlyRate * 1.5m * otHours;
+                // [C] Allowances (Use Employee override if not null, otherwise Position default)
+                decimal mealAllowance = emp.MealAllowance ?? (emp.Position?.DefaultMealAllowance ?? 0);
+                decimal phoneAllowance = emp.PhoneAllowance ?? (emp.Position?.DefaultPhoneAllowance ?? 0);
+                decimal petrolAllowance = emp.PetrolAllowance ?? (emp.Position?.DefaultPetrolAllowance ?? 0);
+                decimal housingAllowance = emp.HousingAllowance ?? (emp.Position?.DefaultHousingAllowance ?? 0);
 
-                // C. Bảo hiểm (BH) = Lbh × 10.5%  (BHXH 8% + BHYT 1.5% + BHTN 1%)
-                decimal insuranceBase = emp.InsuranceSalary ?? basicSalary;
-                decimal bh = insuranceBase * 0.105m; // 10.5% total employee contribution
+                // [D] Insurance
+                decimal insuranceBase = (emp.InsuranceSalary > 0) ? emp.InsuranceSalary.Value : theoreticalSalary;
+                decimal siCap = settings.CommonBaseSalary * 20;
+                decimal uiCap = settings.RegionBaseSalary * 20;
 
-                // D. Thực lĩnh Net = (Ltg + Lot) - BH
-                decimal net = ltg + lot - bh;
+                decimal siBaseFinal = Math.Min(insuranceBase, siCap);
+                decimal uiBaseFinal = Math.Min(insuranceBase, uiCap);
+
+                decimal socialInsurance = siBaseFinal * (settings.SocialInsuranceRate / 100);
+                decimal healthInsurance = siBaseFinal * (settings.HealthInsuranceRate / 100);
+                decimal unemploymentInsurance = uiBaseFinal * (settings.UnemploymentInsuranceRate / 100);
+
+                // [E] PIT
+                decimal totalIncome = actualWorkingSalary + overtimePay 
+                                    + mealAllowance + phoneAllowance + petrolAllowance + housingAllowance;
+
+                decimal nonTaxableDeductions = socialInsurance + healthInsurance + unemploymentInsurance;
+                decimal familyDeductions = settings.PersonalDeductionAmount + (emp.NumberOfDependents * settings.DependentDeductionAmount);
+
+                decimal taxableIncome = totalIncome - nonTaxableDeductions - familyDeductions;
+                decimal pit = CalculatePIT(taxableIncome);
+
+                // [F] Net
+                decimal net = totalIncome - nonTaxableDeductions - pit;
 
                 var record = new PayrollRecord
                 {
                     PayrollPeriodId = periodId,
                     EmployeeId = emp.Id,
-                    BasicSalary = basicSalary,
-                    ActualWorkingSalary = ltg,
-                    OvertimePay = lot,
-                    SocialInsurance = insuranceBase * (settings.SocialInsuranceRate / 100),
-                    HealthInsurance = insuranceBase * (settings.HealthInsuranceRate / 100),
-                    UnemploymentInsurance = insuranceBase * (settings.UnemploymentInsuranceRate / 100),
-                    PersonalIncomeTax = 0, // No income tax per requirements
-                    PositionAllowance = 0,
-                    PetrolAllowance = 0,
-                    PhoneAllowance = 0,
+                    BasicSalary = theoreticalSalary,
+                    ActualWorkingSalary = actualWorkingSalary,
+                    OvertimePay = overtimePay,
+                    SocialInsurance = socialInsurance,
+                    HealthInsurance = healthInsurance,
+                    UnemploymentInsurance = unemploymentInsurance,
+                    PersonalIncomeTax = pit,
+                    MealDeduction = 0,
+                    PositionAllowance = 0, // Using Meal, Phone, Petrol, Housing directly
+                    PetrolAllowance = petrolAllowance,
+                    PhoneAllowance = phoneAllowance,
+                    HousingAllowance = housingAllowance,
+                    MealAllowance = mealAllowance,
                     OtherAllowance = 0,
                     SalesSalary = 0,
                     Bonus = 0,

@@ -7,7 +7,8 @@ namespace HRMS.Domain.Enums
         DepartmentHead,
         CnbSpecialist,
         Admin,
-        Candidate
+        Candidate,
+        Accountant
     }
 }
 

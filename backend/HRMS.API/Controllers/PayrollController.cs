@@ -30,17 +30,13 @@ namespace HRMS.API.Controllers
 
         private bool IsCbProcessor()
         {
-            var roles = User.FindFirst(ClaimTypes.Role)?.Value ?? "";
-            var deptId = int.Parse(User.FindFirst("DepartmentId")?.Value ?? "0");
-            // Only DepartmentHead of Dept 7 (C&B) can manage records. 
-            // Admin is strictly "view-only" as per user request.
-            return User.IsInRole("DepartmentHead") && deptId == 7;
+            return User.IsInRole("CnbSpecialist") || User.IsInRole("Accountant");
         }
 
         // ==================== SETTINGS ====================
 
         [HttpGet("settings")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> GetSettings()
         {
             // Assuming OrgId = 1 for now, can be extracted from user claims if multi-org
@@ -49,7 +45,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("settings")]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> UpdateSettings([FromBody] PayrollSettingDto dto)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -60,7 +56,7 @@ namespace HRMS.API.Controllers
         // ==================== EMPLOYEE PROFILES ====================
 
         [HttpGet("employee-profiles")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> GetEmployeeProfiles([FromQuery] int? departmentId)
         {
             var profiles = await _payrollService.GetEmployeePayrollProfilesAsync(departmentId);
@@ -69,7 +65,7 @@ namespace HRMS.API.Controllers
 
         // Enriched profiles with attendance data for pre-calculation display
         [HttpGet("employee-profiles-with-attendance")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> GetEmployeeProfilesWithAttendance([FromQuery] int departmentId, [FromQuery] int schedulePeriodId)
         {
             if (departmentId <= 0 || schedulePeriodId <= 0)
@@ -79,7 +75,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPut("employee-profiles/{employeeId}")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> UpdateEmployeeProfile(int employeeId, [FromBody] EmployeePayrollUpdateDto dto)
         {
             await _payrollService.UpdateEmployeePayrollProfileAsync(employeeId, dto);
@@ -96,7 +92,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("periods")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> CreatePeriod([FromBody] CreatePayrollPeriodDto dto)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -105,7 +101,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("periods/{periodId}/calculate")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> CalculatePayroll(int periodId)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -118,7 +114,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("records/{recordId}/adjust")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> AdjustRecord(int recordId, [FromBody] AdjustPayrollRecordDto dto)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -127,7 +123,7 @@ namespace HRMS.API.Controllers
         }
 
          [HttpPost("periods/{periodId}/review")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")] // Payroll Dept Head
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")] // Payroll Dept Head
         public async Task<IActionResult> ReviewPayroll(int periodId)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -136,7 +132,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("periods/{periodId}/approve")]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")] // HR Director
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")] // HR Director
         public async Task<IActionResult> ApprovePayroll(int periodId)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -147,7 +143,7 @@ namespace HRMS.API.Controllers
         // ==================== RECORDS ====================
 
         [HttpGet("periods/{periodId}/records")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> GetRecords(int periodId)
         {
             var records = await _payrollService.GetPayrollRecordsAsync(periodId);
@@ -169,7 +165,7 @@ namespace HRMS.API.Controllers
         // ==================== NEW PROFESSIONAL WORKFLOW ====================
 
         [HttpPost("periods/{periodId}/employees")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> AddEmployeesToPayroll(int periodId, [FromBody] List<int> employeeIds)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -178,7 +174,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("periods/{periodId}/bulk-update")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> BulkUpdateRecords(int periodId, [FromBody] BulkUpdatePayrollRequest request)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -187,7 +183,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("periods/{periodId}/aggregate")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> AggregatePayroll(int periodId)
         {
             if (!IsCbProcessor()) return Forbid();
@@ -203,7 +199,7 @@ namespace HRMS.API.Controllers
 
         // ===== NEW: Calculate payroll for selected employees =====
         [HttpPost("periods/{periodId}/calculate-for-employees")]
-        [Authorize(Roles = "Admin,PayrollStaff,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,CnbSpecialist,DepartmentManager,DepartmentHead,Accountant")]
         public async Task<IActionResult> CalculateForEmployees(int periodId, [FromBody] CalculateForEmployeesDto dto)
         {
             if (!IsCbProcessor()) return Forbid();

@@ -12,7 +12,11 @@ namespace HRMS.Application.DTOs.Employees
         
         // Metadata for contract auto-filling
         public decimal? BaseSalaryMin { get; set; }
-        public decimal? BaseSalaryMax { get; set; }
+        public decimal DefaultCoefficient { get; set; }
+        public decimal DefaultMealAllowance { get; set; }
+        public decimal DefaultPhoneAllowance { get; set; }
+        public decimal DefaultPetrolAllowance { get; set; }
+        public decimal DefaultHousingAllowance { get; set; }
         public int? DefaultShiftId { get; set; }
     }
 }

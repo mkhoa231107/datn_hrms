@@ -127,6 +127,9 @@ namespace HRMS.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("PaidLeaveDays")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("PeriodId")
                         .HasColumnType("int");
 
@@ -138,6 +141,9 @@ namespace HRMS.Infrastructure.Migrations
 
                     b.Property<decimal>("TotalWorkingHours")
                         .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UnpaidLeaveDays")
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -358,6 +364,9 @@ namespace HRMS.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("Coefficient")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -388,6 +397,9 @@ namespace HRMS.Infrastructure.Migrations
                     b.Property<string>("Gender")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal?>("HousingAllowance")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<DateTime?>("IdentityDate")
                         .HasColumnType("datetime2");
 
@@ -416,6 +428,9 @@ namespace HRMS.Infrastructure.Migrations
                     b.Property<int?>("ManagerId")
                         .HasColumnType("int");
 
+                    b.Property<decimal?>("MealAllowance")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int>("NumberOfDependents")
                         .HasColumnType("int");
 
@@ -425,8 +440,14 @@ namespace HRMS.Infrastructure.Migrations
                     b.Property<string>("PersonalEmail")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal?>("PetrolAllowance")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Phone")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("PhoneAllowance")
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("PlaceOfBirth")
                         .HasColumnType("nvarchar(max)");
@@ -1350,6 +1371,15 @@ namespace HRMS.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("HousingAllowance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MealAllowance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("MealDeduction")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<decimal>("NetSalary")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1506,10 +1536,25 @@ namespace HRMS.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<decimal>("DefaultCoefficient")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DefaultHousingAllowance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DefaultMealAllowance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DefaultPetrolAllowance")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DefaultPhoneAllowance")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int?>("DefaultShiftId")
                         .HasColumnType("int");
 
-                    b.Property<int>("DepartmentId")
+                    b.Property<int?>("DepartmentId")
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
@@ -1536,7 +1581,7 @@ namespace HRMS.Infrastructure.Migrations
 
                     b.HasIndex("DepartmentId", "PositionCode")
                         .IsUnique()
-                        .HasFilter("[PositionCode] IS NOT NULL");
+                        .HasFilter("[DepartmentId] IS NOT NULL AND [PositionCode] IS NOT NULL");
 
                     b.ToTable("Positions");
                 });
@@ -2278,7 +2323,7 @@ namespace HRMS.Infrastructure.Migrations
                     b.HasOne("HRMS.Domain.Entities.WorkShift", "Shift")
                         .WithMany()
                         .HasForeignKey("ShiftId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("HRMS.Domain.Entities.Department", "TargetDepartment")
                         .WithMany()
@@ -2576,9 +2621,7 @@ namespace HRMS.Infrastructure.Migrations
 
                     b.HasOne("HRMS.Domain.Entities.Department", "Department")
                         .WithMany("Positions")
-                        .HasForeignKey("DepartmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("DepartmentId");
 
                     b.Navigation("DefaultShift");
 

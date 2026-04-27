@@ -1,38 +1,37 @@
-using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace HRMS.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddEmployeeDetails : Migration
+    public partial class AddEmployeeAllowances : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "Ethnicity",
+            migrationBuilder.AddColumn<decimal>(
+                name: "HousingAllowance",
                 table: "Employees",
-                type: "nvarchar(max)",
+                type: "decimal(18,2)",
                 nullable: true);
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "IdentityExpirationDate",
+            migrationBuilder.AddColumn<decimal>(
+                name: "MealAllowance",
                 table: "Employees",
-                type: "datetime2",
+                type: "decimal(18,2)",
                 nullable: true);
 
-            migrationBuilder.AddColumn<string>(
-                name: "PlaceOfOrigin",
+            migrationBuilder.AddColumn<decimal>(
+                name: "PetrolAllowance",
                 table: "Employees",
-                type: "nvarchar(max)",
+                type: "decimal(18,2)",
                 nullable: true);
 
-            migrationBuilder.AddColumn<string>(
-                name: "Religion",
+            migrationBuilder.AddColumn<decimal>(
+                name: "PhoneAllowance",
                 table: "Employees",
-                type: "nvarchar(max)",
+                type: "decimal(18,2)",
                 nullable: true);
         }
 
@@ -40,19 +39,19 @@ namespace HRMS.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "Ethnicity",
+                name: "HousingAllowance",
                 table: "Employees");
 
             migrationBuilder.DropColumn(
-                name: "IdentityExpirationDate",
+                name: "MealAllowance",
                 table: "Employees");
 
             migrationBuilder.DropColumn(
-                name: "PlaceOfOrigin",
+                name: "PetrolAllowance",
                 table: "Employees");
 
             migrationBuilder.DropColumn(
-                name: "Religion",
+                name: "PhoneAllowance",
                 table: "Employees");
         }
     }

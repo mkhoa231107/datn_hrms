@@ -110,7 +110,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPut("{id}")]
-        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
         public async Task<IActionResult> UpdateContract(int id, [FromBody] ContractCreateDto dto)
         {
             try
@@ -125,7 +125,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("{id}/submit")]
-        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
         public async Task<IActionResult> SubmitContract(int id)
         {
             try
@@ -142,7 +142,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("{id}/approve")]
-        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
         public async Task<IActionResult> ApproveContract(int id, [FromBody] ContractActionDto dto)
         {
             try
@@ -170,7 +170,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("{id}/reject")]
-        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
         public async Task<IActionResult> RejectContract(int id, [FromBody] ContractActionDto dto)
         {
             try
@@ -223,7 +223,7 @@ namespace HRMS.API.Controllers
             }
         }
         [HttpPost("bulk-create")]
-        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
         public async Task<IActionResult> BulkCreate([FromBody] BulkContractCreateDto dto)
         {
             try
@@ -289,7 +289,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("renew-all")]
-        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager")]
+        [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
         public async Task<IActionResult> RenewAll()
         {
             try

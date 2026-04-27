@@ -54,10 +54,10 @@ namespace HRMS.API.Controllers
         }
 
         /// <summary>
-        /// [Dept Head/C&B/Admin] Xem danh sách kế hoạch
+        /// [Dept Head/C&B/Admin/Accountant] Xem danh sách kế hoạch
         /// </summary>
         [HttpGet("plans")]
-        [Authorize(Roles = "Admin,DepartmentHead,CnbSpecialist")]
+        [Authorize(Roles = "Admin,DepartmentHead,CnbSpecialist,Accountant")]
         public async Task<IActionResult> GetPlans([FromQuery] int? departmentId, [FromQuery] int? month, [FromQuery] int? year)
         {
             try

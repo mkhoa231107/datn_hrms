@@ -121,6 +121,20 @@ export const positionService = {
   getAll: async () => {
     const res = await api.get('/positions');
     return res.data;
+  },
+  updateCoefficient: async (id, coefficient) => {
+    const res = await api.put(`/positions/${id}/coefficient`, { coefficient });
+    return res.data;
+  },
+  updateAllowances: async (id, meal, phone, petrol, housing) => {
+    const res = await api.put(`/positions/${id}/allowances`, { meal, phone, petrol, housing });
+    return res.data;
+  },
+  updateEmployeePayrollOverrides: async (employeeId, coefficient, mealAllowance, phoneAllowance, petrolAllowance, housingAllowance) => {
+    const res = await api.put(`/employees/${employeeId}/payroll-overrides`, { 
+      coefficient, mealAllowance, phoneAllowance, petrolAllowance, housingAllowance 
+    });
+    return res.data;
   }
 };
 
@@ -292,6 +306,26 @@ export const usersService = {
   },
   updateRoles: async (id, roleIds) => {
     const res = await api.put(`/users/${id}/roles`, { roleIds });
+    return res.data;
+  },
+  createUser: async (dto) => {
+    const res = await api.post('/users', dto);
+    return res.data;
+  },
+  updateUserInfo: async (id, dto) => {
+    const res = await api.put(`/users/${id}`, dto);
+    return res.data;
+  },
+  resetPassword: async (id, newPassword) => {
+    const res = await api.post(`/users/${id}/reset-password`, { newPassword });
+    return res.data;
+  },
+  toggleActive: async (id) => {
+    const res = await api.post(`/users/${id}/toggle-active`);
+    return res.data;
+  },
+  deleteUser: async (id) => {
+    const res = await api.delete(`/users/${id}`);
     return res.data;
   }
 };

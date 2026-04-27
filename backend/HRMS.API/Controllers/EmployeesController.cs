@@ -44,7 +44,7 @@ namespace HRMS.API.Controllers
 
         private void ValidateDepartmentAccess(int targetDeptId)
         {
-            if (User.IsInRole("Admin") || User.IsInRole("HrAdmin")) return;
+            if (User.IsInRole("Admin") || User.IsInRole("CnbSpecialist")) return;
 
             var userDeptIdStr = User.FindFirst("DepartmentId")?.Value;
             var userDeptCode = User.FindFirst("DepartmentCode")?.Value;
@@ -84,7 +84,7 @@ namespace HRMS.API.Controllers
 
         // GET: api/employees/{id}
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> GetById(int id)
         {
             try
@@ -132,7 +132,7 @@ namespace HRMS.API.Controllers
 
         // PUT: api/employees/{id}
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,DepartmentManager")]
+        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
         public async Task<IActionResult> Update(int id, [FromBody] EmployeeUpdateDto dto)
         {
             try
@@ -150,9 +150,33 @@ namespace HRMS.API.Controllers
             }
         }
 
+        // PUT: api/employees/{id}/payroll-overrides  — Override hệ số và phụ cấp riêng cho từng nhân viên
+        [HttpPut("{id}/payroll-overrides")]
+        [Authorize(Roles = "Admin,Accountant,CnbSpecialist")]
+        public async Task<IActionResult> UpdateEmployeePayrollOverrides(int id, [FromBody] EmployeePayrollOverridesRequest request)
+        {
+            try
+            {
+                var employee = await _context.Employees.FindAsync(id);
+                if (employee == null) return NotFound(new { message = "Không tìm thấy nhân viên" });
+                employee.Coefficient = request.Coefficient;
+                employee.MealAllowance = request.MealAllowance;
+                employee.PhoneAllowance = request.PhoneAllowance;
+                employee.PetrolAllowance = request.PetrolAllowance;
+                employee.HousingAllowance = request.HousingAllowance;
+                employee.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return Ok(new { success = true, message = "Cập nhật thông tin lương nhân viên thành công" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         // GET: api/employees
         [HttpGet]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader,Employee")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader,Employee,CnbSpecialist,Accountant")]
         public async Task<IActionResult> GetAll([FromQuery] int? departmentId = null)
         {
             return await GetManagedUsers(departmentId);
@@ -160,13 +184,13 @@ namespace HRMS.API.Controllers
 
         // GET: api/employees/managed-users
         [HttpGet("managed-users")]
-        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader,Employee")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader,Employee,CnbSpecialist,Accountant")]
         public async Task<IActionResult> GetManagedUsers([FromQuery] int? requestedDeptId = null)
         {
             try
             {
                 int? departmentId = requestedDeptId;
-                if (!User.IsInRole("Admin") && !User.IsInRole("HrAdmin"))
+                if (!User.IsInRole("Admin") && !User.IsInRole("CnbSpecialist"))
                 {
                     var deptIdStr = User.FindFirst("DepartmentId")?.Value;
                     var deptCode = User.FindFirst("DepartmentCode")?.Value;
@@ -198,7 +222,7 @@ namespace HRMS.API.Controllers
 
         // POST: api/employees
         [HttpPost]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,CnbSpecialist")]
         public async Task<IActionResult> Create([FromBody] EmployeeCreateDto dto)
         {
             try
@@ -327,5 +351,14 @@ namespace HRMS.API.Controllers
     public class FaceDescriptorDto
     {
         public string Descriptor { get; set; } = string.Empty;
+    }
+
+    public class EmployeePayrollOverridesRequest
+    {
+        public decimal Coefficient { get; set; }
+        public decimal? MealAllowance { get; set; }
+        public decimal? PhoneAllowance { get; set; }
+        public decimal? PetrolAllowance { get; set; }
+        public decimal? HousingAllowance { get; set; }
     }
 }

@@ -23,6 +23,8 @@ namespace HRMS.Domain.Entities
         
         public decimal TotalWorkingHours { get; set; }
         public decimal OvertimeHours { get; set; }
+        public decimal PaidLeaveDays { get; set; }    // Nghỉ hưởng lương 100%
+        public decimal UnpaidLeaveDays { get; set; }  // Nghỉ không lương
         
         // Approval Workflow
         public HRMS.Domain.Enums.TimesheetStatus Status { get; set; } = HRMS.Domain.Enums.TimesheetStatus.Draft;

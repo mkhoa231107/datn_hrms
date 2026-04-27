@@ -9,6 +9,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ClosedXML.Excel;
+using System.IO;
 
 namespace HRMS.Infrastructure.Services
 {
@@ -641,25 +643,15 @@ namespace HRMS.Infrastructure.Services
             bool targetIsAdmin = summary.Employee?.User?.UserRoles?.Any(ur => ur.Role?.RoleName == "Admin" || ur.Role?.RoleName == "HrAdmin") ?? false;
             if (targetIsAdmin && !isAdmin) return false;
 
-            // Workflow: Head (Level 1 Approval) -> Manager (Level 2 Finalization/Locking)
-            if (isHead && (summary.Status == TimesheetStatus.Draft || summary.Status == TimesheetStatus.PendingHeadApproval))
+            // Workflow: Manager/Admin finalizes the record directly from Draft or Pending
+            if ((isManager || isAdmin) && (summary.Status == TimesheetStatus.Draft || summary.Status == TimesheetStatus.PendingManagerApproval || summary.Status == TimesheetStatus.PendingHeadApproval))
             {
-                // Head approves the draft or the pending-head-level record
-                summary.Status = TimesheetStatus.PendingManagerApproval;
-            }
-            else if ((isManager || isAdmin) && summary.Status == TimesheetStatus.PendingManagerApproval)
-            {
-                // Manager/Admin finalizes the record that was approved by Head
-                summary.Status = TimesheetStatus.Approved;
-            }
-            else if (isAdmin && summary.Status == TimesheetStatus.Draft)
-            {
-                // Admin can jump levels if needed (optional, but let's allow it for flexibility)
+                // Manager/Admin finalizes the record
                 summary.Status = TimesheetStatus.Approved;
             }
             else
             {
-                // Invalid transition for the given role
+                // Invalid transition or unauthorized role (e.g. Head trying to approve)
                 return false;
             }
 
@@ -726,10 +718,10 @@ namespace HRMS.Infrastructure.Services
                 bool targetIsAdmin = summary.Employee?.User?.UserRoles?.Any(ur => ur.Role?.RoleName == "Admin" || ur.Role?.RoleName == "HrAdmin") ?? false;
                 if (targetIsAdmin && !isAdmin) continue;
 
-                if (isHead)
-                    summary.Status = TimesheetStatus.PendingManagerApproval;
-                else if (isManager || isAdmin)
+                if (isManager || isAdmin)
                     summary.Status = TimesheetStatus.Approved;
+                else
+                    continue; // Head is no longer authorized to bulk approve
                 
                 summary.ApprovedById = approverId;
                 summary.ApprovedAt = DateTime.UtcNow;
@@ -1464,6 +1456,58 @@ namespace HRMS.Infrastructure.Services
             }
 
             return result.Distinct().ToList();
+        }
+        public async Task<byte[]> ExportTimesheetToExcelAsync(int departmentId, int periodId)
+        {
+            var grid = await GetDepartmentAttendanceGridAsync(departmentId, periodId);
+            var period = await _context.SchedulePeriods.FindAsync(periodId);
+            var dept = await _context.Departments.FindAsync(departmentId);
+
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Bảng công");
+
+                // Style
+                var headerRow = worksheet.Row(1);
+                headerRow.Style.Font.Bold = true;
+                headerRow.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                // Headers
+                worksheet.Cell(1, 1).Value = "Mã NV";
+                worksheet.Cell(1, 2).Value = "Họ và tên";
+                
+                for (int i = 0; i < grid.DateHeaders.Count; i++)
+                {
+                    worksheet.Cell(1, i + 3).Value = grid.DateHeaders[i];
+                }
+                
+                worksheet.Cell(1, grid.DateHeaders.Count + 3).Value = "Tổng công (OT)";
+
+                // Data
+                for (int r = 0; r < grid.Rows.Count; r++)
+                {
+                    var row = grid.Rows[r];
+                    var excelRow = r + 2;
+                    
+                    worksheet.Cell(excelRow, 1).Value = row.EmployeeId;
+                    worksheet.Cell(excelRow, 2).Value = row.EmployeeName;
+                    
+                    for (int c = 0; c < row.DailyValues.Count; c++)
+                    {
+                        worksheet.Cell(excelRow, c + 3).Value = (double)row.DailyValues[c];
+                    }
+                    
+                    worksheet.Cell(excelRow, row.DailyValues.Count + 3).Value = (double)row.TotalOT;
+                }
+
+                worksheet.Columns().AdjustToContents();
+
+                using (var stream = new MemoryStream())
+                {
+                    workbook.SaveAs(stream);
+                    return stream.ToArray();
+                }
+            }
         }
     }
 }

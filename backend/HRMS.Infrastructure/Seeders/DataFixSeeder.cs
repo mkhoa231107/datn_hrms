@@ -209,7 +209,7 @@ namespace HRMS.Infrastructure.Seeders
 
             // 3. DỌN DEP NHÂN VIÊN RÁC BẰNG SQL NGUYÊN BẢN (TRÁNH LỖI CONCURRENCY)
             var codesToCleanup = new[] { 
-                "CNB_01", "TT_01", "NV_01", "NV_02", "NV_03", 
+                "TT_01", "NV_01", "NV_02", "NV_03", 
                 "HR_ADMIN_FIXED", "ADMIN_FIXED", "FIX_ADMIN", "FIX_HR_ADMIN", "FIX_MANAGER_HR", "FIX_CNB_HR" 
             };
 
@@ -275,101 +275,6 @@ namespace HRMS.Infrastructure.Seeders
             // 4. ESTABLISH HIERARCHY & ADDITIONAL SEEDING
             Console.WriteLine("🛠️ [HIERARCHY] Đang thiết lập cấu trúc phòng ban cha-con & nhân sự mới...");
             
-            var hrDept = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "HR");
-            if (hrDept != null)
-            {
-                // Ensure 'Tổ Lương Thưởng' exists and is linked to HR parent
-                var cbTeam = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "HR-CB");
-                if (cbTeam == null)
-                {
-                    cbTeam = new Department { 
-                        DepartmentName = "Tổ Lương Thưởng", 
-                        DepartmentCode = "HR-CB", 
-                        ParentDepartmentId = hrDept.Id, 
-                        OrganizationId = hrDept.OrganizationId,
-                        IsActive = true 
-                    };
-                    context.Departments.Add(cbTeam);
-                }
-                else
-                {
-                    cbTeam.ParentDepartmentId = hrDept.Id;
-                    cbTeam.DepartmentName = "Tổ Lương Thưởng";
-                    cbTeam.IsActive = true;
-                }
-
-                // Create 'Tổ Tuyển dụng' if not exists
-                var recTeam = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "HR-REC");
-                if (recTeam == null)
-                {
-                    recTeam = new Department { 
-                        DepartmentName = "Tổ Tuyển dụng", 
-                        DepartmentCode = "HR-REC", 
-                        ParentDepartmentId = hrDept.Id, 
-                        OrganizationId = hrDept.OrganizationId,
-                        IsActive = true 
-                    };
-                    context.Departments.Add(recTeam);
-                }
-                else
-                {
-                    recTeam.ParentDepartmentId = hrDept.Id;
-                    recTeam.DepartmentName = "Tổ Tuyển dụng";
-                    recTeam.IsActive = true;
-                }
-                await context.SaveChangesAsync();
-
-                // Seed 6 regular employees across these teams
-                int recId = recTeam.Id;
-                int cbId = (cbTeam?.Id) ?? hrDept.Id;
-                var posId = (await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "HR-REC-SPEC" || p.PositionCode == "HR-CB-SPEC"))?.Id ?? (await context.Positions.FirstOrDefaultAsync())?.Id ?? 1;
-
-                var newEmployees = new[] {
-                    (Code: "EMP-HR-01", Name: "Nguyễn Văn An", Dept: recId),
-                    (Code: "EMP-HR-02", Name: "Trần Thị Bình", Dept: recId),
-                    (Code: "EMP-HR-03", Name: "Lê Văn Cường", Dept: recId),
-                    (Code: "EMP-HR-04", Name: "Hoàng Thị Dung", Dept: cbId),
-                    (Code: "EMP-HR-05", Name: "Đỗ Minh Đức", Dept: cbId),
-                    (Code: "EMP-HR-06", Name: "Vũ Văn Giang", Dept: cbId)
-                };
-
-                foreach (var empData in newEmployees)
-                {
-                    if (!await context.Employees.AnyAsync(e => e.EmployeeCode == empData.Code))
-                    {
-                        var emp = new Employee {
-                            EmployeeCode = empData.Code,
-                            FullName = empData.Name,
-                            DepartmentId = empData.Dept,
-                            PositionId = posId,
-                            OrganizationId = hrDept.OrganizationId,
-                            Email = empData.Code.ToLower() + "@techvn.com",
-                            Phone = "0987112233",
-                            Address = "Hà Nội",
-                            Status = Domain.Enums.EmployeeStatus.Active,
-                            JoinDate = DateTime.UtcNow.AddYears(-1)
-                        };
-                        context.Employees.Add(emp);
-                        await context.SaveChangesAsync();
-
-                        // Add an active contract so they show up in payroll calculation
-                        context.EmployeeContracts.Add(new EmployeeContract {
-                            EmployeeId = emp.Id,
-                            ContractNumber = "CT-" + empData.Code,
-                            ContractType = Domain.Enums.ContractType.FixedTerm,
-                            BasicSalary = 10000000m + (new Random().Next(10) * 500000m),
-                            JobDescription = "Chuyên viên nhân sự",
-                            WorkLocation = "Hà Nội",
-                            StartDate = DateTime.UtcNow.AddYears(-1),
-                            IsActive = true,
-                            Status = Domain.Enums.ContractStatus.Active,
-                            SignedBy = "CEO"
-                        });
-                    }
-                }
-                await context.SaveChangesAsync();
-                Console.WriteLine("   -> ✅ Đã hoàn tất thiết lập phân cấp và thêm 6 nhân sự mẫu!");
-            }
         }
 
         public static async Task ClearLeaveHistoryAsync(HRMSDbContext context)
@@ -668,14 +573,20 @@ namespace HRMS.Infrastructure.Seeders
                 .Distinct()
                 .ToList();
 
+            var accountantRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Accountant");
+
             int updatedCount = 0;
             foreach (var userId in targetUserIds)
             {
                 var user = await context.Users.FindAsync(userId);
-                if (user == null) continue;
+                if (user == null || user.Username == "ketoan") continue;
 
                 var currentRoles = await context.UserRoles.Where(ur => ur.UserId == userId).ToListAsync();
                 
+                // Skip if user already has Accountant role (they should keep their specialized role)
+                if (accountantRole != null && currentRoles.Any(ur => ur.RoleId == accountantRole.Id))
+                    continue;
+
                 // Nếu chưa có role DepartmentHead thì thêm vào
                 if (!currentRoles.Any(ur => ur.RoleId == headRole.Id))
                 {

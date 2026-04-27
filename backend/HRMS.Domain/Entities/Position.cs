@@ -16,9 +16,16 @@ namespace HRMS.Domain.Entities
         public string? Description { get; set; }  // Nullable - Mô tả chức danh
         
         // Department relationship
-        public int DepartmentId { get; set; }
+        public int? DepartmentId { get; set; }
         public Department Department { get; set; }
+
+        public decimal DefaultCoefficient { get; set; } = 1.0m; // Hệ số lương mặc định cho vị trí này
         
+        public decimal DefaultMealAllowance { get; set; } = 0;
+        public decimal DefaultPhoneAllowance { get; set; } = 0;
+        public decimal DefaultPetrolAllowance { get; set; } = 0;
+        public decimal DefaultHousingAllowance { get; set; } = 0;
+
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }

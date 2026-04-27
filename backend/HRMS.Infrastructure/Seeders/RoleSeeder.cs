@@ -14,13 +14,11 @@ namespace HRMS.Infrastructure.Seeders
         {
             var rolesToSeed = new List<(string Name, string Description)>
             {
-                ("Admin",            "Quản trị viên - Toàn quyền hệ thống"),
                 ("DepartmentManager", "Trưởng phòng - Quản lý nhân sự và ngân sách phòng ban"),
                 ("DepartmentHead",    "Trưởng bộ phận - Quản lý hoạt động và công của bộ phận/tổ"),
-                ("TeamLeader",       "Tổ trưởng - Điều phối ca làm việc và tăng ca đội nhóm"),
                 ("CnbSpecialist",    "Chuyên viên C&B - Tính toán lương, chốt bảng công"),
                 ("Employee",         "Nhân viên - Xem lịch, nhận thông báo, chấm công"),
-                ("Candidate",        "Ứng viên - Người tìm việc")
+                ("Accountant",       "Kế toán - Quản lý tính toán lương và quyết toán")
             };
 
             foreach (var (name, description) in rolesToSeed)
@@ -45,19 +43,26 @@ namespace HRMS.Infrastructure.Seeders
             if (context.ChangeTracker.HasChanges())
                 await context.SaveChangesAsync();
 
-            // Clean up HrAdmin if it exists
-            var hrAdminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "HrAdmin");
-            if (hrAdminRole != null)
+            // Clean up Admin, TeamLeader and HrAdmin if they exist
+            var rolesToClean = new[] { "Admin", "TeamLeader", "HrAdmin" };
+            var fallbackRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentManager");
+
+            foreach (var roleName in rolesToClean)
             {
-                var roleMappings = await context.UserRoles.Where(ur => ur.RoleId == hrAdminRole.Id).ToListAsync();
-                var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Admin");
-                foreach (var mapping in roleMappings)
+                var roleToRemove = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
+                if (roleToRemove != null)
                 {
-                    if (!await context.UserRoles.AnyAsync(ur => ur.UserId == mapping.UserId && ur.RoleId == adminRole.Id))
-                        context.UserRoles.Add(new UserRole { UserId = mapping.UserId, RoleId = adminRole.Id, AssignedAt = System.DateTime.UtcNow, CreatedAt = System.DateTime.UtcNow });
+                    var roleMappings = await context.UserRoles.Where(ur => ur.RoleId == roleToRemove.Id).ToListAsync();
+                    foreach (var mapping in roleMappings)
+                    {
+                        if (fallbackRole != null && !await context.UserRoles.AnyAsync(ur => ur.UserId == mapping.UserId && ur.RoleId == fallbackRole.Id))
+                        {
+                            context.UserRoles.Add(new UserRole { UserId = mapping.UserId, RoleId = fallbackRole.Id, AssignedAt = System.DateTime.UtcNow, CreatedAt = System.DateTime.UtcNow });
+                        }
+                    }
+                    context.UserRoles.RemoveRange(roleMappings);
+                    context.Roles.Remove(roleToRemove);
                 }
-                context.UserRoles.RemoveRange(roleMappings);
-                context.Roles.Remove(hrAdminRole);
             }
 
             if (context.ChangeTracker.HasChanges())

@@ -25,11 +25,18 @@ namespace HRMS.Application.DTOs.Payroll
         public string WorkingStatus { get; set; }
         public string Email { get; set; }
         public decimal BasicSalary { get; set; }
+        public decimal Coefficient { get; set; }
+        public decimal? MealAllowance { get; set; }
+        public decimal? PhoneAllowance { get; set; }
+        public decimal? PetrolAllowance { get; set; }
+        public decimal? HousingAllowance { get; set; }
         public decimal? InsuranceSalary { get; set; }
         public int NumberOfDependents { get; set; }
         // Attendance summary data for display before calculation
         public decimal ActualWorkingDays { get; set; }
         public decimal OvertimeHours { get; set; }
+        public decimal PaidLeaveDays { get; set; }
+        public decimal UnpaidLeaveDays { get; set; }
         public bool HasApprovedTimesheet { get; set; }
     }
 
@@ -37,6 +44,7 @@ namespace HRMS.Application.DTOs.Payroll
     {
         public decimal? InsuranceSalary { get; set; }
         public int NumberOfDependents { get; set; }
+        public decimal Coefficient { get; set; }
     }
 
     public class PayrollPeriodDto
@@ -101,6 +109,8 @@ namespace HRMS.Application.DTOs.Payroll
         public string EmployeeName { get; set; }
         public string DepartmentName { get; set; }
         public string PositionName { get; set; }
+        public decimal Coefficient { get; set; }
+        public decimal ActualWorkingDays { get; set; }
         public decimal BasicSalary { get; set; }
          public decimal ActualWorkingSalary { get; set; }
         public decimal OvertimePay { get; set; }
@@ -109,6 +119,8 @@ namespace HRMS.Application.DTOs.Payroll
         public decimal PositionAllowance { get; set; }
         public decimal PetrolAllowance { get; set; }
         public decimal PhoneAllowance { get; set; }
+        public decimal HousingAllowance { get; set; }
+        public decimal MealAllowance { get; set; }
         public decimal OtherAllowance { get; set; }
         public decimal SalesSalary { get; set; }
         
@@ -119,6 +131,7 @@ namespace HRMS.Application.DTOs.Payroll
         public decimal HealthInsurance { get; set; }
         public decimal UnemploymentInsurance { get; set; }
         public decimal PersonalIncomeTax { get; set; }
+        public decimal MealDeduction { get; set; }
         public decimal OtherDeductions { get; set; }
         public decimal TotalDeductions { get; set; }
         public decimal NetSalary { get; set; }

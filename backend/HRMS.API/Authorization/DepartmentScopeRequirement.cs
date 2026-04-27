@@ -20,7 +20,7 @@ namespace HRMS.API.Authorization
         protected override Task HandleRequirementAsync(AuthorizationHandlerContext context, DepartmentScopeRequirement requirement)
         {
             // Admins bypass
-            if (context.User.IsInRole("Admin") || context.User.IsInRole("HrAdmin"))
+            if (context.User.IsInRole("Admin") || context.User.IsInRole("HrAdmin") || context.User.IsInRole("CnbSpecialist"))
             {
                 context.Succeed(requirement);
                 return Task.CompletedTask;

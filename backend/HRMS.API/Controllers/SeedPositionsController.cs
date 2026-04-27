@@ -20,6 +20,20 @@ namespace HRMS.API.Controllers
             _context = context;
         }
 
+        [HttpPost("run-role-permission-seed")]
+        public async Task<IActionResult> RunRolePermissionSeed()
+        {
+            try
+            {
+                await HRMS.Infrastructure.Seeders.RolePermissionSeeder.SeedAsync(_context);
+                return Ok(new { success = true, message = "Role permissions updated successfully." });
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpPost("run-seed")]
         public async Task<IActionResult> RunSeed()
         {
@@ -44,18 +58,6 @@ namespace HRMS.API.Controllers
                 var positionsData = new List<PositionSeedConfig>
                 {
                     // HR
-                    new("Phòng Nhân sự", "Quản lý chung", "HR", "Trưởng phòng Nhân sự", 25000000, 40000000, "Hành chính", 1),
-                    new("Phòng Nhân sự", "Tổ Tuyển dụng", "HR-REC", "Trưởng nhóm Tuyển dụng", 15000000, 22000000, "Hành chính", 2),
-                    new("Phòng Nhân sự", "Tổ Tuyển dụng", "HR-REC", "Chuyên viên Tuyển dụng", 9000000, 15000000, "Hành chính", 3),
-                    new("Phòng Nhân sự", "Tổ Lương thưởng", "HR-CB", "Trưởng nhóm C&B", 15000000, 25000000, "Hành chính", 2),
-                    new("Phòng Nhân sự", "Tổ Lương thưởng", "HR-CB", "Chuyên viên C&B", 10000000, 16000000, "Hành chính", 3),
-
-                    // Kế toán
-                    new("Phòng Kế toán", "Quản lý chung", "ACC", "Kế toán trưởng", 30000000, 50000000, "Hành chính", 1),
-                    new("Phòng Kế toán", "Kế toán Thuế", "ACC-TAX", "Trưởng nhóm Kế toán thuế", 18000000, 25000000, "Hành chính", 2),
-                    new("Phòng Kế toán", "Kế toán Thuế", "ACC-TAX", "Nhân viên Kế toán thuế", 10000000, 15000000, "Hành chính", 3),
-                    new("Phòng Kế toán", "Kế toán Nội bộ", "ACC-INT", "Trưởng nhóm Kế toán nội bộ", 15000000, 22000000, "Hành chính", 2),
-                    new("Phòng Kế toán", "Kế toán Nội bộ", "ACC-INT", "Kế toán viên nội bộ", 8000000, 13000000, "Hành chính", 3),
 
                     // Marketing
                     new("Phòng Marketing", "Quản lý chung", "MKT", "Trưởng phòng Marketing", 20000000, 35000000, "Hành chính", 1),
@@ -81,8 +83,6 @@ namespace HRMS.API.Controllers
                     new("Sản xuất", "Quản lý chất lượng", "PRD-QA", "Nhân viên QA (Quy trình)", 10000000, 16000000, "Hành chính", 3),
                     new("Sản xuất", "Quản lý chất lượng", "PRD-QA", "Nhân viên QC (Kiểm hàng)", 7000000, 11000000, "Ca luân phiên", 3),
 
-                    // Hành chính
-                    new("Hành chính", "Quản trị viên", "ADM", "Nhân viên IT/Admin", 10000000, 20000000, "Hành chính", 2)
                 };
 
                 int deptCount = 0;

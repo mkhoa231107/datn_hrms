@@ -11,56 +11,23 @@ namespace HRMS.Infrastructure.Seeders
     {
         public static async Task SeedAsync(HRMSDbContext context)
         {
-            // Ensure ADM department exists
-            var org = await context.Organizations.FirstOrDefaultAsync();
-            if (org != null)
-            {
-                var admDept = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "ADM");
-                if (admDept == null)
-                {
-                    admDept = new Department 
-                    { 
-                        DepartmentName = "Quản trị viên", 
-                        DepartmentCode = "ADM", 
-                        Description = "Bộ phận quản trị hệ thống", 
-                        OrganizationId = org.Id, 
-                        IsActive = true 
-                    };
-                    context.Departments.Add(admDept);
-                    await context.SaveChangesAsync();
-                }
-
-                var admPos = await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "ADM-SYS");
-                if (admPos == null)
-                {
-                    admPos = new Position 
-                    { 
-                        PositionName = "Quản trị hệ thống", 
-                        PositionCode = "ADM-SYS", 
-                        Level = 1, 
-                        DepartmentId = admDept.Id, 
-                        IsActive = true 
-                    };
-                    context.Positions.Add(admPos);
-                    await context.SaveChangesAsync();
-                }
-            }
-
-            // ===== 1. Seed Admin User =====
-            await SeedUserWithEmployee(context, "admin", "admin123", "admin@hrms.local",
-                "System Administrator", "Admin", "ADMIN_01", "ADM", "ADM-SYS");
+            // ===== 2. Seed Accountant User =====
+            await SeedUserWithEmployee(context, "ketoan", "123456", "ketoan@hrms.local",
+                "Nguyễn Văn Kế Toán", "Accountant", "KT_01", "HR", "HR_SPEC");
 
 
-/*
             // ===== 3. Seed Trưởng phòng (DepartmentManager) =====
-            await SeedUserWithEmployee(context, "manager_hr", "admin123", "truongphong1@hrms.local",
+            await SeedUserWithEmployee(context, "manager_01", "123456", "truongphong1@hrms.local",
                 "Phạm Văn Đức", "DepartmentManager", "TP_01", "HR", "HR_DIR");
 
-            // ===== 4. Seed Chuyên viên C&B (Employee - acting as C&B) =====
-            // Note: CnbSpecialist role was removed in previous refactors, use Employee or a generic role
+            // ===== 5. Seed Trưởng bộ phận (DepartmentHead) =====
+            await SeedUserWithEmployee(context, "head_01", "123456", "totruong1@hrms.local",
+                "Ngô Văn Hùng", "DepartmentHead", "TT_01", "HR", "HR_SPEC");
+
+            // ===== 4. Seed Chuyên viên C&B =====
             await SeedUserWithEmployee(context, "cnb_hr", "123456", "cnb1@hrms.local",
-                "Hoàng Thị Mai", "Employee", "CNB_01", "HR", "HR_SPEC");
- 
+                "Hoàng Thị Mai", "CnbSpecialist", "CNB_01", "HR", "HR_SPEC");
+/*
             // ===== 5. Seed Trưởng bộ phận (DepartmentHead) =====
             await SeedUserWithEmployee(context, "tl_hr_01", "123456", "totruong1@hrms.local",
                 "Ngô Văn Hùng", "DepartmentHead", "TT_01", "HR", "HR_SPEC");
