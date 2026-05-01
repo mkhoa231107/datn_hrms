@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { leaveService } from '../../api';
-import { Umbrella, Plus, Info, Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Umbrella, Plus, Info, Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import ExcelJS from 'exceljs';
 import LeavePaperModal from './LeavePaperModal';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import EmptyState from '../ui/EmptyState';
@@ -145,6 +146,61 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
         return <span className="badge badge-accent">{status}</span>;
     };
 
+    const exportToExcel = async () => {
+        if (!rawData || rawData.length === 0) {
+            showMsg(false, 'Không có dữ liệu để xuất');
+            return;
+        }
+        
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('LichSuNghiPhep');
+            
+            worksheet.columns = [
+                { header: 'STT', key: 'stt', width: 5 },
+                { header: 'Nhân viên', key: 'empName', width: 25 },
+                { header: 'Phòng ban', key: 'deptName', width: 20 },
+                { header: 'Loại phép', key: 'leaveType', width: 20 },
+                { header: 'Từ ngày', key: 'fromDate', width: 15 },
+                { header: 'Đến ngày', key: 'toDate', width: 15 },
+                { header: 'Số ngày', key: 'totalDays', width: 10 },
+                { header: 'Lý do', key: 'reason', width: 30 },
+                { header: 'Trạng thái', key: 'status', width: 15 }
+            ];
+            
+            worksheet.getRow(1).font = { bold: true };
+            worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+            
+            rawData.forEach((r, idx) => {
+                const statusStr = r.statusName || (r.status === 0 ? 'Pending' : r.status === 1 ? 'Approved' : r.status === 2 ? 'Rejected' : 'Cancelled');
+                worksheet.addRow({
+                    stt: idx + 1,
+                    empName: r.employeeName || user?.fullName || 'N/A',
+                    deptName: r.employeeDepartmentName || user?.departmentName || 'N/A',
+                    leaveType: r.leaveTypeName,
+                    fromDate: formatDate(r.fromDate),
+                    toDate: formatDate(r.toDate),
+                    totalDays: r.totalDays,
+                    reason: r.reason,
+                    status: statusStr
+                });
+            });
+            
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `LichSuNghiPhep_${new Date().toISOString().slice(0,10)}.xlsx`;
+            anchor.click();
+            window.URL.revokeObjectURL(url);
+            showMsg(true, 'Xuất file thành công');
+        } catch (e) {
+            console.error(e);
+            showMsg(false, 'Lỗi khi xuất file Excel');
+        }
+    };
+
     return (
         <div className="flex flex-col gap-6 animate-fade-up">
             {flash && (
@@ -241,6 +297,11 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
                                     <option value="all">Tất cả bộ phận</option>
                                     {allSubDepts.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
+                            )}
+                            {(tab === 'history' || tab === 'pending') && (
+                                <button onClick={exportToExcel} className="btn btn-ghost border-slate-200 text-slate-600 hover:bg-slate-50 !py-1.5" title="Xuất Excel">
+                                    <Download size={16} /> Xuất Excel
+                                </button>
                             )}
                             {!approvalOnly && (
                                 <button onClick={() => setCreateModal(true)} className="btn btn-primary !py-1.5">
