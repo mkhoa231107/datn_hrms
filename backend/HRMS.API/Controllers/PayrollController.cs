@@ -264,7 +264,7 @@ namespace HRMS.API.Controllers
                                 Title = $"PHIẾU LƯƠNG {periodName.ToUpper()}",
                                 Message = $"Phiếu lương {periodName} đã có. Lương thực lĩnh: {r.NetSalary:N0}đ. Nhấn để xem chi tiết.",
                                 Type = "Payslip",
-                                RelatedId = periodId
+                                RelatedId = periodId.ToString()
                             });
                         }
                         sent++;
@@ -293,7 +293,7 @@ namespace HRMS.API.Controllers
 
         private static string BuildPayslipEmailHtml(PayrollRecordDto r, string periodName)
         {
-            var bhTotal = (r.SocialInsurance ?? 0) + (r.HealthInsurance ?? 0) + (r.UnemploymentInsurance ?? 0);
+            var bhTotal = r.SocialInsurance + r.HealthInsurance + r.UnemploymentInsurance;
             return $@"
 <!DOCTYPE html>
 <html><head><meta charset='utf-8'></head>

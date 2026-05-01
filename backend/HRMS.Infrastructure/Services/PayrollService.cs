@@ -370,6 +370,7 @@ namespace HRMS.Infrastructure.Services
                 EmployeeId = r.EmployeeId,
                 EmployeeCode = r.Employee?.EmployeeCode ?? "N/A",
                 EmployeeName = r.Employee?.FullName ?? "N/A",
+                EmployeeEmail = r.Employee?.Email ?? "N/A",
                 DepartmentName = r.Employee?.Department?.DepartmentName ?? "N/A",
                 PositionName = r.Employee?.Position?.PositionName ?? "N/A",
                 Coefficient = r.Employee?.Coefficient > 0 ? r.Employee.Coefficient : (r.Employee?.Position?.DefaultCoefficient ?? 1.0m),

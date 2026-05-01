@@ -107,6 +107,7 @@ namespace HRMS.Application.DTOs.Payroll
         public int EmployeeId { get; set; }
         public string EmployeeCode { get; set; } = string.Empty;
         public string EmployeeName { get; set; } = string.Empty;
+        public string EmployeeEmail { get; set; } = string.Empty;
         public string DepartmentName { get; set; } = string.Empty;
         public string PositionName { get; set; } = string.Empty;
         public decimal Coefficient { get; set; }

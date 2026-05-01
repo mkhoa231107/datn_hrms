@@ -189,6 +189,30 @@ namespace HRMS.Application.DTOs.Attendance
         public DateTime Date { get; set; }
         public decimal Hours { get; set; }
     }
+
+    // --- DTOs for Attendance Report ---
+    public class AttendanceReportItemDto
+    {
+        public int EmployeeId { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string EmployeeCode { get; set; } = string.Empty;
+        public int DepartmentId { get; set; }
+        public string DepartmentName { get; set; } = string.Empty;
+        public decimal TotalWorkingDays { get; set; }
+        public decimal ActualWorkingDays { get; set; }
+        public decimal TotalOvertimeHours { get; set; }
+        public decimal TotalLeaveDays { get; set; }
+        public int LateOrEarlyCount { get; set; }
+        public decimal OnTimePercentage { get; set; }
+    }
+
+    public class AttendanceReportSummaryDto
+    {
+        public List<AttendanceReportItemDto> Items { get; set; } = new List<AttendanceReportItemDto>();
+        public int TotalItems { get; set; }
+        public int CurrentPage { get; set; }
+        public int TotalPages { get; set; }
+    }
 }
 
 
