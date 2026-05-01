@@ -1,9 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import SignatureCanvas from 'react-signature-canvas';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import { vi } from 'date-fns/locale/vi';
+import 'react-datepicker/dist/react-datepicker.css';
 import { Umbrella, Clock, Paperclip, X, Save, Printer, Check, Trash2, Image as ImageIcon } from 'lucide-react';
 import { BASE_URL } from '../../api';
 import './LeavePaper.css';
+
+// Register Vietnamese locale for datepicker
+registerLocale('vi', vi);
 
 // Custom helper as a robust workaround for react-signature-canvas bug
 const trimCanvasManual = (canvas) => {
@@ -62,8 +68,8 @@ export default function LeavePaperModal({
 
     const [form, setForm] = useState({
         leaveTypeId: '',
-        fromDate: '',
-        toDate: '',
+        fromDate: null,
+        toDate: null,
         reason: '',
         phone: user?.phone || '',
         address: user?.address || '',
@@ -84,8 +90,14 @@ export default function LeavePaperModal({
         const start = new Date(form.fromDate);
         const end = new Date(form.toDate);
         if (end < start) return 0;
-        const diffTime = Math.abs(end - start);
-        return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        let count = 0;
+        let cur = new Date(start);
+        while (cur <= end) {
+            const dow = cur.getDay();
+            if (dow !== 0 && dow !== 6) count++; // exclude weekends
+            cur.setDate(cur.getDate() + 1);
+        }
+        return count;
     };
     const requestedDays = calculateDays();
     const isOverBalance = activeBalance && requestedDays > activeBalance.remainingDays;
@@ -144,8 +156,8 @@ export default function LeavePaperModal({
         if (requestData && mode === 'view') {
             setForm({
                 leaveTypeId: requestData.leaveTypeId,
-                fromDate: requestData.fromDate?.split('T')[0],
-                toDate: requestData.toDate?.split('T')[0],
+                fromDate: requestData.fromDate ? new Date(requestData.fromDate) : null,
+                toDate: requestData.toDate ? new Date(requestData.toDate) : null,
                 reason: requestData.reason,
                 phone: requestData.phone,
                 address: requestData.address,
@@ -185,7 +197,14 @@ export default function LeavePaperModal({
                 return;
             }
 
-            onSubmit({ ...form, leaveTypeId: parseInt(form.leaveTypeId, 10), requesterSignature: finalSignature });
+            onSubmit({ 
+                ...form, 
+                leaveTypeId: parseInt(form.leaveTypeId, 10), 
+                requesterSignature: finalSignature,
+                // Convert Date objects to ISO strings for API
+                fromDate: form.fromDate ? form.fromDate.toISOString().split('T')[0] : '',
+                toDate: form.toDate ? form.toDate.toISOString().split('T')[0] : '',
+            });
         } else if (mode === 'view' && onSubmit && canApprove) {
             // Approval flow
             const canvas = approverSigCanvas.current.getCanvas();
@@ -292,13 +311,35 @@ export default function LeavePaperModal({
                     <div className="leave-paper-row">
                         <span className="leave-paper-label">Thời gian từ ngày:</span>
                         {mode === 'create' ? (
-                            <input type="date" className="leave-paper-input" value={form.fromDate} onChange={e => setForm({...form, fromDate: e.target.value})} required />
+                            <DatePicker
+                                selected={form.fromDate}
+                                onChange={date => setForm({...form, fromDate: date, toDate: form.toDate && date && form.toDate < date ? null : form.toDate})}
+                                locale="vi"
+                                dateFormat="dd/MM/yyyy"
+                                placeholderText="Chọn ngày..."
+                                filterDate={d => d.getDay() !== 0 && d.getDay() !== 6}
+                                minDate={new Date()}
+                                className="leave-paper-input"
+                                wrapperClassName="inline-block"
+                                required
+                            />
                         ) : (
                             <strong>{formatDate(form.fromDate)}</strong>
                         )}
                         <span style={{ margin: '0 10px' }}>đến ngày:</span>
                         {mode === 'create' ? (
-                            <input type="date" className="leave-paper-input" value={form.toDate} onChange={e => setForm({...form, toDate: e.target.value})} required />
+                            <DatePicker
+                                selected={form.toDate}
+                                onChange={date => setForm({...form, toDate: date})}
+                                locale="vi"
+                                dateFormat="dd/MM/yyyy"
+                                placeholderText="Chọn ngày..."
+                                filterDate={d => d.getDay() !== 0 && d.getDay() !== 6}
+                                minDate={form.fromDate || new Date()}
+                                className="leave-paper-input"
+                                wrapperClassName="inline-block"
+                                required
+                            />
                         ) : (
                             <strong>{formatDate(form.toDate)}</strong>
                         )}

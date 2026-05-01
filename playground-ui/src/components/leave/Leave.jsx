@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { leaveService } from '../../api';
-import { Umbrella, Plus, Info, Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Umbrella, Plus, Info, Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import LeavePaperModal from './LeavePaperModal';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import EmptyState from '../ui/EmptyState';
@@ -23,6 +23,7 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
     const [flash, setFlash] = useState(null);
     const [cancelConfirmId, setCancelConfirmId] = useState(null);
     const [cancelling, setCancelling] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     // Modals
     const [createModal, setCreateModal] = useState(false);
@@ -114,6 +115,113 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
     const formatDate = d => {
         if (!d) return '--';
         return new Date(d).toLocaleDateString('vi-VN');
+    };
+
+    const exportExcel = async () => {
+        const data = approvalOnly ? [...deptRequests] : [...myRequests];
+        if (data.length === 0) { showMsg(false, 'Không có dữ liệu để xuất'); return; }
+        setExporting(true);
+        try {
+            const ExcelJS = (await import('exceljs')).default;
+            const wb = new ExcelJS.Workbook();
+            const now = new Date();
+            const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+            // ── Sheet 1: Chi tiết đơn nghỉ phép ──
+            const ws = wb.addWorksheet('Chi tiết');
+            ws.columns = [
+                { header: 'STT', key: 'stt', width: 6 },
+                { header: 'Họ tên', key: 'employeeName', width: 22 },
+                { header: 'Mã NV', key: 'employeeCode', width: 12 },
+                { header: 'Phòng ban', key: 'employeeDepartmentName', width: 20 },
+                { header: 'Loại phép', key: 'leaveTypeName', width: 16 },
+                { header: 'Từ ngày', key: 'fromDate', width: 14 },
+                { header: 'Đến ngày', key: 'toDate', width: 14 },
+                { header: 'Số ngày', key: 'totalDays', width: 10 },
+                { header: 'Lý do', key: 'reason', width: 30 },
+                { header: 'Trạng thái', key: 'status', width: 14 },
+                { header: 'Người duyệt', key: 'approverName', width: 20 },
+            ];
+            ws.getRow(1).eachCell(cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF7C3AED' } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            });
+            ws.getRow(1).height = 24;
+
+            const fmtD = d => d ? new Date(d).toLocaleDateString('vi-VN') : '--';
+            const statusLabel = s => {
+                if (s === 'Pending' || s === 0) return 'Chờ duyệt';
+                if (s === 'Approved' || s === 1) return 'Đã duyệt';
+                if (s === 'Rejected' || s === 2) return 'Từ chối';
+                if (s === 'Cancelled' || s === 3) return 'Đã hủy';
+                return s;
+            };
+
+            data.forEach((r, i) => {
+                const row = ws.addRow({
+                    stt: i + 1,
+                    employeeName: r.employeeName || r.fullName || '',
+                    employeeCode: r.employeeCode || '',
+                    employeeDepartmentName: r.employeeDepartmentName || '',
+                    leaveTypeName: r.leaveTypeName || '',
+                    fromDate: fmtD(r.fromDate),
+                    toDate: fmtD(r.toDate),
+                    totalDays: r.totalDays ?? '',
+                    reason: r.reason || '',
+                    status: statusLabel(r.statusName || r.status),
+                    approverName: r.approverName || '',
+                });
+                if (i % 2 === 1) {
+                    row.eachCell(cell => {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F3FF' } };
+                    });
+                }
+            });
+
+            // ── Sheet 2: Tổng hợp ──
+            const ws2 = wb.addWorksheet('Tổng hợp');
+            ws2.columns = [
+                { header: 'Mã NV', key: 'code', width: 12 },
+                { header: 'Họ tên', key: 'name', width: 22 },
+                { header: 'Phòng ban', key: 'dept', width: 20 },
+                { header: 'Tổng ngày đã nghỉ', key: 'used', width: 18 },
+                { header: 'Số đơn đã duyệt', key: 'approved', width: 18 },
+                { header: 'Số đơn chờ duyệt', key: 'pending', width: 20 },
+            ];
+            ws2.getRow(1).eachCell(cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+            });
+            ws2.getRow(1).height = 24;
+
+            // Group by employee
+            const empMap = {};
+            data.forEach(r => {
+                const key = r.employeeCode || r.employeeName || 'unknown';
+                if (!empMap[key]) empMap[key] = { code: r.employeeCode || '', name: r.employeeName || '', dept: r.employeeDepartmentName || '', used: 0, approved: 0, pending: 0 };
+                const status = r.statusName || r.status;
+                if (status === 'Approved' || status === 1) { empMap[key].used += r.totalDays || 0; empMap[key].approved++; }
+                if (status === 'Pending' || status === 0) empMap[key].pending++;
+            });
+            Object.values(empMap).forEach(e => ws2.addRow(e));
+
+            const buf = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BaoCaoNghiPhep_${monthStr}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showMsg(true, 'Xuất Excel thành công!');
+        } catch (err) {
+            console.error(err);
+            showMsg(false, 'Lỗi khi xuất Excel');
+        } finally {
+            setExporting(false);
+        }
     };
 
     let rawData = [];
@@ -245,6 +353,15 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
                             {!approvalOnly && (
                                 <button onClick={() => setCreateModal(true)} className="btn btn-primary !py-1.5">
                                     <Plus size={16} /> Đăng ký nghỉ
+                                </button>
+                            )}
+                            {approvalOnly && (
+                                <button 
+                                    onClick={exportExcel}
+                                    disabled={exporting}
+                                    className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-1.5 text-xs flex items-center gap-1.5"
+                                >
+                                    <Download size={14} /> Xuất Excel
                                 </button>
                             )}
                         </div>
