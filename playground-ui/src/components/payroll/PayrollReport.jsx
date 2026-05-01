@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { api } from '../../api';
 import { toast } from 'react-hot-toast';
 import {
-    BarChart2, Download, RefreshCw, ChevronRight, ChevronDown,
+    BarChart2, Download, RefreshCw, Send,
     Users, DollarSign, ShieldCheck, TrendingUp, Calendar,
-    Building2, CreditCard, FileText, X
+    Building2, FileText, X, CheckCircle2, AlertCircle
 } from 'lucide-react';
 
 const fmt = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val ?? 0);
@@ -85,6 +85,9 @@ export default function PayrollReport() {
     const [loading, setLoading] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [detailRecord, setDetailRecord] = useState(null);
+    const [showSendConfirm, setShowSendConfirm] = useState(false);
+    const [sending, setSending] = useState(false);
+    const [sendResult, setSendResult] = useState(null);
 
     useEffect(() => {
         Promise.all([
@@ -234,6 +237,25 @@ export default function PayrollReport() {
         }
     };
 
+    const sendPayslips = async () => {
+        setSending(true);
+        setSendResult(null);
+        try {
+            const res = await api.post(`/Payroll/periods/${selectedPeriod}/send-payslips`);
+            const result = res.data;
+            setSendResult(result);
+            if (result.success) toast.success(result.message);
+            else toast.error(result.message || 'Có lỗi xảy ra');
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Lỗi kết nối server';
+            toast.error(msg);
+            setSendResult({ success: false, message: msg });
+        } finally {
+            setSending(false);
+            setShowSendConfirm(false);
+        }
+    };
+
     return (
         <div className="flex flex-col gap-6 animate-fade-up pb-10">
             {/* Header */}
@@ -307,10 +329,19 @@ export default function PayrollReport() {
                         <h3 className="text-sm font-black text-slate-700">
                             Chi tiết bảng lương — {periods.find(p => p.id === parseInt(selectedPeriod))?.name || ''}
                         </h3>
-                        <button onClick={exportExcel} disabled={exporting} className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2 text-xs flex items-center gap-2">
-                            {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-                            Xuất Excel
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowSendConfirm(true)}
+                                disabled={!selectedPeriod}
+                                className="btn btn-ghost border-violet-200 text-violet-700 hover:bg-violet-50 !py-2 text-xs flex items-center gap-2"
+                            >
+                                <Send size={14} /> Gửi phiếu lương
+                            </button>
+                            <button onClick={exportExcel} disabled={exporting} className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2 text-xs flex items-center gap-2">
+                                {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+                                Xuất Excel
+                            </button>
+                        </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full border-collapse">
@@ -373,6 +404,52 @@ export default function PayrollReport() {
             )}
 
             {detailRecord && <PayslipDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />}
+
+            {/* Send payslips confirm modal */}
+            {showSendConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-up">
+                        <div className="bg-violet-600 text-white p-6 rounded-t-2xl">
+                            <h3 className="text-lg font-black flex items-center gap-2"><Send size={20} /> Gửi phiếu lương</h3>
+                            <p className="text-violet-200 text-sm mt-1">{periods.find(p => p.id === parseInt(selectedPeriod))?.name}</p>
+                        </div>
+                        <div className="p-6">
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-700">
+                                <p className="font-bold mb-1">⚠️ Xác nhận gửi</p>
+                                <p>Thao tác này sẽ gửi thông báo trong app và email (nếu đã cấu hình) cho <strong>{records.length} nhân viên</strong>. Không thể hoàn tác.</p>
+                            </div>
+                            {sendResult && (
+                                <div className={`rounded-xl p-4 mb-4 flex items-start gap-3 ${sendResult.success ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200'}`}>
+                                    {sendResult.success
+                                        ? <CheckCircle2 size={18} className="text-emerald-600 mt-0.5 shrink-0" />
+                                        : <AlertCircle size={18} className="text-rose-600 mt-0.5 shrink-0" />}
+                                    <div>
+                                        <p className={`text-sm font-bold ${sendResult.success ? 'text-emerald-700' : 'text-rose-700'}`}>{sendResult.message}</p>
+                                        {sendResult.failedList?.length > 0 && (
+                                            <ul className="text-xs text-rose-600 mt-1 list-disc ml-4">
+                                                {sendResult.failedList.map((f, i) => <li key={i}>{f}</li>)}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => { setShowSendConfirm(false); setSendResult(null); }} className="btn btn-ghost !py-2 text-sm">
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={sendPayslips}
+                                    disabled={sending}
+                                    className="btn btn-primary !py-2 text-sm flex items-center gap-2"
+                                >
+                                    {sending ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+                                    {sending ? 'Đang gửi...' : 'Xác nhận gửi'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -1,8 +1,11 @@
 using HRMS.Application.DTOs.Payroll;
 using HRMS.Application.Interfaces;
+using HRMS.Application.DTOs.Notification;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -14,10 +17,14 @@ namespace HRMS.API.Controllers
     public class PayrollController : ControllerBase
     {
         private readonly IPayrollService _payrollService;
+        private readonly IEmailService _emailService;
+        private readonly INotificationService _notificationService;
 
-        public PayrollController(IPayrollService payrollService)
+        public PayrollController(IPayrollService payrollService, IEmailService emailService, INotificationService notificationService)
         {
             _payrollService = payrollService;
+            _emailService = emailService;
+            _notificationService = notificationService;
         }
 
         private int GetUserId() => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
@@ -212,5 +219,107 @@ namespace HRMS.API.Controllers
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        // ===== NEW: Gửi phiếu lương qua email + tạo in-app notification =====
+        [HttpPost("periods/{periodId}/send-payslips")]
+        [Authorize(Roles = "Admin,CnbSpecialist,Accountant")]
+        public async Task<IActionResult> SendPayslips(int periodId)
+        {
+            if (!IsCbProcessor()) return Forbid();
+            try
+            {
+                var records = (await _payrollService.GetPayrollRecordsAsync(periodId)).ToList();
+                if (!records.Any())
+                    return BadRequest(new { success = false, message = "Không có bản ghi lương nào để gửi." });
+
+                // Lấy thông tin kỳ lương
+                var periods = (await _payrollService.GetPayrollPeriodsAsync()).ToList();
+                var period = periods.FirstOrDefault(p => p.Id == periodId);
+                var periodName = period?.Name ?? $"Kỳ {periodId}";
+
+                int sent = 0, failed = 0;
+                var failedList = new List<string>();
+
+                foreach (var r in records)
+                {
+                    try
+                    {
+                        // 1. Gửi email nếu có email
+                        if (!string.IsNullOrEmpty(r.EmployeeEmail))
+                        {
+                            var emailBody = BuildPayslipEmailHtml(r, periodName);
+                            await _emailService.SendEmailAsync(
+                                r.EmployeeEmail,
+                                $"[HRMS Net] Phiếu lương {periodName}",
+                                emailBody
+                            );
+                        }
+
+                        // 2. Tạo in-app notification
+                        if (r.EmployeeId > 0)
+                        {
+                            await _notificationService.CreateNotificationAsync(new CreateNotificationDto
+                            {
+                                EmployeeId = r.EmployeeId,
+                                Title = $"PHIẾU LƯƠNG {periodName.ToUpper()}",
+                                Message = $"Phiếu lương {periodName} đã có. Lương thực lĩnh: {r.NetSalary:N0}đ. Nhấn để xem chi tiết.",
+                                Type = "Payslip",
+                                RelatedId = periodId
+                            });
+                        }
+                        sent++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        failedList.Add($"{r.EmployeeName}: {ex.Message}");
+                    }
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    sent,
+                    failed,
+                    failedList,
+                    message = $"Đã gửi {sent} phiếu lương thành công. {(failed > 0 ? $"{failed} thất bại." : "")}"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
+            }
+        }
+
+        private static string BuildPayslipEmailHtml(PayrollRecordDto r, string periodName)
+        {
+            var bhTotal = (r.SocialInsurance ?? 0) + (r.HealthInsurance ?? 0) + (r.UnemploymentInsurance ?? 0);
+            return $@"
+<!DOCTYPE html>
+<html><head><meta charset='utf-8'></head>
+<body style='font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px'>
+  <div style='max-width:580px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1)'>
+    <div style='background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:28px 32px;color:#fff'>
+      <h1 style='margin:0;font-size:22px;font-weight:800'>HRMS Net</h1>
+      <p style='margin:8px 0 0;opacity:0.85;font-size:14px'>Phiếu lương {periodName}</p>
+    </div>
+    <div style='padding:28px 32px'>
+      <p style='font-size:15px;color:#374151'>Xin chào <strong>{r.EmployeeName}</strong>,</p>
+      <p style='color:#6b7280;font-size:14px'>Phiếu lương kỳ <strong>{periodName}</strong> của bạn đã được phát hành. Chi tiết như sau:</p>
+      <table style='width:100%;border-collapse:collapse;margin:16px 0;font-size:14px'>
+        <tr style='background:#f9fafb'><td style='padding:10px 12px;color:#6b7280;border-bottom:1px solid #e5e7eb'>Mã nhân viên</td><td style='padding:10px 12px;font-weight:600;text-align:right;border-bottom:1px solid #e5e7eb'>{r.EmployeeCode}</td></tr>
+        <tr><td style='padding:10px 12px;color:#6b7280;border-bottom:1px solid #e5e7eb'>Ngày công thực tế</td><td style='padding:10px 12px;font-weight:600;text-align:right;border-bottom:1px solid #e5e7eb'>{r.ActualWorkingDays} ngày</td></tr>
+        <tr style='background:#f9fafb'><td style='padding:10px 12px;color:#6b7280;border-bottom:1px solid #e5e7eb'>Lương theo công</td><td style='padding:10px 12px;font-weight:600;text-align:right;border-bottom:1px solid #e5e7eb'>{r.ActualWorkingSalary:N0}đ</td></tr>
+        <tr><td style='padding:10px 12px;color:#6b7280;border-bottom:1px solid #e5e7eb'>Lương tăng ca (OT)</td><td style='padding:10px 12px;font-weight:600;text-align:right;border-bottom:1px solid #e5e7eb'>{r.OvertimePay:N0}đ</td></tr>
+        <tr style='background:#f9fafb'><td style='padding:10px 12px;color:#6b7280;border-bottom:1px solid #e5e7eb'>Tổng phụ cấp</td><td style='padding:10px 12px;font-weight:600;text-align:right;border-bottom:1px solid #e5e7eb'>{r.TotalAllowances:N0}đ</td></tr>
+        <tr><td style='padding:10px 12px;color:#dc2626;border-bottom:1px solid #e5e7eb'>BHXH/BHYT/BHTN (NV đóng)</td><td style='padding:10px 12px;font-weight:600;color:#dc2626;text-align:right;border-bottom:1px solid #e5e7eb'>-{bhTotal:N0}đ</td></tr>
+        <tr style='background:#ede9fe'><td style='padding:14px 12px;color:#4f46e5;font-weight:700;font-size:15px'>LƯƠNG THỰC LĨNH</td><td style='padding:14px 12px;font-weight:800;color:#4f46e5;font-size:18px;text-align:right'>{r.NetSalary:N0}đ</td></tr>
+      </table>
+      <p style='color:#9ca3af;font-size:12px;margin-top:24px;border-top:1px solid #f3f4f6;padding-top:16px'>Email này được gửi tự động từ hệ thống HRMS Net. Vui lòng không trả lời email này.</p>
+    </div>
+  </div>
+</body></html>";
+        }
     }
 }
+

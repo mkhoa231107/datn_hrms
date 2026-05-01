@@ -17,7 +17,8 @@ const TAB_LABELS = {
     'admin-contracts': 'Quản lý Hợp đồng', 'admin-roles': 'Quản lý Tài khoản',
     'payroll-processing': 'Tính lương & Thuế', 'payroll-settings': 'Cấu hình lương',
     'payroll-report': 'Báo cáo lương', 'dept-contracts': 'Hợp đồng phòng ban',
-    'admin-system': 'Cấu hình hệ thống',
+    'admin-system': 'Cấu hình hệ thống', 'attendance-report': 'BC chấm công',
+    'team-shift-approvals': 'Duyệt đổi ca',
 };
 
 const TAB_SECTION = {
@@ -31,6 +32,7 @@ const TAB_SECTION = {
     'admin-contracts': 'Nhân sự', 'admin-roles': 'Nhân sự',
     'payroll-processing': 'Tiền lương', 'payroll-settings': 'Tiền lương',
     'payroll-report': 'Tiền lương', 'dept-contracts': 'Quản lý', 'admin-system': 'Hệ thống',
+    'attendance-report': 'Nhân sự', 'team-shift-approvals': 'Quản lý',
 };
 
 export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
