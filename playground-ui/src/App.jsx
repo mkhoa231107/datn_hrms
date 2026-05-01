@@ -12,6 +12,7 @@ import Leave from './components/leave/Leave';
 import MySchedule from './components/scheduling/MySchedule';
 import DeptActivities from './components/dashboard/DeptActivities';
 import AttendanceManagement from './components/attendance/AttendanceManagement';
+import AttendanceSummaryReport from './components/attendance/AttendanceSummaryReport';
 import Login from './components/auth/Login';
 import { RoleGuard } from './components/auth/RoleGuard';
 import ContractManagement from './components/contracts/ContractManagement';
@@ -443,6 +444,11 @@ export default function App() {
           {tab('attendance-management') && (
             <RoleGuard user={user} allowedRoles={['CnbSpecialist']}>
               <AttendanceManagement onBack={() => setActiveTab('me')} />
+            </RoleGuard>
+          )}
+          {tab('attendance-report') && (
+            <RoleGuard user={user} allowedRoles={['Admin', 'DepartmentManager', 'CnbSpecialist']}>
+              <AttendanceSummaryReport user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('insurance-management') && (

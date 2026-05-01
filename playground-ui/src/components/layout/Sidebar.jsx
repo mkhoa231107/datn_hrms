@@ -46,6 +46,7 @@ const ROLE_MENUS = {
         { id: 'team-shift-approvals', label: 'Duyệt đổi ca', icon: ArrowLeftRight },
         { id: 'dept-activities', label: 'Hoạt động PB', icon: Activity },
         { id: 'team-timesheets', label: 'Chốt công',    icon: Activity },
+        { id: 'attendance-report', label: 'Báo cáo chấm công', icon: BarChart2 },
     ],
     CnbSpecialist: [
         { id: 'employees',             label: 'Nhân viên',        icon: Users },
@@ -57,6 +58,7 @@ const ROLE_MENUS = {
         { id: 'payroll-processing',    label: 'Tính lương & Thuế',icon: DollarSign },
         { id: 'payroll-settings',      label: 'Cấu hình lương',   icon: Settings },
         { id: 'payroll-report',        label: 'Báo cáo lương',    icon: BarChart2 },
+        { id: 'attendance-report',     label: 'Báo cáo chấm công',icon: BarChart2 },
     ],
     Accountant: [
         { id: 'payroll-processing', label: 'Tính lương & Thuế', icon: DollarSign },
@@ -69,6 +71,7 @@ const ROLE_MENUS = {
         { id: 'team-shift-approvals', label: 'Duyệt đổi ca',     icon: ArrowLeftRight },
         { id: 'admin-roles',        label: 'Quản lý Tài khoản',  icon: UserPlus },
         { id: 'payroll-processing', label: 'Tính lương & Thuế',  icon: DollarSign },
+        { id: 'attendance-report',  label: 'Báo cáo chấm công',  icon: BarChart2 },
         { id: 'admin-system',       label: 'Cấu hình hệ thống',  icon: Settings },
     ],
 };

@@ -25,6 +25,7 @@ namespace HRMS.Application.Interfaces
         Task<bool> RejectAdjustmentRequestAsync(int requestId, int approverId, string note);
         
         // Timesheet Summary Approval
+        Task<AttendanceReportSummaryDto> GetAttendanceSummaryReportAsync(string month, int? departmentId, int page, int limit);
         Task<List<AttendanceSummaryDto>> GetDepartmentTimesheetsAsync(int departmentId, int periodId);
         Task<AttendanceGridDto> GetDepartmentAttendanceGridAsync(int departmentId, int periodId);
         Task<bool> ApproveTimesheetAsync(int summaryId, int approverId, bool isHead = false, bool isManager = false, bool isAdmin = false);

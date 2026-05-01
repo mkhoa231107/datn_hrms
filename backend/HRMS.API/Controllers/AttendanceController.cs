@@ -226,6 +226,38 @@ namespace HRMS.API.Controllers
             }
         }
 
+        // ==================== REPORTING ENDPOINTS ====================
+
+        /// <summary>
+        /// Báo cáo chấm công tổng hợp theo tháng/phòng ban
+        /// </summary>
+        [HttpGet("report/summary")]
+        [Authorize(Roles = "Admin,DepartmentManager,HrAdmin,CnbSpecialist")]
+        public async Task<IActionResult> GetAttendanceSummaryReport(
+            [FromQuery] string month,
+            [FromQuery] int? departmentId,
+            [FromQuery] int page = 1,
+            [FromQuery] int limit = 50)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(month))
+                    return BadRequest(new { success = false, message = "Vui lòng chọn tháng." });
+
+                if (departmentId.HasValue && departmentId.Value > 0)
+                {
+                    ValidateDepartmentAccess(departmentId.Value);
+                }
+
+                var report = await _attendanceService.GetAttendanceSummaryReportAsync(month, departmentId, page, limit);
+                return Ok(new { success = true, data = report });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
+            }
+        }
+
         // ==================== ADMIN/MANAGER ENDPOINTS ====================
 
         /// <summary>
