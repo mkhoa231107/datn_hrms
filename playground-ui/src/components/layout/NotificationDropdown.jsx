@@ -197,6 +197,11 @@ export default function NotificationDropdown({ user, onClose }) {
                                             
                                             <div className="flex items-center gap-2 mt-2">
                                                 <span className={`text-[10px] font-bold uppercase border px-2 py-0.5 ${
+                                                    notif.type === 'Overtime' ? 'bg-[#f0f7ff] text-[#1a56db] border-[#1a56db]/30' : 
+                                                    notif.type === 'Leave' ? 'bg-[#fef9c3] text-[#a16207] border-[#a16207]/30' : 
+                                                    notif.type === 'ShiftSwap' ? 'bg-[#f5f3ff] text-[#7c3aed] border-[#7c3aed]/30' :
+                                                    notif.type === 'Payslip' ? 'bg-[#f5f3ff] text-[#7c3aed] border-[#7c3aed]/30' :
+                                                    'bg-[#f5f3ff] text-[#4f46e5] border-[#4f46e5]/30'
                                                 }`}>
                                                     {notif.type === 'Overtime' ? 'Tăng ca' :
                                                      notif.type === 'Leave' ? 'Nghỉ phép' :
