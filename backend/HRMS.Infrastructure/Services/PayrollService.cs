@@ -16,15 +16,11 @@ namespace HRMS.Infrastructure.Services
     {
         private readonly HRMSDbContext _context;
         private readonly IMapper _mapper;
-        private readonly INotificationService _notificationService;
-        private readonly IEmailService _emailService;
 
-        public PayrollService(HRMSDbContext context, IMapper mapper, INotificationService notificationService, IEmailService emailService)
+        public PayrollService(HRMSDbContext context, IMapper mapper)
         {
             _context = context;
             _mapper = mapper;
-            _notificationService = notificationService;
-            _emailService = emailService;
         }
 
         public async Task<PayrollSettingDto> GetCurrentSettingsAsync(int organizationId)
@@ -355,57 +351,6 @@ namespace HRMS.Infrastructure.Services
             period.ApprovedById = emp?.Id;
             period.ApprovedAt = DateTime.UtcNow;
             period.Status = PayrollStatus.Locked;
-
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task PublishPayslipsAsync(int periodId, int userId)
-        {
-            var period = await _context.PayrollPeriods.Include(p => p.SchedulePeriod).FirstOrDefaultAsync(p => p.Id == periodId);
-            if (period == null) throw new KeyNotFoundException("Period not found");
-
-            if (period.Status != PayrollStatus.Locked)
-                throw new InvalidOperationException("Bảng lương phải được duyệt (Locked) trước khi gửi phiếu lương.");
-
-            period.Status = PayrollStatus.Published;
-            period.UpdatedAt = DateTime.UtcNow;
-
-            var records = await _context.PayrollRecords
-                .Include(r => r.Employee)
-                .Where(r => r.PayrollPeriodId == periodId)
-                .ToListAsync();
-
-            foreach (var record in records)
-            {
-                if (record.Employee != null)
-                {
-                    // In-app Notification
-                    await _notificationService.CreateNotificationAsync(new HRMS.Application.DTOs.Notification.CreateNotificationDto
-                    {
-                        EmployeeId = record.EmployeeId,
-                        Title = $"Phiếu lương kỳ {period.SchedulePeriod?.PeriodName}",
-                        Message = $"Phiếu lương của bạn cho kỳ {period.SchedulePeriod?.PeriodName} đã được cập nhật. Vui lòng kiểm tra chi tiết.",
-                        Type = NotificationType.System
-                    });
-
-                    // Email Notification
-                    if (!string.IsNullOrEmpty(record.Employee.Email))
-                    {
-                        string emailBody = $@"
-                        <h3>Chào {record.Employee.FullName},</h3>
-                        <p>Phiếu lương của bạn cho <strong>kỳ {period.SchedulePeriod?.PeriodName}</strong> đã được công bố.</p>
-                        <p>Tổng lương thực nhận (Net Salary): <strong>{record.NetSalary:N0} VNĐ</strong></p>
-                        <p>Vui lòng đăng nhập vào hệ thống HRMS để xem chi tiết phiếu lương của bạn.</p>
-                        <p>Trân trọng,<br>Phòng C&B</p>";
-
-                        try {
-                            await _emailService.SendEmailAsync(record.Employee.Email, $"[HRMS] Thông báo phiếu lương kỳ {period.SchedulePeriod?.PeriodName}", emailBody);
-                        } catch (Exception ex) {
-                            Console.WriteLine($"Could not send email to {record.Employee.Email}: {ex.Message}");
-                        }
-                    }
-                }
-            }
 
             await _context.SaveChangesAsync();
         }

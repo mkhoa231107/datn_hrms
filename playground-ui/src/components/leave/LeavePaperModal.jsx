@@ -3,10 +3,6 @@ import { createPortal } from 'react-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import { Umbrella, Clock, Paperclip, X, Save, Printer, Check, Trash2, Image as ImageIcon } from 'lucide-react';
 import { BASE_URL } from '../../api';
-import DatePicker from 'react-datepicker';
-import "react-datepicker/dist/react-datepicker.css";
-import vi from 'date-fns/locale/vi';
-import { isWeekend, format, parseISO } from 'date-fns';
 import './LeavePaper.css';
 
 // Custom helper as a robust workaround for react-signature-canvas bug
@@ -80,14 +76,6 @@ export default function LeavePaperModal({
 
     const [approverNote, setApproverNote] = useState('');
     const [approverSig, setApproverSig] = useState(null);
-
-    const handleDateChange = (field, date) => {
-        if (!date) {
-            setForm({...form, [field]: ''});
-            return;
-        }
-        setForm({...form, [field]: format(date, 'yyyy-MM-dd')});
-    };
 
     const activeBalance = balances.find(b => b.leaveTypeId === parseInt(form.leaveTypeId));
     
@@ -301,36 +289,16 @@ export default function LeavePaperModal({
                         )}
                     </div>
 
-                    <div className="leave-paper-row" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div className="leave-paper-row">
                         <span className="leave-paper-label">Thời gian từ ngày:</span>
                         {mode === 'create' ? (
-                            <DatePicker
-                                selected={form.fromDate ? parseISO(form.fromDate) : null}
-                                onChange={date => handleDateChange('fromDate', date)}
-                                locale={vi}
-                                dateFormat="dd/MM/yyyy"
-                                minDate={new Date()}
-                                placeholderText="Chọn ngày..."
-                                filterDate={date => !isWeekend(date)}
-                                className="leave-paper-input"
-                                required
-                            />
+                            <input type="date" className="leave-paper-input" value={form.fromDate} onChange={e => setForm({...form, fromDate: e.target.value})} required />
                         ) : (
                             <strong>{formatDate(form.fromDate)}</strong>
                         )}
                         <span style={{ margin: '0 10px' }}>đến ngày:</span>
                         {mode === 'create' ? (
-                            <DatePicker
-                                selected={form.toDate ? parseISO(form.toDate) : null}
-                                onChange={date => handleDateChange('toDate', date)}
-                                locale={vi}
-                                dateFormat="dd/MM/yyyy"
-                                minDate={new Date()}
-                                placeholderText="Chọn ngày..."
-                                filterDate={date => !isWeekend(date)}
-                                className="leave-paper-input"
-                                required
-                            />
+                            <input type="date" className="leave-paper-input" value={form.toDate} onChange={e => setForm({...form, toDate: e.target.value})} required />
                         ) : (
                             <strong>{formatDate(form.toDate)}</strong>
                         )}

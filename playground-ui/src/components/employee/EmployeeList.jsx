@@ -15,6 +15,7 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
     const PER_PAGE = 12;
 
     const isScopedManager = (user?.roles?.includes('TeamLeader') || user?.roles?.includes('DepartmentHead') || user?.roles?.includes('DepartmentManager')) && !user?.roles?.includes('Admin') && !user?.roles?.includes('CnbSpecialist');
+    const isReadOnlyViewer = user?.roles?.includes('CnbSpecialist') && !user?.roles?.includes('Admin') && !user?.roles?.includes('DepartmentHead') && !user?.roles?.includes('DepartmentManager');
 
     useEffect(() => {
         if (isScopedManager && user?.departmentId) {
@@ -156,10 +157,15 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
                     <button onClick={fetchData} className="btn btn-ghost border-slate-200 text-slate-600 hover:bg-white !p-2">
                         <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                     </button>
-                    {!user?.roles?.includes('CnbSpecialist') && (
+                    {!isReadOnlyViewer && (
                         <button className="btn btn-primary !py-2 !px-4 text-xs">
                             <UserPlus size={14} /> Thêm nhân sự
                         </button>
+                    )}
+                    {isReadOnlyViewer && (
+                        <span className="text-[10px] font-bold text-teal-600 bg-teal-50 border border-teal-200 px-3 py-1.5 rounded-lg flex items-center gap-1">
+                            👁 Chỉ xem
+                        </span>
                     )}
                 </div>
             </div>
@@ -244,11 +250,9 @@ export default function EmployeeList({ user, onViewProfile, onBack }) {
                                             >
                                                 <QrCode size={16} />
                                             </button>
-                                            {!user?.roles?.includes('CnbSpecialist') && (
-                                                <button className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
-                                                    <MoreHorizontal size={16} />
-                                                </button>
-                                            )}
+                                            <button className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
+                                                <MoreHorizontal size={16} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
