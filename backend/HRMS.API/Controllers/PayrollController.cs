@@ -140,6 +140,16 @@ namespace HRMS.API.Controllers
             return Ok(new { success = true, message = "Đã phê duyệt và chốt bảng lương!" });
         }
 
+        [HttpPost("periods/{periodId}/publish")]
+        [Authorize(Roles = "Admin,CnbSpecialist,Accountant")]
+        public async Task<IActionResult> PublishPayslips(int periodId)
+        {
+            if (!IsCbProcessor()) return Forbid();
+            // Call a new method on IPayrollService
+            await _payrollService.PublishPayslipsAsync(periodId, GetUserId());
+            return Ok(new { success = true, message = "Đã gửi phiếu lương thành công!" });
+        }
+
         // ==================== RECORDS ====================
 
         [HttpGet("periods/{periodId}/records")]

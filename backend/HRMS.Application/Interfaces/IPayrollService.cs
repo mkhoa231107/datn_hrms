@@ -23,6 +23,7 @@ namespace HRMS.Application.Interfaces
         Task AdjustPayrollRecordAsync(int recordId, AdjustPayrollRecordDto dto); // Step 3: Payroll Staff
         Task ReviewPayrollAsync(int periodId, int userId); // Step 4: HR-CB Manager
         Task ApprovePayrollAsync(int periodId, int userId); // Step 5: HR Director/Admin
+        Task PublishPayslipsAsync(int periodId, int userId); // Step 6: Publish
         
         // New Professional Payroll Methods
         Task BulkUpdateRecordsAsync(int periodId, BulkUpdatePayrollRequest request);

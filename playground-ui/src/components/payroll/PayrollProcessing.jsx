@@ -3,7 +3,7 @@ import { api } from '../../api';
 import { toast } from 'react-hot-toast';
 import {
     Calculator, Lock, ChevronRight, CheckCircle2,
-    Users, Play, Download, RefreshCw, AlertTriangle,
+    Users, Play, Download, RefreshCw, AlertTriangle, Send,
     ArrowLeft, Calendar, Building2, History, CreditCard,
     TrendingUp, ShieldCheck, FileText, ChevronDown, Filter, Search
 } from 'lucide-react';
@@ -133,6 +133,17 @@ export default function PayrollProcessing({ user }) {
         }
     };
 
+    const handlePublish = async () => {
+        if (!window.confirm('Xác nhận gửi phiếu lương cho tất cả nhân viên trong kỳ?')) return;
+        try {
+            await api.post(`/Payroll/periods/${payrollPeriod.id}/publish`);
+            toast.success('Đã gửi phiếu lương thành công');
+            setPayrollPeriod(prev => ({ ...prev, status: 'Published' }));
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Lỗi khi gửi phiếu lương');
+        }
+    };
+
     const totals = {
         ltg: records.reduce((s, r) => s + (r.actualWorkingSalary || 0), 0),
         ot: records.reduce((s, r) => s + (r.overtimePay || 0), 0),
@@ -193,10 +204,18 @@ export default function PayrollProcessing({ user }) {
                         <span className="text-sm font-black text-slate-700">{payrollPeriod?.name}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        {canManage && payrollPeriod?.status !== 'Locked' && (
+                        {canManage && (payrollPeriod?.status === 'Open' || payrollPeriod?.status === 'HR_Reviewing') && (
                             <button onClick={handleLock} className="btn btn-ghost border-rose-200 text-rose-600 hover:bg-rose-50 !py-2 text-xs">
                                 <Lock size={14} /> Khóa bảng lương
                             </button>
+                        )}
+                        {canManage && payrollPeriod?.status === 'Locked' && (
+                            <button onClick={handlePublish} className="btn btn-ghost border-emerald-200 text-emerald-600 hover:bg-emerald-50 !py-2 text-xs">
+                                <Send size={14} /> Gửi Phiếu Lương
+                            </button>
+                        )}
+                        {payrollPeriod?.status === 'Published' && (
+                            <span className="badge badge-success !py-1.5"><CheckCircle2 size={14} /> Đã gửi phiếu lương</span>
                         )}
                         <button className="btn btn-primary !py-2 !px-4 text-xs">
                             <Download size={14} /> Xuất Báo Cáo

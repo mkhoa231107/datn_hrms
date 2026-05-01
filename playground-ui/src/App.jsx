@@ -13,6 +13,7 @@ import MySchedule from './components/scheduling/MySchedule';
 import DeptActivities from './components/dashboard/DeptActivities';
 import AttendanceManagement from './components/attendance/AttendanceManagement';
 import AttendanceSummaryReport from './components/attendance/AttendanceSummaryReport';
+import PayrollReport from './components/payroll/PayrollReport';
 import Login from './components/auth/Login';
 import { RoleGuard } from './components/auth/RoleGuard';
 import ContractManagement from './components/contracts/ContractManagement';
@@ -435,10 +436,7 @@ export default function App() {
           )}
           {tab('payroll-report') && (
             <RoleGuard user={user} allowedRoles={['Accountant', 'CnbSpecialist', 'Admin']}>
-              <ComingSoon 
-                title="Báo cáo lương & Thuế" 
-                description="Hệ thống đang tổng hợp dữ liệu báo cáo chi tiết cho kỳ lương hiện tại."
-              />
+              <PayrollReport user={user} />
             </RoleGuard>
           )}
           {tab('attendance-management') && (
