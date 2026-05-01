@@ -28,6 +28,7 @@ import PayrollSettings from './components/payroll/PayrollSettings';
 import MyPayslip from './components/payroll/MyPayslip';
 import InsuranceManagement from './components/payroll/InsuranceManagement';
 import MyInsurance from './components/payroll/MyInsurance';
+import PayrollReport from './components/payroll/PayrollReport';
 
 // Inject global keyframes for page transitions
 const pageTransitionStyle = document.createElement('style');
@@ -435,10 +436,7 @@ export default function App() {
           )}
           {tab('payroll-report') && (
             <RoleGuard user={user} allowedRoles={['Accountant', 'CnbSpecialist', 'Admin']}>
-              <ComingSoon 
-                title="Báo cáo lương & Thuế" 
-                description="Hệ thống đang tổng hợp dữ liệu báo cáo chi tiết cho kỳ lương hiện tại."
-              />
+              <PayrollReport />
             </RoleGuard>
           )}
           {tab('attendance-management') && (
