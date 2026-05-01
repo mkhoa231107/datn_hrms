@@ -719,5 +719,10 @@ namespace HRMS.Infrastructure.Data
                 .HasForeignKey(ssr => ssr.HRId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
+        protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+        {
+            configurationBuilder.Properties<decimal>().HavePrecision(18, 2);
+            configurationBuilder.Properties<decimal?>().HavePrecision(18, 2);
+        }
     }
 }

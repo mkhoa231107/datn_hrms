@@ -25,3 +25,5 @@ namespace HRMS.Application.DTOs.Contract
         public int? PositionId { get; set; }
     }
 }
+
+

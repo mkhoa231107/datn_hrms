@@ -31,9 +31,9 @@ namespace HRMS.Application.Interfaces
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public int TargetShiftId { get; set; }
-        public string Reason { get; set; }
+        public string Reason { get; set; } = string.Empty;
         public string? PhoneNumber { get; set; }
         public string? Address { get; set; }
-        public string SignatureA { get; set; }
+        public string SignatureA { get; set; } = string.Empty;
     }
 }

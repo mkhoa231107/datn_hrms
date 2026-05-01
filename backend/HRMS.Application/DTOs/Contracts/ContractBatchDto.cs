@@ -42,3 +42,5 @@ namespace HRMS.Application.DTOs.Contracts
         public List<HRMS.Application.DTOs.Employees.EmployeeContractDto> Contracts { get; set; } = new();
     }
 }
+
+

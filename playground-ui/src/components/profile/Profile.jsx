@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { employeeService } from '../../api';
-import '../employee/EmployeeFlat.css';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
-import { Camera } from 'lucide-react';
+import { Camera, Mail, Phone, MapPin, User, Shield, Briefcase, Calendar, CreditCard, Save, ChevronLeft, Building2 } from 'lucide-react';
 
 const BACKEND_URL = 'http://localhost:5052';
 
@@ -12,6 +11,7 @@ export default function Profile({ mode = 'me', employeeId = null, onBack }) {
     const [formData, setFormData] = useState({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState('personal');
     const fileInputRef = React.useRef(null);
 
     useEffect(() => {
@@ -57,15 +57,24 @@ export default function Profile({ mode = 'me', employeeId = null, onBack }) {
     };
 
     if (loading) return (
-        <div style={{ backgroundColor: '#fff', padding: '50px', textAlign: 'center', color: '#888' }}>
-            <strong>Đang tải dữ liệu hồ sơ...</strong>
+        <div className="flex flex-col gap-6 animate-pulse">
+            <div className="h-48 skeleton w-full" />
+            <div className="h-96 skeleton w-full" />
         </div>
     );
 
     if (!profile) return (
-        <div style={{ backgroundColor: '#fff', padding: '50px', textAlign: 'center' }}>
-            <h3 style={{ marginBottom: '10px' }}>Hồ Sơ Không Tồn Tại</h3>
-            <p style={{ color: '#555' }}>Hồ sơ này không tồn tại hoặc bạn không có quyền truy cập.</p>
+        <div className="card flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                <User size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-700">Hồ Sơ Không Tồn Tại</h3>
+            <p className="text-slate-500 max-w-sm mt-2">Hồ sơ này không tồn tại hoặc bạn không có quyền truy cập.</p>
+            {onBack && (
+                <button onClick={onBack} className="btn btn-ghost mt-6">
+                    <ChevronLeft size={16} /> Quay lại
+                </button>
+            )}
         </div>
     );
 
@@ -73,167 +82,196 @@ export default function Profile({ mode = 'me', employeeId = null, onBack }) {
         ? (profile.avatar.startsWith('http') ? profile.avatar : `${BACKEND_URL}${profile.avatar}`)
         : null;
 
-    // A helper for rendering a form field in the grid
-    const renderField = (label, required, content) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', color: '#333' }}>
-                {label} {required && <span style={{ color: '#d32f2f' }}>*</span>}
+    const renderField = (label, icon, value, isEditable = false, field = null, type = "text") => (
+        <div className="flex flex-col gap-1.5">
+            <label className="text-[13px] font-medium text-slate-500 flex items-center gap-2">
+                {icon && React.createElement(icon, { size: 14 })}
+                {label}
             </label>
-            {content}
+            {isEditable ? (
+                <input 
+                    type={type}
+                    className="input"
+                    value={value || ''}
+                    onChange={e => handleInputChange(field, e.target.value)}
+                />
+            ) : (
+                <div className="px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-lg text-[14px] text-slate-700 font-medium">
+                    {value || '--'}
+                </div>
+            )}
         </div>
     );
 
-    const inputStyle = {
-        width: '100%',
-        height: '32px',
-        padding: '0 8px',
-        border: '1px solid #ccc',
-        backgroundColor: '#fff',
-        fontSize: '13px',
-        color: '#333',
-        outline: 'none',
-        boxSizing: 'border-box'
-    };
-
-    const readOnlyStyle = {
-        ...inputStyle,
-        backgroundColor: '#f9f9f9',
-        color: '#555'
-    };
-
     return (
-        <div style={{ backgroundColor: '#fff', border: '1px solid #ddd', padding: '0', minHeight: '600px', fontFamily: 'Arial, sans-serif' }}>
-            
-            <div style={{ display: 'flex', padding: '20px', gap: '30px' }}>
-                
-                {/* Left Column: Avatar */}
-                <div style={{ width: '180px', flexShrink: 0, position: 'relative' }}>
-                    <div style={{ 
-                        width: '180px', 
-                        height: '240px', 
-                        border: '1px solid #ddd', 
-                        backgroundColor: '#f8f8f8', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        overflow: 'hidden'
-                    }}>
-                        {avatarUrl ? (
-                            <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                            <span style={{ color: '#aaa', fontSize: '13px' }}>Không có ảnh</span>
-                        )}
-                    </div>
-                    {mode === 'me' && (
-                        <>
-                            <button 
-                                onClick={() => fileInputRef.current?.click()} 
-                                style={{
-                                    position: 'absolute', bottom: '0', right: '0',
-                                    border: 'none', backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff',
-                                    padding: '6px', cursor: 'pointer', display: 'flex'
-                                }}
-                            >
-                                <Camera size={14} />
-                            </button>
-                            <input type="file" ref={fileInputRef} style={{ display: 'none' }} />
-                        </>
+        <div className="flex flex-col gap-6 animate-fade-up">
+            {/* Header / Summary Card */}
+            <div className="card overflow-hidden !p-0">
+                <div className="h-32 bg-violet-600 relative">
+                    {onBack && (
+                        <button 
+                            onClick={onBack}
+                            className="absolute top-4 left-4 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md text-white flex items-center justify-center hover:bg-white/30 transition-colors"
+                        >
+                            <ChevronLeft size={20} />
+                        </button>
                     )}
                 </div>
-
-                {/* Right Column: Grid Fields */}
-                <div style={{ flex: '1', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px 20px', alignContent: 'start' }}>
-                    
-                    {/* ROW 1 */}
-                    {renderField("Họ và tên", true, 
-                        <input style={mode === 'me' ? readOnlyStyle : inputStyle} value={formData.fullName || ''} onChange={e => handleInputChange('fullName', e.target.value)} readOnly={mode === 'me'} />
-                    )}
-                    {renderField("Mã nhân viên", true, 
-                        <input style={readOnlyStyle} value={profile.employeeCode || ''} readOnly />
-                    )}
-                    {renderField("Ngày sinh", true, 
-                        <input type="date" style={mode === 'me' ? readOnlyStyle : inputStyle} value={formData.dateOfBirth?.split('T')[0] || ''} onChange={e => handleInputChange('dateOfBirth', e.target.value)} readOnly={mode === 'me'} />
-                    )}
-
-                    {/* ROW 2 */}
-                    {renderField("", false, 
-                        <div style={{ 
-                            backgroundColor: '#0056b3', color: '#fff', fontWeight: 'bold', 
-                            height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '13px', marginTop: '18px'
-                        }}>
-                            {profile.departmentName || 'Chưa Xếp Phòng Ban'}
+                <div className="px-8 pb-8 flex flex-col md:flex-row items-end gap-6 -mt-12 relative z-10">
+                    <div className="relative group">
+                        <div className="w-32 h-32 rounded-2xl border-4 border-white shadow-xl overflow-hidden bg-slate-100">
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-slate-300">
+                                    <User size={48} />
+                                </div>
+                            )}
                         </div>
-                    )}
-                    {renderField("Chức danh", true, 
-                        <div style={{ display: 'flex', height: '32px' }}>
-                            <input style={{ ...readOnlyStyle, width: 'calc(100% - 32px)', borderRight: 'none' }} value={profile.positionName || 'Chưa Xếp Vị Trí'} readOnly />
-                            <button style={{ width: '32px', backgroundColor: '#0056b3', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <span style={{ fontSize: '16px', fontWeight: 'bold', lineHeight: '1' }}>+</span>
+                        {mode === 'me' && (
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="absolute bottom-2 right-2 w-8 h-8 rounded-lg bg-violet-600 text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Camera size={16} />
                             </button>
+                        )}
+                        <input type="file" ref={fileInputRef} className="hidden" />
+                    </div>
+
+                    <div className="flex-1 pb-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-slate-800">{profile.fullName}</h1>
+                                <div className="flex items-center gap-3 mt-1">
+                                    <span className="badge badge-accent uppercase tracking-wider">{profile.employeeCode}</span>
+                                    <span className="text-slate-400">•</span>
+                                    <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                                        <Briefcase size={14} className="text-violet-500" />
+                                        {profile.positionName || 'Chưa Xếp Vị Trí'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={handleSave}
+                                    disabled={saving}
+                                    className="btn btn-primary"
+                                >
+                                    <Save size={16} />
+                                    {saving ? 'Đang lưu...' : 'Lưu hồ sơ'}
+                                </button>
+                            </div>
                         </div>
-                    )}
-                    {renderField("Trạng thái", true, 
-                        <input style={{...readOnlyStyle, color: profile.isActive ? '#28a745' : '#dc3545', fontWeight: 'bold'}} value={profile.isActive ? 'Đang làm việc' : 'Đã nghỉ việc'} readOnly />
-                    )}
-
-                    {/* ROW 3 */}
-                    {renderField("SĐT di động", true, 
-                        <input type="tel" style={inputStyle} value={formData.phone || ''} onChange={e => handleInputChange('phone', e.target.value)} />
-                    )}
-                    {renderField("Email", false, 
-                        <input type="email" style={readOnlyStyle} value={formData.email || ''} readOnly />
-                    )}
-                    {renderField("Giới tính", false, 
-                        mode === 'me' ? (
-                            <input style={readOnlyStyle} value={formData.gender || ''} readOnly />
-                        ) : (
-                            <select style={inputStyle} value={formData.gender || 'Nam'} onChange={e => handleInputChange('gender', e.target.value)}>
-                                <option value="Nam">Nam</option>
-                                <option value="Nữ">Nữ</option>
-                                <option value="Khác">Khác</option>
-                            </select>
-                        )
-                    )}
-
-                    {/* ROW 4 */}
-                    {renderField("Số CCCD", true, 
-                        <input style={mode === 'me' ? readOnlyStyle : inputStyle} value={formData.identityNumber || ''} onChange={e => handleInputChange('identityNumber', e.target.value)} readOnly={mode === 'me'} />
-                    )}
-                    {renderField("Ngày cấp", false, 
-                        <input type="date" style={mode === 'me' ? readOnlyStyle : inputStyle} value={formData.identityDate?.split('T')[0] || ''} onChange={e => handleInputChange('identityDate', e.target.value)} readOnly={mode === 'me'} />
-                    )}
-                    {renderField("Ngày hết hạn", false, 
-                        <input type="date" style={mode === 'me' ? readOnlyStyle : inputStyle} value={formData.identityExpirationDate?.split('T')[0] || ''} onChange={e => handleInputChange('identityExpirationDate', e.target.value)} readOnly={mode === 'me'} />
-                    )}
-
-                    {/* ROW 5 */}
-                    {renderField("Nơi sinh (Quốc tịch)", false, 
-                        <input style={inputStyle} value={formData.placeOfOrigin || ''} onChange={e => handleInputChange('placeOfOrigin', e.target.value)} />
-                    )}
-                    {renderField("Nơi cấp CCCD", false, 
-                        <input style={mode === 'me' ? readOnlyStyle : inputStyle} value={formData.identityPlace || ''} onChange={e => handleInputChange('identityPlace', e.target.value)} readOnly={mode === 'me'} />
-                    )}
-                    {renderField("Email cá nhân", false, 
-                        <input type="email" style={inputStyle} value={formData.personalEmail || ''} onChange={e => handleInputChange('personalEmail', e.target.value)} />
-                    )}
-
-                    {/* ROW 6 */}
-                    {renderField("Dân tộc", false, 
-                        <input style={inputStyle} value={formData.ethnicity || ''} onChange={e => handleInputChange('ethnicity', e.target.value)} />
-                    )}
-                    {renderField("Ghi chú", false, 
-                        <input style={inputStyle} placeholder="Không có ghi chú..." />
-                    )}
-                    {renderField("Nơi làm việc", false, 
-                        <select style={inputStyle} disabled>
-                            <option>Trụ sở chính</option>
-                        </select>
-                    )}
-
+                    </div>
+                </div>
+                
+                {/* Quick Stats Overlay */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 border-t border-slate-100 divide-x divide-slate-100">
+                    <div className="p-4 flex items-center justify-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <Building2 size={20} />
+                        </div>
+                        <div className="text-center sm:text-left">
+                            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Phòng ban</p>
+                            <p className="text-sm font-bold text-slate-700">{profile.departmentName || '---'}</p>
+                        </div>
+                    </div>
+                    <div className="p-4 flex items-center justify-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <Shield size={20} />
+                        </div>
+                        <div className="text-center sm:text-left">
+                            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Trạng thái</p>
+                            <p className="text-sm font-bold text-emerald-600">{profile.isActive ? 'Đang làm việc' : 'Đã nghỉ việc'}</p>
+                        </div>
+                    </div>
+                    <div className="p-4 flex items-center justify-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <Calendar size={20} />
+                        </div>
+                        <div className="text-center sm:text-left">
+                            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Ngày gia nhập</p>
+                            <p className="text-sm font-bold text-slate-700">12/05/2022</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            {/* Detail Tabs */}
+            <div className="flex flex-col gap-6">
+                <div className="flex items-center gap-2 border-b border-slate-200">
+                    <button 
+                        onClick={() => setActiveTab('personal')}
+                        className={`px-6 py-3 text-sm font-bold transition-all relative ${activeTab === 'personal' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Thông tin cá nhân
+                        {activeTab === 'personal' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('work')}
+                        className={`px-6 py-3 text-sm font-bold transition-all relative ${activeTab === 'work' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Quá trình làm việc
+                        {activeTab === 'work' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
+                    </button>
+                </div>
+
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    {activeTab === 'personal' ? (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Personal Info Group */}
+                            <div className="card h-fit">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <div className="w-1.5 h-6 bg-violet-500 rounded-full" />
+                                    <h3 className="text-lg font-bold text-slate-800">Thông tin cơ bản</h3>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                                    {renderField("Họ và tên", User, profile.fullName, mode !== 'me', 'fullName')}
+                                    {renderField("Ngày sinh", Calendar, profile.dateOfBirth?.split('T')[0], mode !== 'me', 'dateOfBirth', 'date')}
+                                    {renderField("Giới tính", User, profile.gender, mode !== 'me', 'gender')}
+                                    {renderField("Số điện thoại", Phone, formData.phone, true, 'phone', 'tel')}
+                                    {renderField("Email cá nhân", Mail, formData.personalEmail, true, 'personalEmail', 'email')}
+                                    {renderField("Email công việc", Mail, profile.email)}
+                                    <div className="sm:col-span-2">
+                                        {renderField("Địa chỉ liên lạc", MapPin, formData.address || '---', true, 'address')}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Identity Group */}
+                            <div className="card h-fit">
+                                <div className="flex items-center gap-2 mb-6">
+                                    <div className="w-1.5 h-6 bg-amber-500 rounded-full" />
+                                    <h3 className="text-lg font-bold text-slate-800">Giấy tờ tùy thân</h3>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                                    <div className="sm:col-span-2">
+                                        {renderField("Số CCCD", CreditCard, formData.identityNumber, mode !== 'me', 'identityNumber')}
+                                    </div>
+                                    {renderField("Ngày cấp", Calendar, formData.identityDate?.split('T')[0], mode !== 'me', 'identityDate', 'date')}
+                                    {renderField("Ngày hết hạn", Calendar, formData.identityExpirationDate?.split('T')[0], mode !== 'me', 'identityExpirationDate', 'date')}
+                                    <div className="sm:col-span-2">
+                                        {renderField("Nơi cấp", MapPin, formData.identityPlace, mode !== 'me', 'identityPlace')}
+                                    </div>
+                                    {renderField("Dân tộc", User, formData.ethnicity, true, 'ethnicity')}
+                                    {renderField("Quốc tịch", MapPin, formData.placeOfOrigin || 'Việt Nam', true, 'placeOfOrigin')}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="card">
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                                    <Briefcase size={32} />
+                                </div>
+                                <p className="text-slate-500 font-medium">Chưa có dữ liệu quá trình làm việc để hiển thị.</p>
+                                <p className="text-xs text-slate-400 mt-1">Dữ liệu sẽ được tự động cập nhật khi có biến động nhân sự.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

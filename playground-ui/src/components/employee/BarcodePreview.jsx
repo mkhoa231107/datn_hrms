@@ -101,7 +101,7 @@ export default function BarcodePreview({ value, name, department, onClose }) {
         <div style={{ marginBottom: '20px' }}>
           <div style={{
             width: '52px', height: '52px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, #1e40af, #0284c7)',
+            background: '#1e40af',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 12px', fontSize: '22px', fontWeight: '700', color: '#fff',
           }}>
@@ -126,7 +126,7 @@ export default function BarcodePreview({ value, name, department, onClose }) {
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
             width: '100%', padding: '12px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, #1e40af, #0284c7)',
+            background: '#1e40af',
             color: '#fff', border: 'none', cursor: 'pointer',
             fontSize: '14px', fontWeight: '600',
           }}

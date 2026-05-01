@@ -8,3 +8,5 @@ namespace HRMS.Application.DTOs.Scheduling
         public string Message { get; set; } = string.Empty;
     }
 }
+
+

@@ -254,6 +254,10 @@ export const attendanceService = {
   scanBarcode: async (employeeCode) => {
     const res = await api.post('/attendance/scan-barcode', { employeeCode });
     return res.data;
+  },
+  getMyOvertime: async () => {
+    const res = await api.get('/attendance/my-overtime');
+    return res.data;
   }
 };
 

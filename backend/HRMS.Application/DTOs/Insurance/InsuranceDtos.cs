@@ -6,8 +6,8 @@ namespace HRMS.Application.DTOs.Insurance
     {
         public int Id { get; set; }
         public int EmployeeId { get; set; }
-        public string EmployeeName { get; set; }
-        public string EmployeeCode { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string EmployeeCode { get; set; } = string.Empty;
         public string? DepartmentName { get; set; }
         public EmployeeStatus Status { get; set; }
         
@@ -38,3 +38,4 @@ namespace HRMS.Application.DTOs.Insurance
         public string? Note { get; set; }
     }
 }
+

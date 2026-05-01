@@ -48,7 +48,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpGet("pending")]
-        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin")]
+        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin,CnbSpecialist,Accountant")]
         public async Task<IActionResult> GetPendingRequests()
         {
             try
@@ -65,7 +65,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpGet("all")]
-        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin")]
+        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin,CnbSpecialist,Accountant")]
         public async Task<IActionResult> GetAllRequestsForDept()
         {
             try
@@ -80,7 +80,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("{id}/approve")]
-        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin")]
+        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin,CnbSpecialist,Accountant")]
         public async Task<IActionResult> ApproveRequest(int id)
         {
             try
@@ -95,7 +95,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("{id}/reject")]
-        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin")]
+        [Authorize(Roles = "DepartmentHead,DepartmentManager,Admin,HrAdmin,CnbSpecialist,Accountant")]
         public async Task<IActionResult> RejectRequest(int id, [FromBody] RejectShiftChangeDto dto)
         {
             try

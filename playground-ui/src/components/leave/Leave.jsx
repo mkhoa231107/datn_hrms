@@ -1,118 +1,72 @@
 import React, { useState, useEffect } from 'react';
-import '../employee/EmployeeFlat.css';
-import { leaveService, attendanceService } from '../../api';
-import shiftSwapService from '../../services/shiftSwapService';
-import { Umbrella, Clock, RefreshCw } from 'lucide-react';
+import { leaveService } from '../../api';
+import { Umbrella, Plus, Info, Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import LeavePaperModal from './LeavePaperModal';
-import ShiftSwapRequestDetail from '../request/ShiftSwapRequestDetail';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import EmptyState from '../ui/EmptyState';
 
 export default function Leave({ user, approvalOnly = false, onBack }) {
     const roles = user?.roles || [];
     const isApprover = roles.some(r => ['Admin', 'DepartmentHead', 'TeamLeader'].includes(r));
-    const isManager = roles.some(r => ['Admin', 'DepartmentHead'].includes(r));
 
     const [tab, setTab] = useState(approvalOnly ? 'pending' : 'overview');
-    const [subTab, setSubTab] = useState('leave'); // 'leave' or 'overtime'
-    const [statusFilter, setStatusFilter] = useState('all');
     const [page, setPage] = useState(1);
     const PER_PAGE = 10;
 
     const [balances, setBalances] = useState([]);
     const [myRequests, setMyRequests] = useState([]);
-    const [myOtRequests, setMyOtRequests] = useState([]);
     const [deptRequests, setDeptRequests] = useState([]);
-    const [deptOtRequests, setDeptOtRequests] = useState([]);
-    const [deptSwapRequests, setDeptSwapRequests] = useState([]);
     const [approvalHistory, setApprovalHistory] = useState([]);
     const [leaveTypes, setLeaveTypes] = useState([]);
     
     const [loading, setLoading] = useState(false);
     const [flash, setFlash] = useState(null);
+    const [cancelConfirmId, setCancelConfirmId] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
 
     // Modals
     const [createModal, setCreateModal] = useState(false);
-    const [createOtModal, setCreateOtModal] = useState(false);
-    const [viewingSwapId, setViewingSwapId] = useState(null);
-    
-    const [form, setForm] = useState({ leaveTypeId: '', fromDate: '', toDate: '', reason: '' });
-    const [otForm, setOtForm] = useState({ date: '', startTime: '17:00', endTime: '19:00', reason: '' });
-
     const [approvalModal, setApprovalModal] = useState(null);
-    const [approvalNote, setApprovalNote] = useState('');
     const [activeDeptTab, setActiveDeptTab] = useState('all');
     const [allSubDepts, setAllSubDepts] = useState([]);
-    const [deptSwapTab, setDeptSwapTab] = useState('all');
-    const [allSwapDepts, setAllSwapDepts] = useState([]);
 
-    useEffect(() => { init(); }, [approvalOnly, tab, subTab]);
+    useEffect(() => { init(); }, [approvalOnly, tab]);
 
     const init = async () => {
+        setLoading(true);
         try {
             if (!approvalOnly) {
-                if (subTab === 'leave') {
-                    const [types, balance, requests] = await Promise.all([
-                        leaveService.getTypes(),
-                        leaveService.getMyBalance(),
-                        leaveService.getMyRequests(),
-                    ]);
-                    const typeData = types.data || (types.success ? types.data : types);
-                    setLeaveTypes(Array.isArray(typeData) ? typeData : []);
-                    setBalances(balance.data || balance);
-                    setMyRequests(requests.data || requests);
-                } else {
-                    const otRes = await attendanceService.getMyOvertime();
-                    setMyOtRequests(otRes.data || otRes);
-                }
+                const [types, balance, requests] = await Promise.all([
+                    leaveService.getTypes(),
+                    leaveService.getMyBalance(),
+                    leaveService.getMyRequests(),
+                ]);
+                const typeData = types.data || (types.success ? types.data : types);
+                setLeaveTypes(Array.isArray(typeData) ? typeData : []);
+                setBalances(balance.data || balance);
+                setMyRequests(requests.data || requests);
             }
-            if (isApprover && (approvalOnly || tab === 'pending')) {
-                if (subTab === 'leave') {
-                    const [appRes, histRes] = await Promise.all([
-                        leaveService.getToApprove(),
-                        leaveService.getApprovalHistory(),
-                    ]);
-                    const data = appRes.data || appRes;
-                    setDeptRequests(data);
-                    setApprovalHistory(histRes.data || histRes);
-                    const foundDepts = [...new Set(data.map(r => r.employeeDepartmentName))].filter(Boolean);
-                    setAllSubDepts(foundDepts);
-                } else if (subTab === 'overtime') {
-                    const deptId = user?.departmentId || 1;
-                    // Fallback since getPendingOvertime is not implemented yet
-                    const appRes = { data: [] }; 
-                    const histRes = { data: [] };
-                    try {
-                        if (typeof attendanceService.getDepartmentOvertime === 'function') {
-                            const res = await attendanceService.getDepartmentOvertime(deptId);
-                            if (res) histRes.data = res.data || res;
-                        }
-                    } catch (err) {
-                        console.warn("Could not fetch overtime data", err);
-                    }
-                    setDeptOtRequests(appRes.data);
-                    setApprovalHistory(histRes.data);
-                } else if (subTab === 'swap') {
-                    const [appRes, histRes] = await Promise.all([
-                        shiftSwapService.getPendingApprovals(),
-                        shiftSwapService.getApprovalHistory()
-                    ]);
-                    const swapArr = Array.isArray(appRes) ? appRes : [];
-                    setDeptSwapRequests(swapArr);
-                    
-                    const histArr = Array.isArray(histRes) ? histRes : [];
-                    setApprovalHistory(histArr);
-                    
-                    // Extract unique departments from swap requests
-                    const swapDepts = [...new Set(swapArr.map(r => r.employeeA?.department?.departmentName).filter(Boolean))];
-                    setAllSwapDepts(swapDepts);
-                }
+            if (isApprover && (approvalOnly || tab === 'pending' || tab === 'history')) {
+                const [appRes, histRes] = await Promise.all([
+                    leaveService.getToApprove(),
+                    leaveService.getApprovalHistory(),
+                ]);
+                const data = appRes.data || appRes;
+                setDeptRequests(data);
+                setApprovalHistory(histRes.data || histRes);
+                const foundDepts = [...new Set(data.map(r => r.employeeDepartmentName))].filter(Boolean);
+                setAllSubDepts(foundDepts);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error(e); 
+        } finally {
+            setLoading(false);
+        }
     };
 
     const showMsg = (ok, text) => { setFlash({ ok, text }); setTimeout(() => setFlash(null), 4500); };
 
     const handleCreate = async (formData) => {
-        setLoading(true);
         try {
             const res = await leaveService.createRequest(formData);
             if (res.success) {
@@ -126,48 +80,18 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
         } catch (err) {
             const msg = err.response?.data?.message || err.message || 'Lỗi hệ thống khi tạo đơn.';
             showMsg(false, msg);
-        } finally { setLoading(false); }
-    };
-
-    const handleCreateOt = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const res = await attendanceService.submitOvertimeRequest(otForm);
-            if (res.success) {
-                showMsg(true, 'Gửi đơn tăng ca thành công!');
-                setOtForm({ date: '', startTime: '17:00', endTime: '19:00', reason: '' });
-                setCreateOtModal(false);
-                await init();
-                setTab('history');
-            } else {
-                showMsg(false, res.message || 'Gửi đơn thất bại.');
-            }
-        } catch (err) {
-            const msg = err.response?.data?.message || err.message || 'Lỗi hệ thống khi tạo đơn.';
-            showMsg(false, msg);
-        } finally { setLoading(false); }
+        }
     };
 
     const handleApproval = async (approvalData) => {
         if (!approvalModal) return;
         try {
-            const isOt = subTab === 'overtime';
-            if (isOt) {
-                const res = await attendanceService.reviewOvertimeRequest({
-                    requestId: approvalModal.requestId,
-                    status: approvalData.action === 'approve' ? 'Approved' : 'Rejected',
-                    note: approvalData.note
-                });
-                if (res.success) showMsg(true, 'Đã cập nhật trạng thái đơn tăng ca.');
+            if (approvalData.action === 'approve') {
+                await leaveService.approveRequest(approvalModal.id, approvalData.note, approvalData.approverSignature);
+                showMsg(true, 'Đã duyệt đơn nghỉ phép.');
             } else {
-                if (approvalData.action === 'approve') {
-                    await leaveService.approveRequest(approvalModal.id, approvalData.note, approvalData.approverSignature);
-                    showMsg(true, 'Đã duyệt đơn nghỉ phép.');
-                } else {
-                    await leaveService.rejectRequest(approvalModal.id, approvalData.note);
-                    showMsg(true, 'Đã từ chối đơn nghỉ phép.');
-                }
+                await leaveService.rejectRequest(approvalModal.id, approvalData.note);
+                showMsg(true, 'Đã từ chối đơn nghỉ phép.');
             }
             setApprovalModal(null);
             await init();
@@ -175,16 +99,16 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
     };
 
     const handleCancel = async (id) => {
-        if (!window.confirm('Bạn có chắc muốn hủy đơn này?')) return;
+        setCancelling(true);
         try {
-            if (subTab === 'overtime') {
-                showMsg(false, 'Tính năng hủy tăng ca đang được cập nhật.');
-            } else {
-                await leaveService.cancelRequest(id);
-                showMsg(true, 'Đã hủy đơn nghỉ phép.');
-            }
+            await leaveService.cancelRequest(id);
+            showMsg(true, 'Đã hủy đơn nghỉ phép.');
             await init();
         } catch (err) { showMsg(false, 'Không thể hủy đơn.'); }
+        finally {
+            setCancelling(false);
+            setCancelConfirmId(null);
+        }
     };
 
     const formatDate = d => {
@@ -193,303 +117,222 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
     };
 
     let rawData = [];
-    if (!approvalOnly && tab === 'history') {
-        rawData = subTab === 'leave' ? myRequests : myOtRequests;
-    }
-    if (approvalOnly) {
+    if (!approvalOnly) {
+        if (tab === 'history') rawData = myRequests;
+    } else {
         if (tab === 'pending') {
-            if (subTab === 'leave') {
-                rawData = deptRequests.filter(r => r.statusName === 'Pending');
-                if (activeDeptTab !== 'all') {
-                    rawData = rawData.filter(r => r.employeeDepartmentName?.trim().toLowerCase() === activeDeptTab.trim().toLowerCase());
-                }
-            } else if (subTab === 'overtime') {
-                rawData = deptOtRequests;
-            } else if (subTab === 'swap') {
-                rawData = deptSwapRequests;
-                if (deptSwapTab !== 'all') {
-                    rawData = rawData.filter(r => r.employeeA?.department?.departmentName?.trim().toLowerCase() === deptSwapTab.trim().toLowerCase());
-                }
+            rawData = deptRequests.filter(r => r.statusName === 'Pending');
+            if (activeDeptTab !== 'all') {
+                rawData = rawData.filter(r => r.employeeDepartmentName?.trim().toLowerCase() === activeDeptTab.trim().toLowerCase());
             }
+        } else {
+            rawData = approvalHistory;
         }
-        else rawData = approvalHistory;
     }
 
-    if (statusFilter !== 'all' && !approvalOnly && tab === 'history') {
-        rawData = rawData.filter(r => (r.statusName || r.status) === statusFilter);
-    }
-
-    rawData.sort((a, b) => new Date(b.createdAt || b.date || b.fromDate) - new Date(a.createdAt || a.date || a.fromDate));
+    rawData.sort((a, b) => new Date(b.createdAt || b.fromDate) - new Date(a.createdAt || a.fromDate));
     
     const totalPages = Math.max(1, Math.ceil(rawData.length / PER_PAGE));
     const safePage = Math.min(page, totalPages);
     const visibleRows = rawData.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
-    const isManagerRole = roles.includes('DepartmentManager') || roles.includes('DepartmentHead') || roles.includes('Admin');
-
-    const getStatusClass = (status) => {
-        switch(status) {
-            case 'Approved': case 'Đã Duyệt': return 'ef-text-ok';
-            case 'Rejected': case 'Từ Chối': return 'ef-text-late';
-            case 'Pending':  case 'Chờ Duyệt': return 'ef-text-warn';
-            default: return 'ef-text-na';
-        }
-    };
-
-    const getStatusText = (r) => {
+    const getStatusBadge = (r) => {
         const status = r.statusName || r.status;
-        if (status === 'Pending' || status === 0) {
-            if (subTab === 'leave') {
-                return r.totalDays <= 3 ? 'Chờ TBP Duyệt' : 'Chờ Trưởng Phòng Duyệt';
-            }
-            return 'Chờ Duyệt';
-        }
-        switch(status) {
-            case 'Approved': case 1: return 'Đã Duyệt';
-            case 'Rejected': case 2: return 'Từ Chối';
-            case 'Cancelled': case 3: return 'Đã Hủy';
-            default: return status;
-        }
+        if (status === 'Pending' || status === 0) return <span className="badge badge-warning">Chờ duyệt</span>;
+        if (status === 'Approved' || status === 1) return <span className="badge badge-success">Đã duyệt</span>;
+        if (status === 'Rejected' || status === 2) return <span className="badge badge-danger">Từ chối</span>;
+        if (status === 'Cancelled' || status === 3) return <span className="badge badge-accent">Đã hủy</span>;
+        return <span className="badge badge-accent">{status}</span>;
     };
 
     return (
-        <div className="ef-wrap">
-            {flash && <div className={`ef-flash ${flash.ok ? 'ok' : 'err'}`}>{flash.text}</div>}
+        <div className="flex flex-col gap-6 animate-fade-up">
+            {flash && (
+                <div className={`fixed top-6 right-6 z-[9999] px-6 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in slide-in-from-right-4 duration-300 ${flash.ok ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                    {flash.ok ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
+                    <span className="font-bold text-sm">{flash.text}</span>
+                </div>
+            )}
 
-            <div className="ef-tab-bar">
+            <div className="flex items-center gap-2 border-b border-slate-200">
                 {!approvalOnly ? (
                     <>
-                        <div className={`ef-tab ${tab === 'overview' ? 'ef-tab-on' : ''}`} onClick={() => { setTab('overview'); setPage(1); }}>Tổng Quan</div>
-                        <div className={`ef-tab ${tab === 'history' ? 'ef-tab-on' : ''}`} onClick={() => { setTab('history'); setPage(1); }}>Đơn Của Tôi</div>
+                        <button onClick={() => setTab('overview')} className={`px-6 py-3 text-sm font-bold transition-all relative ${tab === 'overview' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                            Tổng quan
+                            {tab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
+                        </button>
+                        <button onClick={() => setTab('history')} className={`px-6 py-3 text-sm font-bold transition-all relative ${tab === 'history' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                            Lịch sử đơn
+                            {tab === 'history' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
+                        </button>
                     </>
                 ) : (
                     <>
-                        <div className={`ef-tab ${tab === 'pending' ? 'ef-tab-on' : ''}`} onClick={() => { setTab('pending'); setPage(1); }}>Chờ Xét Duyệt</div>
-                        <div className={`ef-tab ${tab === 'history' ? 'ef-tab-on' : ''}`} onClick={() => { setTab('history'); setPage(1); }}>Lịch Sử Duyệt</div>
+                        <button onClick={() => setTab('pending')} className={`px-6 py-3 text-sm font-bold transition-all relative ${tab === 'pending' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                            Chờ xét duyệt
+                            {tab === 'pending' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
+                        </button>
+                        <button onClick={() => setTab('history')} className={`px-6 py-3 text-sm font-bold transition-all relative ${tab === 'history' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                            Lịch sử duyệt
+                            {tab === 'history' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-600 rounded-full" />}
+                        </button>
                     </>
                 )}
             </div>
 
-            <div style={{ display: 'flex', borderBottom: '1px solid #eee', marginBottom: '20px', background: '#f9fafb', padding: '0 15px' }}>
-                <div 
-                    onClick={() => { setSubTab('leave'); setPage(1); }}
-                    style={{ padding: '12px 20px', cursor: 'pointer', borderBottom: subTab === 'leave' ? '2px solid #1a56db' : 'none', color: subTab === 'leave' ? '#1a56db' : '#666', fontWeight: 'bold' }}
-                > Nghỉ Phép </div>
-                <div 
-                    onClick={() => { setSubTab('overtime'); setPage(1); }}
-                    style={{ padding: '12px 20px', cursor: 'pointer', borderBottom: subTab === 'overtime' ? '2px solid #1a56db' : 'none', color: subTab === 'overtime' ? '#1a56db' : '#666', fontWeight: 'bold' }}
-                > Tăng Ca </div>
-                <div 
-                    onClick={() => { setSubTab('swap'); setPage(1); }}
-                    style={{ padding: '12px 20px', cursor: 'pointer', borderBottom: subTab === 'swap' ? '2px solid #1a56db' : 'none', color: subTab === 'swap' ? '#1a56db' : '#666', fontWeight: 'bold' }}
-                > Đổi Ca </div>
-            </div>
-
-            {!approvalOnly && tab === 'overview' && subTab === 'leave' && (
-                <>
-                    <div className="ef-section-title">Số dư phép hiện tại</div>
-                    <div className="ef-table-wrap" style={{ marginBottom: '20px' }}>
-                        <table className="ef-table no-top-border">
-                            <thead>
-                                <tr>
-                                    <th>Loại Nghỉ Phép</th>
-                                    <th className="c">Tổng Số Ngày</th>
-                                    <th className="c">Đã Dùng</th>
-                                    <th className="c">Còn Lại</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {balances.map(b => (
-                                    <tr key={b.leaveTypeId}>
-                                        <td style={{ fontWeight: 'bold' }}>{b.leaveTypeName}</td>
-                                        <td className="c">{b.totalDays}</td>
-                                        <td className="c">{b.usedDays}</td>
-                                        <td className="c" style={{ fontWeight: 'bold', color: '#1a56db' }}>{b.remainingDays}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+            {tab === 'overview' && !approvalOnly && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {balances.map(b => (
+                        <div key={b.leaveTypeId} className="card flex flex-col gap-4 group">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center">
+                                        <Umbrella size={20} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-700">{b.leaveTypeName}</h4>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Hạn mức năm 2026</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-2xl font-black text-violet-600">{b.remainingDays}</span>
+                                    <span className="text-xs text-slate-400 font-bold ml-1">/{b.totalDays}</span>
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between text-[11px] font-bold">
+                                    <span className="text-slate-400">Đã sử dụng: {b.usedDays} ngày</span>
+                                    <span className="text-violet-600">{Math.round((b.usedDays / b.totalDays) * 100)}%</span>
+                                </div>
+                                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-violet-500 rounded-full transition-all duration-1000"
+                                        style={{ width: `${(b.usedDays / b.totalDays) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="card border-dashed border-2 border-slate-200 bg-slate-50/50 flex flex-col items-center justify-center gap-3 py-8 hover:border-violet-300 hover:bg-violet-50/30 transition-all cursor-pointer" onClick={() => setCreateModal(true)}>
+                        <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-violet-600">
+                            <Plus size={24} />
+                        </div>
+                        <p className="font-bold text-slate-600">Đăng ký nghỉ phép</p>
                     </div>
-                </>
+                </div>
             )}
 
-            {/* Content: History / Pending List */}
-            {(tab === 'history' || tab === 'pending' || (tab === 'overview' && subTab === 'overtime')) && (
-                <>
-                    {/* Department Filter Tabs for Leave */}
-                    {approvalOnly && tab === 'pending' && subTab === 'leave' && allSubDepts.length > 0 && (
-                        <div className="ef-toolbar print:hidden" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', minHeight: '44px', marginBottom: '15px' }}>
-                            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
-                                <button
-                                    onClick={() => { setActiveDeptTab('all'); setPage(1); }}
-                                    style={{
-                                        padding: '10px 20px', fontSize: '12px', fontWeight: 'bold',
-                                        border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                                        background: activeDeptTab === 'all' ? '#fff' : 'transparent',
-                                        color: activeDeptTab === 'all' ? '#1a56db' : '#64748b',
-                                        borderBottom: activeDeptTab === 'all' ? '3px solid #1a56db' : '3px solid transparent',
-                                    }}
+            {(tab === 'history' || tab === 'pending') && (
+                <div className="card !p-0 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
+                        <div className="flex items-center gap-3">
+                            <Clock size={18} className="text-slate-400" />
+                            <h3 className="text-lg font-bold text-slate-800">
+                                {approvalOnly && tab === 'pending' ? 'Danh sách chờ duyệt' : 'Lịch sử đơn từ'}
+                            </h3>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {approvalOnly && tab === 'pending' && allSubDepts.length > 0 && (
+                                <select 
+                                    className="input !py-1.5 !text-xs font-bold w-48"
+                                    value={activeDeptTab}
+                                    onChange={e => { setActiveDeptTab(e.target.value); setPage(1); }}
                                 >
-                                    TẤT CẢ ({deptRequests.filter(r => r.statusName === 'Pending').length})
-                                </button>
-                                {allSubDepts.map(deptName => {
-                                    const count = deptRequests.filter(r => r.statusName === 'Pending' && r.employeeDepartmentName === deptName).length;
-                                    const isActive = activeDeptTab === deptName;
-                                    return (
-                                        <button key={deptName} onClick={() => { setActiveDeptTab(deptName); setPage(1); }}
-                                            style={{
-                                                padding: '10px 20px', fontSize: '12px', fontWeight: 'bold',
-                                                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                                                background: isActive ? '#fff' : 'transparent',
-                                                color: isActive ? '#1a56db' : '#64748b',
-                                                borderBottom: isActive ? '3px solid #1a56db' : '3px solid transparent',
-                                            }}
-                                        >
-                                            {deptName.toUpperCase()} ({count})
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Department Filter Tabs for Swap */}
-                    {approvalOnly && tab === 'pending' && subTab === 'swap' && (
-                        <div className="ef-toolbar print:hidden" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', minHeight: '44px', marginBottom: '15px' }}>
-                            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', alignItems: 'center', padding: '0 8px' }}>
-                                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', marginRight: '4px' }}>🏢 PHÒNG BAN:</span>
-                                <button
-                                    onClick={() => { setDeptSwapTab('all'); setPage(1); }}
-                                    style={{
-                                        padding: '8px 16px', fontSize: '12px', fontWeight: 'bold',
-                                        border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', borderRadius: '4px',
-                                        background: deptSwapTab === 'all' ? '#1a56db' : '#e2e8f0',
-                                        color: deptSwapTab === 'all' ? '#fff' : '#475569',
-                                    }}
-                                >
-                                    Tất Cả ({deptSwapRequests.length})
-                                </button>
-                                {allSwapDepts.map(deptName => {
-                                    const count = deptSwapRequests.filter(r => r.employeeA?.department?.departmentName?.trim().toLowerCase() === deptName.trim().toLowerCase()).length;
-                                    const isActive = deptSwapTab === deptName.trim().toLowerCase();
-                                    return (
-                                        <button key={deptName}
-                                            onClick={() => { setDeptSwapTab(deptName.trim().toLowerCase()); setPage(1); }}
-                                            style={{
-                                                padding: '8px 16px', fontSize: '12px', fontWeight: 'bold',
-                                                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', borderRadius: '4px',
-                                                background: isActive ? '#1a56db' : '#e2e8f0',
-                                                color: isActive ? '#fff' : '#475569',
-                                            }}
-                                        >
-                                            {deptName} ({count})
-                                        </button>
-                                    );
-                                })}
-                                {deptSwapRequests.length === 0 && (
-                                    <span style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic', marginLeft: '8px' }}>Không có đơn nào đang chờ duyệt</span>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="ef-toolbar">
-                        <div className="ef-toolbar-left" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '10px' }}>
-                            <div className="ef-toolbar-title">
-                                {subTab === 'leave' ? <Umbrella size={16} /> : (subTab === 'overtime' ? <Clock size={16} /> : <RefreshCw size={16} />)}
-                                <strong style={{ textTransform: 'uppercase' }}>
-                                    {approvalOnly && tab === 'pending' ? 'Chờ xét duyệt' : (subTab === 'leave' ? 'Lịch sử nghỉ phép' : (subTab === 'overtime' ? 'Lịch sử tăng ca' : 'Lịch sử hoán đổi'))}
-                                </strong>
-                            </div>
-                        </div>
-                        <div className="ef-toolbar-right">
+                                    <option value="all">Tất cả bộ phận</option>
+                                    {allSubDepts.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                            )}
                             {!approvalOnly && (
-                                <button onClick={() => subTab === 'leave' ? setCreateModal(true) : setCreateOtModal(true)} className="ef-btn ef-btn-primary">
-                                    + {subTab === 'leave' ? 'Tạo Đơn Phép' : 'Xin Tăng Ca'}
+                                <button onClick={() => setCreateModal(true)} className="btn btn-primary !py-1.5">
+                                    <Plus size={16} /> Đăng ký nghỉ
                                 </button>
                             )}
                         </div>
                     </div>
 
-                    <div className="ef-table-wrap">
-                        <table className="ef-table no-top-border">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
                             <thead>
-                                <tr>
-                                    <th className="c" style={{ width: '50px' }}>STT</th>
-                                    {approvalOnly && <th>Nhân Viên</th>}
-                                    {subTab === 'leave' ? (
-                                        <>
-                                            <th>Loại Phép</th>
-                                            <th>Từ Ngày</th>
-                                            <th>Đến Ngày</th>
-                                            <th className="c">Số Ngày</th>
-                                        </>
-                                    ) : subTab === 'swap' ? (
-                                        <>
-                                            <th>Bên A</th>
-                                            <th>Bên B</th>
-                                            <th>Thời Gian Đổi</th>
-                                            <th>Ca Đổi Sang</th>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <th>Ngày Làm</th>
-                                            <th>Giờ Bắt Đầu</th>
-                                            <th>Giờ Kết Thúc</th>
-                                            <th className="c">Tổng Giờ</th>
-                                        </>
-                                    )}
-                                    <th>Lý Do</th>
-                                    <th>Trạng Thái</th>
-                                    <th className="c" style={{ width: '100px' }}>Thao Tác</th>
+                                <tr className="bg-slate-50 border-b border-slate-100">
+                                    <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider w-16">STT</th>
+                                    {approvalOnly && <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nhân viên</th>}
+                                    <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Loại phép</th>
+                                    <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thời gian</th>
+                                    <th className="px-6 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Số ngày</th>
+                                    <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Lý do</th>
+                                    <th className="px-6 py-3 text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider">Trạng thái</th>
+                                    <th className="px-6 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Thao tác</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                {visibleRows.length === 0 ? (
-                                    <tr><td colSpan={10} className="ef-empty">Không có dữ liệu</td></tr>
-                                ) : visibleRows.map((r, i) => (
-                                    <tr key={r.id}>
-                                        <td className="c">{(safePage - 1) * PER_PAGE + i + 1}</td>
-                                        {approvalOnly && <td style={{ fontWeight: 'bold' }}>{r.employeeName}</td>}
-                                        {subTab === 'leave' ? (
-                                            <>
-                                                <td>{r.leaveTypeName}</td>
-                                                <td>{formatDate(r.fromDate)}</td>
-                                                <td>{formatDate(r.toDate)}</td>
-                                                <td className="c"><strong>{r.totalDays}</strong></td>
-                                            </>
-                                        ) : subTab === 'overtime' ? (
-                                            <>
-                                                <td>{formatDate(r.date)}</td>
-                                                <td>{r.startTime}</td>
-                                                <td>{r.endTime}</td>
-                                                <td className="c"><strong>{r.totalHours}h</strong></td>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <td>{r.employeeA?.fullName || r.employeeAId}</td>
-                                                <td>{r.employeeB?.fullName || r.employeeBId}</td>
-                                                <td>{formatDate(r.startDate)} - {formatDate(r.endDate)}</td>
-                                                <td>{r.targetShiftId}</td>
-                                            </>
-                                        )}
-                                        <td>{r.reason}</td>
-                                         <td className={getStatusClass(r.statusName || r.status)}>
-                                            {getStatusText(r)}
+                            <tbody className="divide-y divide-slate-50">
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <tr key={i}>
+                                            <td colSpan={8} className="px-6 py-4"><div className="h-4 skeleton w-full" /></td>
+                                        </tr>
+                                    ))
+                                ) : visibleRows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={8}>
+                                            <EmptyState
+                                                icon="document"
+                                                title="Không tìm thấy đơn nào"
+                                                description={!approvalOnly ? 'Bạn chưa có đơn nghỉ phép nào. Hãy tạo đơn mới!' : 'Không có đơn nào đang chờ xử lý.'}
+                                                action={!approvalOnly ? { label: 'Tạo đơn nghỉ', onClick: () => setCreateModal(true) } : undefined}
+                                                compact
+                                            />
                                         </td>
-                                        <td className="c">
+                                    </tr>
+                                ) : visibleRows.map((r, i) => (
+                                    <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                                        <td className="px-6 py-4 text-xs font-bold text-slate-400">
+                                            {(safePage - 1) * PER_PAGE + i + 1}
+                                        </td>
+                                        {approvalOnly && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs uppercase">
+                                                        {r.employeeName?.substring(0, 2)}
+                                                    </div>
+                                                    <div className="text-sm font-bold text-slate-700">{r.employeeName}</div>
+                                                </div>
+                                            </td>
+                                        )}
+                                        <td className="px-6 py-4">
+                                            <span className="text-sm font-medium text-slate-600">{r.leaveTypeName}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-700">{formatDate(r.fromDate)}</span>
+                                                <span className="text-[10px] text-slate-400 font-medium">đến {formatDate(r.toDate)}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className="text-sm font-black text-violet-600">{r.totalDays}</span>
+                                        </td>
+                                        <td className="px-6 py-4 max-w-[200px]">
+                                            <p className="text-sm text-slate-500 truncate" title={r.reason}>{r.reason}</p>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {getStatusBadge(r)}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
                                             {tab === 'pending' && approvalOnly ? (
-                                                <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                                                    {subTab === 'swap' ? (
-                                                        <button onClick={() => setViewingSwapId(r.id)} className="ef-btn ef-btn-success ef-btn-sm">DUYỆT</button>
+                                                <button onClick={() => setApprovalModal(r)} className="btn btn-primary !py-1 !px-4 text-xs">
+                                                    Xử lý
+                                                </button>
+                                            ) : (
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {(r.statusName === 'Pending' || r.status === 0) ? (
+                                                        <button onClick={() => setCancelConfirmId(r.id)} className="btn btn-ghost !py-1 !px-4 text-xs text-rose-500 hover:bg-rose-50 border-rose-100">
+                                                            Hủy
+                                                        </button>
                                                     ) : (
-                                                        <button onClick={() => setApprovalModal(r)} className="ef-btn ef-btn-success ef-btn-sm">DUYỆT</button>
+                                                        <button onClick={() => setApprovalModal(r)} className="btn btn-ghost !py-1 !px-4 text-xs">
+                                                            Chi tiết
+                                                        </button>
                                                     )}
                                                 </div>
-                                            ) : (
-                                                (r.statusName || r.status) === 'Pending' ? 
-                                                <button onClick={() => handleCancel(r.id)} className="ef-btn ef-btn-danger ef-btn-sm">HỦY</button>
-                                                : <button onClick={() => subTab === 'swap' ? setViewingSwapId(r.id) : setApprovalModal(r)} className="ef-btn ef-btn-secondary ef-btn-sm">XEM</button>
                                             )}
                                         </td>
                                     </tr>
@@ -498,11 +341,23 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
                         </table>
                     </div>
 
-                    {/* Pagination omitted for brevity but should be here */}
-                </>
+                    <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+                        <p className="text-xs font-medium text-slate-400">
+                            Hiển thị {visibleRows.length} trên {rawData.length} đơn
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 transition-all">
+                                <ChevronLeft size={16} />
+                            </button>
+                            <span className="text-xs font-bold text-slate-600 px-2">Trang {page} / {totalPages}</span>
+                            <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 transition-all">
+                                <ChevronRight size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
-            {/* Leave Create Modal */}
             {createModal && (
                 <LeavePaperModal 
                     user={user} 
@@ -514,35 +369,7 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
                 />
             )}
 
-            {/* Overtime Create Modal */}
-            {createOtModal && (
-                <div className="ef-modal-overlay">
-                    <div className="ef-modal-content">
-                        <div className="ef-modal-header"><span>Đăng Ký Tăng Ca</span><button onClick={() => setCreateOtModal(false)}>X</button></div>
-                        <div className="ef-modal-body">
-                            <p style={{ color: '#666', fontSize: '13px', marginBottom: '15px' }}>* Đơn tăng ca phải được gửi trước ít nhất 1 ngày.</p>
-                            <form id="ot-form" onSubmit={handleCreateOt}>
-                                <div className="mb-3">
-                                    <strong>Ngày Tăng Ca:</strong>
-                                    <input type="date" required className="ef-input" value={otForm.date} onChange={e => setOtForm({...otForm, date: e.target.value})} />
-                                </div>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <div style={{ flex: 1 }}><strong>Giờ Bắt Đầu:</strong><input type="time" required className="ef-input" value={otForm.startTime} onChange={e => setOtForm({...otForm, startTime: e.target.value})} /></div>
-                                    <div style={{ flex: 1 }}><strong>Giờ Kết Thúc:</strong><input type="time" required className="ef-input" value={otForm.endTime} onChange={e => setOtForm({...otForm, endTime: e.target.value})} /></div>
-                                </div>
-                                <div className="mt-3"><strong>Lý Do Tăng Ca:</strong><textarea className="ef-textarea" required value={otForm.reason} onChange={e => setOtForm({...otForm, reason: e.target.value})} placeholder="Vd: Hoàn thành báo cáo tháng..." /></div>
-                            </form>
-                        </div>
-                        <div className="ef-modal-footer">
-                            <button className="ef-btn" onClick={() => setCreateOtModal(false)}>Hủy</button>
-                            <button type="submit" form="ot-form" className="ef-btn ef-btn-primary">Gửi Đơn</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Leave Approval / View Modal */}
-            {approvalModal && subTab === 'leave' && (
+            {approvalModal && (
                 <LeavePaperModal 
                     user={user} 
                     leaveTypes={leaveTypes} 
@@ -554,44 +381,17 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
                 />
             )}
 
-            {/* Overtime Approval Modal (Keep legacy style for now) */}
-            {approvalModal && subTab === 'overtime' && (
-                <div className="ef-modal-overlay">
-                    <div className="ef-modal-content" style={{ maxWidth: '400px' }}>
-                        <div className="ef-modal-header">
-                            <span style={{ color: '#15803d' }}>Duyệt Tăng Ca</span>
-                            <button onClick={() => setApprovalModal(null)}>X</button>
-                        </div>
-                        <div className="ef-modal-body">
-                            <strong>Ghi chú phản hồi:</strong>
-                            <textarea className="ef-textarea" value={approvalNote} onChange={e => setApprovalNote(e.target.value)} placeholder="Nhập ý kiến (không bắt buộc)..." />
-                        </div>
-                        <div className="ef-modal-footer">
-                            <button className="ef-btn" onClick={() => setApprovalModal(null)}>Hủy</button>
-                            <button onClick={() => handleApproval({ action: 'approve', note: approvalNote })} className="ef-btn ef-btn-success">Xác Nhận</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {viewingSwapId && (
-                <div className="ef-modal-overlay" style={{ zIndex: 100 }}>
-                    <div className="ef-modal-content" style={{ maxWidth: '1000px', width: '95%', padding: 0 }}>
-                        <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-                            <h3 className="font-bold uppercase text-slate-700">Chi tiết đơn hoán đổi ca</h3>
-                            <button onClick={() => setViewingSwapId(null)} className="text-slate-400 hover:text-slate-600">
-                                <i className="fas fa-times"></i> Đóng
-                            </button>
-                        </div>
-                        <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-                            <ShiftSwapRequestDetail 
-                                requestId={viewingSwapId} 
-                                onBack={() => { setViewingSwapId(null); init(); }} 
-                                user={user}
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
+            <ConfirmDialog
+                open={!!cancelConfirmId}
+                variant="danger"
+                title="Hủy đơn nghỉ phép"
+                message="Bạn có chắc chắn muốn hủy đơn này không? Hành động này không thể hoàn tác."
+                confirmLabel="Xác nhận hủy"
+                cancelLabel="Quay lại"
+                loading={cancelling}
+                onConfirm={() => handleCancel(cancelConfirmId)}
+                onCancel={() => setCancelConfirmId(null)}
+            />
         </div>
     );
 }

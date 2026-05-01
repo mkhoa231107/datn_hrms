@@ -57,3 +57,5 @@ namespace HRMS.Application.DTOs.Jobs
         public DateTime UpdateTime { get; set; }
     }
 }
+
+

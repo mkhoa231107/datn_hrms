@@ -17,13 +17,13 @@ namespace HRMS.Application.DTOs.Payroll
     public class EmployeePayrollProfileDto
     {
         public int EmployeeId { get; set; }
-        public string FullName { get; set; }
-        public string EmployeeCode { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string EmployeeCode { get; set; } = string.Empty;
         public int DepartmentId { get; set; }
-        public string DepartmentName { get; set; }
-        public string PositionName { get; set; }
-        public string WorkingStatus { get; set; }
-        public string Email { get; set; }
+        public string DepartmentName { get; set; } = string.Empty;
+        public string PositionName { get; set; } = string.Empty;
+        public string WorkingStatus { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
         public decimal BasicSalary { get; set; }
         public decimal Coefficient { get; set; }
         public decimal? MealAllowance { get; set; }
@@ -50,10 +50,10 @@ namespace HRMS.Application.DTOs.Payroll
     public class PayrollPeriodDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public string Status { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
         public int SchedulePeriodId { get; set; }
-        public string SchedulePeriodName { get; set; }
+        public string SchedulePeriodName { get; set; } = string.Empty;
         public string? ProcessedByName { get; set; }
         public string? ReviewedByName { get; set; }
         public DateTime? ReviewedAt { get; set; }
@@ -64,7 +64,7 @@ namespace HRMS.Application.DTOs.Payroll
 
     public class CreatePayrollPeriodDto
     {
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public int SchedulePeriodId { get; set; }
     }
 
@@ -93,7 +93,7 @@ namespace HRMS.Application.DTOs.Payroll
 
     public class BulkUpdatePayrollRequest
     {
-        public List<BulkAdjustPayrollDto> Adjustments { get; set; }
+        public List<BulkAdjustPayrollDto> Adjustments { get; set; } = new();
     }
 
     public class CalculateForEmployeesDto
@@ -105,10 +105,10 @@ namespace HRMS.Application.DTOs.Payroll
     {
         public int Id { get; set; }
         public int EmployeeId { get; set; }
-        public string EmployeeCode { get; set; }
-        public string EmployeeName { get; set; }
-        public string DepartmentName { get; set; }
-        public string PositionName { get; set; }
+        public string EmployeeCode { get; set; } = string.Empty;
+        public string EmployeeName { get; set; } = string.Empty;
+        public string DepartmentName { get; set; } = string.Empty;
+        public string PositionName { get; set; } = string.Empty;
         public decimal Coefficient { get; set; }
         public decimal ActualWorkingDays { get; set; }
         public decimal BasicSalary { get; set; }
@@ -138,3 +138,4 @@ namespace HRMS.Application.DTOs.Payroll
         public string? Note { get; set; }
     }
 }
+

@@ -6,3 +6,5 @@ namespace HRMS.Application.DTOs.Users
         public string Email { get; set; } = string.Empty;
     }
 }
+
+

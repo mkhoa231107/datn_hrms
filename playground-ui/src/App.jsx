@@ -29,6 +29,19 @@ import MyPayslip from './components/payroll/MyPayslip';
 import InsuranceManagement from './components/payroll/InsuranceManagement';
 import MyInsurance from './components/payroll/MyInsurance';
 
+// Inject global keyframes for page transitions
+const pageTransitionStyle = document.createElement('style');
+pageTransitionStyle.textContent = `
+  @keyframes pageEnter {
+    0%   { opacity: 0; transform: translateY(18px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+`;
+if (!document.head.querySelector('#page-enter-keyframes')) {
+  pageTransitionStyle.id = 'page-enter-keyframes';
+  document.head.appendChild(pageTransitionStyle);
+}
+
 // import DailyAttendanceAdmin from './components/attendance/DailyAttendanceAdmin';
 import BarcodeAttendancePage from './components/attendance/BarcodeAttendancePage';
 
@@ -79,6 +92,43 @@ export default function App() {
   // Default to public landing page for any unauthenticated visitor
   const [publicView, setPublicView] = useState(!localStorage.getItem('token'));
 
+  // Professional Loading Screen Component
+  const PremiumLoader = ({ message }) => (
+    <div style={{ 
+      height: '100dvh', width: '100vw', 
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', 
+      background: '#0F0A1E', position: 'fixed', inset: 0, zIndex: 9999, overflow: 'hidden' 
+    }}>
+      {/* Background glow effects */}
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+      
+      <div style={{ textAlign: 'center', position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '28px' }}>
+        {/* Animated Logo */}
+        <div style={{ fontFamily: "'Orbitron', sans-serif", fontSize: '32px', fontWeight: 800, color: '#fff', letterSpacing: '0.12em', animation: 'pulse-slow 2.5s ease-in-out infinite' }}>
+          HRMS <span style={{ color: '#A78BFA' }}>Net</span>
+        </div>
+        
+        {/* Minimalist Progress Container */}
+        <div style={{ width: '220px', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden' }}>
+          <div style={{ 
+            height: '100%', width: '100%', 
+            background: 'linear-gradient(90deg, transparent, #7C3AED, #A78BFA, #7C3AED, transparent)', 
+            animation: 'shimmer-progress 2.5s infinite ease-in-out' 
+          }} />
+        </div>
+        
+        <p style={{ color: 'rgba(167, 139, 250, 0.7)', fontWeight: 600, fontSize: '10px', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: '10px' }}>
+          {message || 'Đang chuẩn bị không gian làm việc...'}
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes pulse-slow { 0%, 100% { opacity: 0.7; transform: scale(0.98); } 50% { opacity: 1; transform: scale(1); } }
+        @keyframes shimmer-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+      `}</style>
+    </div>
+  );
+
   useEffect(() => { checkAuth(); }, []);
 
   const checkUnsignedContracts = async (roles = []) => {
@@ -121,17 +171,15 @@ export default function App() {
         authService.logout();
       }
     }
-    setInitializing(false);
+    // Force a small delay to showcase the professional loader
+    setTimeout(() => setInitializing(false), 1500);
   };
 
   const handleLogin = async (userData) => {
-    setUser(userData);
-    
-
     const primary = getPrimaryRole(userData.roles || []);
-    // Only check contracts for Employee role
     const waiting = await checkUnsignedContracts(userData.roles || []);
     
+    setUser(userData);
     if (waiting) {
       setActiveTab('my-contract');
       toast.error("Bạn cần ký hợp đồng để sử dụng hệ thống", { duration: 6000, icon: '📄' });
@@ -155,20 +203,17 @@ export default function App() {
     setActiveTab('view-profile');
   };
 
-  if (initializing) return (
-    <div className="h-screen w-screen flex items-center justify-center bg-slate-900">
-      <div className="space-y-4 text-center">
-        <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto" />
-        <p className="text-indigo-300 font-bold tracking-widest text-xs uppercase animate-pulse">Khởi tạo hệ thống...</p>
-      </div>
-    </div>
-  );
+  if (initializing) return <PremiumLoader message="Khởi tạo hệ thống..." />;
 
   if (!user) {
       if (publicView === 'barcode') {
           return <BarcodeAttendancePage onBack={() => setPublicView(false)} />;
       }
-      return <Login onLoginSuccess={handleLogin} onShowPublic={() => setPublicView('barcode')} />;
+      return (
+        <div className="app-reveal" style={{ height: '100dvh' }}>
+          <Login onLoginSuccess={handleLogin} onShowPublic={() => setPublicView('barcode')} />
+        </div>
+      );
   }
 
 
@@ -184,38 +229,29 @@ export default function App() {
   const commonRoles = ['Admin', 'Accountant', 'CnbSpecialist', 'DepartmentManager', 'DepartmentHead', 'Employee'];
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="app-reveal" style={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', background: 'var(--bg-base)', color: 'var(--text-primary)', overflow: 'hidden' }}>
       <Header 
         user={user} 
         onLogout={handleLogout}
         onToggleSidebar={() => setSidebarOpen(prev => !prev)}
         activeTab={activeTab}
-        onTabChange={handleTabChange}
       />
 
-      <div className="flex flex-1 mx-auto w-full relative">
-        {/* Mobile Sidebar Overlay */}
-        {sidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
+      <div style={{ display: 'flex', flex: 1, width: '100%', overflow: 'hidden' }}>
         <Sidebar 
           user={user} 
           activeTab={activeTab} 
           sidebarOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           hasUnsignedContract={hasUnsignedContract}
-          hidden={false} 
           onTabChange={handleTabChange}
         />
 
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto w-full max-w-full">
+        <main style={{ flex: 1, padding: '24px 32px', overflowY: 'auto', minWidth: 0, background: 'var(--bg-base)' }}>
+          <div key={activeTab}>
           {/* Thông báo bắt buộc ký hợp đồng */}
           {hasUnsignedContract && (
-            <div className="mb-6 bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-4 text-white shadow-lg shadow-amber-200 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="mb-6 bg-amber-600 rounded-xl p-4 text-white shadow-lg animate-in fade-in slide-in-from-top-4 duration-500">
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center shrink-0">
                   <i className="fas fa-file-contract text-2xl"></i>
@@ -261,7 +297,7 @@ export default function App() {
             <RoleGuard user={user} allowedRoles={['DepartmentManager', 'DepartmentHead', 'TeamLeader', 'Employee', 'Accountant', 'CnbSpecialist']}>
               {hasUnsignedContract ? (
                 <RestrictedView 
-                  title="Tính năng Đơn từ bị khóa" 
+                  title="Tính năng Nghỉ phép bị khóa" 
                   description="Bạn không thể gửi đơn nghỉ phép hoặc theo dõi số dư phép khi chưa ký hợp đồng xác nhận."
                   onGoToContract={() => setActiveTab('my-contract')} 
                 />
@@ -346,12 +382,12 @@ export default function App() {
             </RoleGuard>
           )}
           {tab('team-shift-approvals') && (
-            <RoleGuard user={user} allowedRoles={['DepartmentHead', 'Admin']}>
+            <RoleGuard user={user} allowedRoles={['DepartmentHead', 'DepartmentManager', 'Admin', 'CnbSpecialist']}>
               <ShiftChangeApproval user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('team-leaves') && (
-            <RoleGuard user={user} allowedRoles={['DepartmentHead', 'DepartmentManager', 'Admin']}>
+            <RoleGuard user={user} allowedRoles={['DepartmentHead', 'DepartmentManager', 'Admin', 'CnbSpecialist']}>
               <Leave user={user} approvalOnly={true} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
@@ -419,7 +455,7 @@ export default function App() {
           
           {/* ── Admin Only ── */}
           {tab('add-employee') && (
-            <RoleGuard user={user} allowedRoles={['CnbSpecialist']}>
+            <RoleGuard user={user} allowedRoles={['Admin']}>
               <EmployeeForm onSuccess={() => setActiveTab('employees')} />
             </RoleGuard>
           )}
@@ -454,13 +490,64 @@ export default function App() {
               <Profile mode="id" employeeId={viewingEmployeeId} onBack={() => setActiveTab('employees')} />
             </RoleGuard>
           )}
+          </div>{/* end page-enter */}
         </main>
       </div>
 
-      <footer className="py-2 px-8 text-center text-slate-400 text-[10px] font-bold uppercase tracking-widest border-t border-slate-100 bg-white">
+      <footer style={{
+        padding: '10px 32px',
+        textAlign: 'center',
+        fontSize: '10px',
+        fontWeight: 600,
+        letterSpacing: '0.08em',
+        textTransform: 'uppercase',
+        color: 'var(--text-secondary)',
+        borderTop: '1px solid var(--border)',
+        background: 'var(--bg-surface)',
+        opacity: 0.7,
+      }}>
         © 2026 HRMS Net • Hệ thống quản trị nhân sự
       </footer>
-      <Toaster position="top-right" reverseOrder={false} />
+      <Toaster 
+        position="top-center" 
+        reverseOrder={false} 
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(8px)',
+            color: '#1e293b',
+            padding: '12px 24px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: '600',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10B981',
+              secondary: '#fff',
+            },
+            style: {
+              background: 'rgba(236, 253, 245, 0.9)',
+              color: '#065f46',
+              border: '1px solid rgba(167, 243, 208, 0.5)',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#EF4444',
+              secondary: '#fff',
+            },
+            style: {
+              background: 'rgba(254, 242, 242, 0.9)',
+              color: '#991b1b',
+              border: '1px solid rgba(254, 226, 226, 0.5)',
+            },
+          },
+        }}
+      />
     </div>
   );
 }

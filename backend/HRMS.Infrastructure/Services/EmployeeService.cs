@@ -157,8 +157,9 @@ namespace HRMS.Infrastructure.Services
 
             if (departmentId.HasValue)
             {
+                var deptIds = await GetDepartmentHierarchyIdsAsync(departmentId.Value);
                 // Nếu lọc theo phòng ban (thường là Trưởng phòng), loại bỏ những người có Role 'Admin'
-                query = query.Where(e => e.DepartmentId == departmentId.Value && 
+                query = query.Where(e => deptIds.Contains(e.DepartmentId) && 
                                         !e.User.UserRoles.Any(ur => ur.Role.RoleName == "Admin"));
             }
 
@@ -249,6 +250,22 @@ namespace HRMS.Infrastructure.Services
                     Descriptor = e.FaceDescriptor
                 })
                 .ToListAsync();
+        }
+
+        private async Task<List<int>> GetDepartmentHierarchyIdsAsync(int departmentId)
+        {
+            var result = new List<int> { departmentId };
+            var children = await _context.Departments
+                .Where(d => d.ParentDepartmentId == departmentId && d.IsActive)
+                .Select(d => d.Id)
+                .ToListAsync();
+
+            foreach (var childId in children)
+            {
+                result.AddRange(await GetDepartmentHierarchyIdsAsync(childId));
+            }
+
+            return result.Distinct().ToList();
         }
     }
 }

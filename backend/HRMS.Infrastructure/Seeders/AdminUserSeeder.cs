@@ -87,18 +87,21 @@ namespace HRMS.Infrastructure.Seeders
                 if (user.UserRoles == null)
                     await context.Entry(user).Collection(u => u.UserRoles).LoadAsync();
 
-                var existingRole = user.UserRoles.FirstOrDefault();
-                if (existingRole == null)
+                var currentRoles = user.UserRoles?.ToList() ?? new List<UserRole>();
+                
+                // If user doesn't have the target role, add it
+                if (!currentRoles.Any(ur => ur.RoleId == role.Id))
                 {
                     context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
                     await context.SaveChangesAsync();
                 }
-                else if (existingRole.RoleId != role.Id)
+
+                // Optional: If we want to ensure the user ONLY has this role (standardization)
+                // Remove other roles that are NOT the target role
+                var otherRoles = currentRoles.Where(ur => ur.RoleId != role.Id).ToList();
+                if (otherRoles.Any())
                 {
-                    context.UserRoles.Remove(existingRole);
-                    await context.SaveChangesAsync();
-                    
-                    context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
+                    context.UserRoles.RemoveRange(otherRoles);
                     await context.SaveChangesAsync();
                 }
             }

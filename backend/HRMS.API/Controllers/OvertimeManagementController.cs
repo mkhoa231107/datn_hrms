@@ -38,7 +38,7 @@ namespace HRMS.API.Controllers
         /// [Department Head] Lập kế hoạch tăng ca tháng cho phòng
         /// </summary>
         [HttpPost("plans")]
-        [Authorize(Roles = "Admin,DepartmentHead")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")]
         public async Task<IActionResult> CreatePlan([FromBody] CreateOvertimePlanDto dto)
         {
             try
@@ -57,7 +57,7 @@ namespace HRMS.API.Controllers
         /// [Dept Head/C&B/Admin/Accountant] Xem danh sách kế hoạch
         /// </summary>
         [HttpGet("plans")]
-        [Authorize(Roles = "Admin,DepartmentHead,CnbSpecialist,Accountant")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,CnbSpecialist,Accountant")]
         public async Task<IActionResult> GetPlans([FromQuery] int? departmentId, [FromQuery] int? month, [FromQuery] int? year)
         {
             try
@@ -75,7 +75,7 @@ namespace HRMS.API.Controllers
         /// [Team Leader] Đề cử nhân sự tăng ca hàng loạt (Grid save)
         /// </summary>
         [HttpPost("assignments/bulk")]
-        [Authorize(Roles = "Admin,DepartmentHead,TeamLeader")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader")]
         public async Task<IActionResult> BulkAssign([FromBody] BulkAssignOvertimeDto dto)
         {
             try
@@ -94,7 +94,7 @@ namespace HRMS.API.Controllers
         /// [Team Leader/Dept Head] Lấy lưới đề cử nhân sự bộ phận
         /// </summary>
         [HttpGet("assignments/grid")]
-        [Authorize(Roles = "Admin,DepartmentHead,TeamLeader")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,TeamLeader")]
         public async Task<IActionResult> GetAssignmentGrid([FromQuery] int departmentId, [FromQuery] int month, [FromQuery] int year)
         {
             try
@@ -131,7 +131,7 @@ namespace HRMS.API.Controllers
         /// [Department Head] Gửi kế hoạch tăng ca (Publish)
         /// </summary>
         [HttpPost("plans/{id}/publish")]
-        [Authorize(Roles = "Admin,DepartmentHead")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead")]
         public async Task<IActionResult> PublishPlan(int id)
         {
             try

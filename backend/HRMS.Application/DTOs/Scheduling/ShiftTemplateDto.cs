@@ -5,7 +5,7 @@ namespace HRMS.Application.DTOs.Scheduling
     public class ShiftTemplateDto
     {
         public int Id { get; set; }
-        public string TemplateName { get; set; }
+        public string TemplateName { get; set; } = string.Empty;
         public int CycleDays { get; set; }
         public List<ShiftTemplateDetailDto> Details { get; set; } = new();
     }
@@ -14,7 +14,7 @@ namespace HRMS.Application.DTOs.Scheduling
     {
         public int DayNumber { get; set; }
         public int? WorkShiftId { get; set; }
-        public string ShiftCode { get; set; }
+        public string ShiftCode { get; set; } = string.Empty;
     }
 
     public class ApplyTemplateDto
@@ -25,3 +25,4 @@ namespace HRMS.Application.DTOs.Scheduling
         public int PeriodId { get; set; }
     }
 }
+

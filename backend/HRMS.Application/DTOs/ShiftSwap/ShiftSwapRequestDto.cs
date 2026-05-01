@@ -69,3 +69,5 @@ namespace HRMS.Application.DTOs.ShiftSwap
         public int? ManagerId { get; set; }
     }
 }
+
+

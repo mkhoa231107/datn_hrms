@@ -37,7 +37,7 @@ export default function ContractForm({ onClose, onSuccess, contract }) {
           positionService.getAll()
         ]);
         setEmployees(empData || []);
-        const standardCodes = ['HC', 'S1', 'C1', 'D1'];
+        const standardCodes = ['HC', 'C1', 'C2', 'C3'];
         const filteredShifts = (shiftData.data || []).filter(s => standardCodes.includes(s.shiftCode));
         setShifts(filteredShifts);
         setDepartments(deptData || []);

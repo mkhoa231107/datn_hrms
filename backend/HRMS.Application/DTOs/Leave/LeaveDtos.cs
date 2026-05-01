@@ -62,7 +62,7 @@ namespace HRMS.Application.DTOs.Leave
     public class LeaveBalanceDto
     {
         public int LeaveTypeId { get; set; }
-        public string LeaveTypeName { get; set; }
+        public string LeaveTypeName { get; set; } = string.Empty;
         public bool IsPaid { get; set; }
         public int Year { get; set; }
         public double TotalDays { get; set; }
@@ -74,10 +74,11 @@ namespace HRMS.Application.DTOs.Leave
     public class LeaveTypeDto
     {
         public int Id { get; set; }
-        public string Name { get; set; }
-        public string Code { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Code { get; set; } = string.Empty;
         public string? Description { get; set; }
         public bool IsPaid { get; set; }
         public int DefaultDaysPerYear { get; set; }
     }
 }
+

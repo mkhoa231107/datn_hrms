@@ -132,7 +132,7 @@ namespace HRMS.API.Controllers
 
         // PUT: api/employees/{id}
         [HttpPut("{id}")]
-        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
+        [Authorize(Roles = "Admin,DepartmentManager")]
         public async Task<IActionResult> Update(int id, [FromBody] EmployeeUpdateDto dto)
         {
             try
@@ -222,7 +222,7 @@ namespace HRMS.API.Controllers
 
         // POST: api/employees
         [HttpPost]
-        [Authorize(Roles = "Admin,CnbSpecialist")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] EmployeeCreateDto dto)
         {
             try

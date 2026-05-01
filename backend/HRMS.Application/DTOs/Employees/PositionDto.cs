@@ -20,3 +20,5 @@ namespace HRMS.Application.DTOs.Employees
         public int? DefaultShiftId { get; set; }
     }
 }
+
+

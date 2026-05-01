@@ -103,25 +103,46 @@ namespace HRMS.Infrastructure.Services
 
         public async Task<LeaveRequestDto> CreateRequestAsync(int employeeId, LeaveRequestCreateDto dto)
         {
+            // 0. Basic Validations
+            if (dto.LeaveTypeId <= 0)
+                throw new InvalidOperationException("Vui lòng chọn loại nghỉ phép.");
+            if (string.IsNullOrWhiteSpace(dto.Reason))
+                throw new InvalidOperationException("Vui lòng nhập lý do nghỉ phép.");
+            if (string.IsNullOrWhiteSpace(dto.Phone))
+                throw new InvalidOperationException("Vui lòng nhập số điện thoại liên hệ khi nghỉ.");
+
+            var leaveType = await _context.LeaveTypes.FindAsync(dto.LeaveTypeId);
+            if (leaveType == null || !leaveType.IsActive)
+                throw new InvalidOperationException("Loại nghỉ phép không hợp lệ hoặc đã bị vô hiệu hóa.");
+
+            bool isSickLeave = leaveType.Code == "SICK";
+
             // 1. Validate date range
-            if (dto.ToDate < dto.FromDate)
+            if (dto.ToDate.Date < dto.FromDate.Date)
                 throw new InvalidOperationException("Ngày kết thúc không thể trước ngày bắt đầu.");
 
             // 2. Calculate working days based on schedule (with fallback)
             double totalDays = await CalculateWorkingDaysAsync(employeeId, dto.FromDate, dto.ToDate);
             if (totalDays <= 0)
-                throw new InvalidOperationException("Không có ngày làm việc trong khoảng thời gian đã chọn.");
+                throw new InvalidOperationException("Không có ngày làm việc trong khoảng thời gian đã chọn (có thể trùng ngày nghỉ lễ/cuối tuần).");
+
+            if (totalDays > 30)
+                throw new InvalidOperationException("Một đơn nghỉ phép không được vượt quá 30 ngày làm việc.");
 
             // 3. Check for overlapping requests
             bool overlap = await _context.LeaveRequests.AnyAsync(lr =>
                 lr.EmployeeId == employeeId &&
                 lr.Status != LeaveStatus.Rejected &&
                 lr.Status != LeaveStatus.Cancelled &&
-                lr.FromDate <= dto.ToDate &&
-                lr.ToDate >= dto.FromDate);
+                lr.FromDate.Date <= dto.ToDate.Date &&
+                lr.ToDate.Date >= dto.FromDate.Date);
 
             if (overlap)
-                throw new InvalidOperationException("Đã có đơn nghỉ phép trong khoảng thời gian này.");
+                throw new InvalidOperationException("Đã có đơn nghỉ phép khác trùng lặp thời gian này.");
+
+            // 3.5 Sick Leave specific rules
+            if (isSickLeave && totalDays >= 3 && string.IsNullOrWhiteSpace(dto.AttachmentBase64))
+                throw new InvalidOperationException("Nghỉ ốm từ 3 ngày trở lên yêu cầu phải đính kèm giấy xác nhận của bác sĩ/bệnh viện.");
 
             // 4. Check leave balance
             int year = dto.FromDate.Year;
@@ -131,7 +152,7 @@ namespace HRMS.Infrastructure.Services
                     && lb.Year == year);
 
             if (balance == null)
-                throw new InvalidOperationException("Bạn chưa có số dư nghỉ phép cho loại phép này trong năm nay.");
+                throw new InvalidOperationException($"Bạn chưa có số dư nghỉ phép cho loại '{leaveType.Name}' trong năm {year}.");
 
             double remaining = balance.TotalDays - balance.UsedDays;
             if (totalDays > remaining)
@@ -141,9 +162,6 @@ namespace HRMS.Infrastructure.Services
             var now = DateTime.UtcNow;
             var fromDateLocal = dto.FromDate.Date;
             var requestLeadTime = fromDateLocal - now.Date;
-
-            var leaveType = await _context.LeaveTypes.FindAsync(dto.LeaveTypeId);
-            bool isSickLeave = leaveType?.Code == "SICK";
 
             // 5.1 No Backdating (except SICK)
             if (!isSickLeave && fromDateLocal < now.Date)

@@ -8,8 +8,9 @@ namespace HRMS.Application.DTOs.Auth
     /// </summary>
     public class LoginResponseDto
     {
-        public string Token { get; set; }
+        public string Token { get; set; } = string.Empty;
         public DateTime ExpiresAt { get; set; }
-        public UserDto User { get; set; }
+        public UserDto User { get; set; } = null!;
     }
 }
+

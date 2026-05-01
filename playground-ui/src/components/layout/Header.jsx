@@ -1,192 +1,170 @@
-import { LogOut, Menu, Bell } from 'lucide-react';
+import { LogOut, Menu, Bell, X } from 'lucide-react';
 import { ROLE_META, getPrimaryRole } from './Sidebar';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import NotificationDropdown from './NotificationDropdown';
 
-// Navigation items per role (horizontal top nav)
-export function getNavItems(primaryRole) {
-    const allItems = {
-        // Personal items (all internal roles)
-        me:               { id: 'me',               label: 'Hồ sơ',              roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
-        attendance:       { id: 'attendance',        label: 'Chấm công',          roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
-        leave:            { id: 'leave',             label: 'Đơn từ & Nghỉ phép', roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
-        'my-schedule':    { id: 'my-schedule',       label: 'Lịch ca',            roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
-        'shift-change':   { id: 'shift-change',      label: 'Xin đổi ca',         roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
-        'my-payslip':     { id: 'my-payslip',        label: 'Bảng lương',         roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
-        'my-contract':    { id: 'my-contract',       label: 'Hợp đồng',           roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
-        'my-insurance':   { id: 'my-insurance',      label: 'Bảo hiểm',           roles: ['Admin','DepartmentManager','DepartmentHead','TeamLeader','Employee'] },
+const TAB_LABELS = {
+    'me': 'Hồ sơ của tôi', 'attendance': 'Chấm công',
+    'leave': 'Đơn từ & Nghỉ phép', 'my-schedule': 'Lịch ca',
+    'shift-change': 'Xin đổi ca', 'my-payslip': 'Bảng lương',
+    'my-contract': 'Hợp đồng lao động', 'my-insurance': 'Bảo hiểm',
+    'my-ot-schedule': 'Lịch tăng ca', 'employees': 'Nhân viên',
+    'ot-assignment': 'Tăng ca', 'dept-leaves': 'Duyệt đơn BP',
+    'dept-activities': 'Hoạt động phòng ban', 'ot-planning': 'Kế hoạch OT',
+    'team-timesheets': 'Chốt công', 'team-schedule': 'Xếp ca bộ phận',
+    'team-leaves': 'Duyệt đơn bộ phận', 'view-profile': 'Hồ sơ nhân viên',
+    'attendance-management': 'Quản lý chấm công', 'insurance-management': 'Bảo hiểm xã hội',
+    'admin-contracts': 'Quản lý Hợp đồng', 'admin-roles': 'Quản lý Tài khoản',
+    'payroll-processing': 'Tính lương & Thuế', 'payroll-settings': 'Cấu hình lương',
+    'payroll-report': 'Báo cáo lương', 'dept-contracts': 'Hợp đồng phòng ban',
+    'admin-system': 'Cấu hình hệ thống',
+};
 
+const TAB_SECTION = {
+    'me': 'Cá nhân', 'attendance': 'Cá nhân', 'leave': 'Cá nhân',
+    'my-schedule': 'Cá nhân', 'shift-change': 'Cá nhân', 'my-payslip': 'Cá nhân',
+    'my-contract': 'Cá nhân', 'my-insurance': 'Cá nhân', 'my-ot-schedule': 'Cá nhân',
+    'employees': 'Quản lý', 'ot-assignment': 'Quản lý', 'dept-leaves': 'Quản lý',
+    'dept-activities': 'Quản lý', 'ot-planning': 'Điều hành', 'team-timesheets': 'Điều hành',
+    'team-schedule': 'Quản lý', 'team-leaves': 'Quản lý', 'view-profile': 'Quản lý',
+    'attendance-management': 'Nhân sự', 'insurance-management': 'Nhân sự',
+    'admin-contracts': 'Nhân sự', 'admin-roles': 'Nhân sự',
+    'payroll-processing': 'Tiền lương', 'payroll-settings': 'Tiền lương',
+    'payroll-report': 'Tiền lương', 'dept-contracts': 'Quản lý', 'admin-system': 'Hệ thống',
+};
 
-        // Team Management (Tổ trưởng / Trưởng bộ phận)
-        'ot-assignment':  { id: 'ot-assignment',     label: 'Tăng ca',            roles: ['TeamLeader','DepartmentHead','Admin'] },
-        'team-schedule':  { id: 'team-schedule',     label: 'Xếp ca',             roles: ['TeamLeader','Admin'] },
-        'team-leaves':    { id: 'team-leaves',       label: 'Duyệt đơn',          roles: ['TeamLeader','Admin'] },
-        'team-timesheets':{ id: 'team-timesheets',   label: 'Chốt công',          roles: ['TeamLeader','DepartmentHead','DepartmentManager','Admin'] },
-
-        // Management (Trưởng phòng)
-        'ot-planning':    { id: 'ot-planning',       label: 'Kế hoạch OT',        roles: ['DepartmentManager','Admin'] },
-        employees:        { id: 'employees',         label: 'Nhân viên',           roles: ['DepartmentHead','DepartmentManager','Admin'] },
-        'dept-activities':{ id: 'dept-activities',   label: 'Hoạt động PB',       roles: ['DepartmentHead','DepartmentManager','Admin'] },
-        'dept-leaves':    { id: 'dept-leaves',       label: 'Duyệt đơn BP',       roles: ['DepartmentManager','DepartmentHead','Admin'] },
-
-        // Admin / HR Specialists
-
-        'admin-contracts':{ id: 'admin-contracts',   label: 'Quản lý HĐLĐ',      roles: ['Admin'] },
-        'payroll-processing':{ id: 'payroll-processing', label: 'Lương',          roles: ['Admin', 'DepartmentManager', 'DepartmentHead'] },
-        'insurance-management':{ id: 'insurance-management', label: 'Bảo hiểm',   roles: ['Admin'] },
-        'attendance-management':{ id: 'attendance-management', label: 'Quản lý chấm công', roles: ['Admin'] },
-    };
-
-    const ORDER = {
-        Admin:             ['me','employees','admin-contracts','payroll-processing','insurance-management','attendance-management'],
-        DepartmentManager: ['me','employees','ot-planning','dept-leaves','dept-activities','team-timesheets','payroll-processing'],
-        DepartmentHead:    ['me','employees','ot-assignment','dept-leaves','dept-activities','team-timesheets'],
-        TeamLeader:        ['me','leave','ot-assignment','team-schedule','team-leaves','team-timesheets'],
-        Employee:          ['me','attendance','leave','my-schedule','shift-change','my-payslip','my-contract','my-insurance'],
-    };
-
-    const ids = ORDER[primaryRole] || ORDER.Employee;
-    return ids
-        .map(id => allItems[id])
-        .filter(item => item && item.roles.includes(primaryRole));
-}
-
-export default function Header({ user, onLogout, onToggleSidebar, activeTab, onTabChange }) {
+export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
     const [showNotifications, setShowNotifications] = useState(false);
-    const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
-    const navRef = useRef(null);
+    const [hasNewNotif, setHasNewNotif] = useState(true);
+    const bellRef = useRef(null);
 
     const roles = user?.roles || [];
     const primaryRole = getPrimaryRole(roles);
     const meta = ROLE_META[primaryRole] || ROLE_META.Employee;
-    const navItems = getNavItems(primaryRole).filter(item => {
-        // Special case: Payroll is only for Admin (view) and C&B Dept Head (manage)
-        if (item.id === 'payroll-processing') {
-            if (primaryRole === 'Admin') return true;
-            if ((primaryRole === 'DepartmentHead' || primaryRole === 'DepartmentManager') && user?.departmentId === 7) return true;
-            return false;
-        }
-        return true;
-    });
+    const activeLabel = TAB_LABELS[activeTab] || 'Trang chủ';
+    const sectionLabel = TAB_SECTION[activeTab] || 'Tổng quan';
+    const initials = (user?.fullName || 'U').split(' ').slice(-2).map(w => w[0]).join('').toUpperCase();
 
+    // Close dropdown when clicking outside
     useEffect(() => {
-        if (!navRef.current) return;
-        // Wait a tick for rendering to finish before measuring
-        setTimeout(() => {
-            if (!navRef.current) return;
-            const activeBtn = navRef.current.querySelector('[data-active="true"]');
-            if (activeBtn) {
-                setIndicatorStyle({
-                    left: activeBtn.offsetLeft,
-                    width: activeBtn.offsetWidth,
-                    opacity: 1
-                });
+        if (!showNotifications) return;
+        const handler = (e) => {
+            if (bellRef.current && !bellRef.current.contains(e.target)) {
+                setShowNotifications(false);
             }
-        }, 50);
-    }, [activeTab, navItems]);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showNotifications]);
 
-    // Get label of the current active tab
-    const activeMeta = navItems.find(n => n.id === activeTab);
-    const activeLabel = activeMeta?.label || 'Trang chủ';
-
-    // Breadcrumb: role > section
-    const groupMap = {
-        me: 'Cá nhân', attendance: 'Cá nhân', leave: 'Cá nhân',
-        'my-schedule': 'Cá nhân', 'my-payslip': 'Cá nhân', 'my-contract': 'Cá nhân', 'my-insurance': 'Cá nhân',
-        'ot-assignment': 'Quản lý', 'team-schedule': 'Quản lý',
-        'team-leaves': 'Quản lý', 'team-timesheets': 'Quản lý',
-        'ot-planning': 'Điều hành', employees: 'Điều hành', 'dept-leaves': 'Điều hành', 'dept-activities': 'Điều hành',
-        'admin-contracts': 'Quản trị', 
-        'payroll-processing': 'Quản trị', 'insurance-management': 'Quản trị',
-        'attendance-management': 'Quản trị',
+    const accentColorMap = {
+        Admin: '#EF4444', DepartmentManager: '#4F46E5', DepartmentHead: '#D97706',
+        Accountant: '#059669', CnbSpecialist: '#0D9488', Employee: '#7C3AED',
     };
-    const sectionLabel = groupMap[activeTab] || 'Tổng quan';
+    const accentHex = accentColorMap[primaryRole] || '#7C3AED';
 
     return (
         <div className="sticky top-0 z-50">
-            {/* ── Main top bar ── */}
-            <header className="bg-white border-b border-slate-200 h-14 px-4 flex items-center justify-between shadow-sm">
-                {/* Left: Logo + hamburger */}
+            {/* ── Top bar ── */}
+            <header
+                className="glass-surface h-14 px-4 flex items-center justify-between"
+                style={{ borderBottom: '1px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+            >
+                {/* Left */}
                 <div className="flex items-center gap-3 shrink-0">
                     <button
                         onClick={onToggleSidebar}
-                        className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-                        title="Menu"
+                        className="btn-ghost"
+                        style={{ padding: '8px', borderRadius: 'var(--r-md)', border: 'none', background: 'transparent', color: 'var(--text-secondary)' }}
+                        title="Toggle sidebar"
                     >
                         <Menu className="w-5 h-5" />
                     </button>
+                    <span
+                        className="text-gradient hidden sm:block"
+                        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '15px', fontWeight: 800, letterSpacing: '-0.02em' }}
+                    >
+                        HRMS Net
+                    </span>
                 </div>
 
-                {/* Left-aligned: Horizontal nav tabs */}
-                <nav ref={navRef} className="relative flex-1 flex flex-row h-full items-center justify-start overflow-x-auto scrollbar-none ml-6 gap-2">
-                    {/* Animated Underline */}
-                    <div 
-                        className="absolute bottom-0 h-[3px] bg-violet-600 transition-all duration-300 ease-out z-10 rounded-t-sm"
-                        style={indicatorStyle}
-                    />
-                    
-                    {navItems.map(item => {
-                        const isActive = activeTab === item.id;
-                        return (
-                            <button
-                                key={item.id}
-                                data-active={isActive}
-                                onClick={() => onTabChange(item.id)}
-                                className={`
-                                    relative px-3 md:px-4 h-full flex items-center justify-center text-[13px] font-semibold whitespace-nowrap transition-colors duration-150
-                                    ${isActive
-                                        ? 'text-violet-600'
-                                        : 'text-slate-500 hover:text-slate-800'
-                                    }
-                                `}
-                            >
-                                {item.label}
-                            </button>
-                        );
-                    })}
-                </nav>
+                <div className="flex-1" />
 
-                {/* Right: avatar circle + bell + logout */}
-                <div className="flex items-center gap-1.5 shrink-0">
+                {/* Right */}
+                <div className="flex items-center gap-2 shrink-0">
                     {/* Role badge */}
-                    <span className={`hidden md:inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full ${meta.light} whitespace-nowrap`}>
+                    <span
+                        className="badge badge-accent hidden md:inline-flex"
+                        style={{ fontSize: '10px' }}
+                    >
                         {meta.label}
                     </span>
 
-                    {/* Notification Bell */}
-                    <div className="relative">
+                    {/* Bell */}
+                    <div className="relative" ref={bellRef}>
                         <button
-                            onClick={() => setShowNotifications(!showNotifications)}
-                            className={`p-2 relative rounded-lg transition-colors ${
-                                showNotifications
-                                    ? 'text-indigo-600 bg-indigo-50'
-                                    : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50'
-                            }`}
+                            onClick={() => { setShowNotifications(v => !v); setHasNewNotif(false); }}
+                            style={{
+                                padding: '8px',
+                                borderRadius: 'var(--r-md)',
+                                border: 'none',
+                                background: showNotifications ? 'var(--accent-subtle)' : 'transparent',
+                                color: showNotifications ? 'var(--accent)' : 'var(--text-secondary)',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                transition: 'background 0.18s ease, color 0.18s ease',
+                            }}
+                            onMouseEnter={e => { if (!showNotifications) { e.currentTarget.style.background = 'var(--accent-subtle)'; e.currentTarget.style.color = 'var(--accent)'; } }}
+                            onMouseLeave={e => { if (!showNotifications) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; } }}
                             title="Thông báo"
                         >
                             <Bell className="w-4 h-4" />
-                            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-red-500 rounded-full border border-white animate-pulse" />
+                            {hasNewNotif && (
+                                <span style={{
+                                    position: 'absolute', top: '6px', right: '6px',
+                                    width: '7px', height: '7px',
+                                    background: '#EF4444', borderRadius: '50%',
+                                    border: '1.5px solid var(--bg-surface)',
+                                    animation: 'pulse 2s infinite',
+                                }} />
+                            )}
                         </button>
                         {showNotifications && (
-                            <NotificationDropdown
-                                user={user}
-                                onClose={() => setShowNotifications(false)}
-                            />
+                            <NotificationDropdown user={user} onClose={() => setShowNotifications(false)} />
                         )}
                     </div>
 
-                    {/* Avatar circle */}
+                    {/* Avatar */}
                     <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-white cursor-default shadow-sm border-2 border-white ${meta.color}`}
+                        style={{
+                            width: '32px', height: '32px',
+                            borderRadius: 'var(--r-md)',
+                            background: accentHex,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '12px', fontWeight: 700, color: '#fff',
+                            boxShadow: `0 2px 8px ${accentHex}44`,
+                            cursor: 'default',
+                            letterSpacing: '0.02em',
+                        }}
                         title={user?.fullName}
                     >
-                        {(user?.fullName || 'U').charAt(0).toUpperCase()}
+                        {initials}
                     </div>
 
                     {/* Logout */}
                     <button
                         onClick={onLogout}
-                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        style={{
+                            padding: '8px',
+                            borderRadius: 'var(--r-md)',
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            transition: 'all 0.18s ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#DC2626'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
                         title="Đăng xuất"
                     >
                         <LogOut className="w-4 h-4" />
@@ -194,16 +172,25 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab, onT
                 </div>
             </header>
 
-            {/* ── Sub-bar: page title + breadcrumb ── */}
-            <div className="bg-white border-b border-slate-100 px-5 py-3 flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-700">{activeLabel}</span>
-                <span className="text-slate-400">
-                    {meta.label}
-                    <span className="mx-1.5 text-slate-300">›</span>
-                    {sectionLabel}
-                    <span className="mx-1.5 text-slate-300">›</span>
-                    <span className="text-slate-600 font-medium">{activeLabel}</span>
-                </span>
+            {/* ── Breadcrumb sub-bar ── */}
+            <div
+                style={{
+                    background: 'var(--bg-base)',
+                    borderBottom: '1px solid var(--border)',
+                    padding: '6px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    letterSpacing: '0.02em',
+                }}
+            >
+                <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>{meta.label}</span>
+                <span style={{ color: 'var(--border-strong)' }}>›</span>
+                <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>{sectionLabel}</span>
+                <span style={{ color: 'var(--border-strong)' }}>›</span>
+                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{activeLabel}</span>
             </div>
         </div>
     );

@@ -72,8 +72,8 @@ const ShiftSwapRequestModal = ({ isOpen, onClose, onRefresh }) => {
             const deptId = profile.departmentId;
             const empList = await api.get(`/employees?departmentId=${deptId}`).then(res => res.data);
             const shiftList = await api.get('/workshifts').then(res => res.data);
-            // Chỉ lấy 4 ca chuẩn: HC, Ca 1 (S1), Ca 2 (C1), Ca 3 (D1)
-            const standardCodes = ['HC', 'S1', 'C1', 'D1'];
+            // Chỉ lấy 4 ca chuẩn: HC, Ca 1 (C1), Ca 2 (C2), Ca 3 (C3)
+            const standardCodes = ['HC', 'C1', 'C2', 'C3'];
             const filteredShifts = shiftList.filter(s => standardCodes.includes(s.shiftCode));
             setShifts(filteredShifts);
 

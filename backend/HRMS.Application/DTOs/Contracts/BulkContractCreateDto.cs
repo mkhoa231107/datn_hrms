@@ -19,3 +19,5 @@ namespace HRMS.Application.DTOs.Contract
         public int? ShiftId { get; set; }
     }
 }
+
+

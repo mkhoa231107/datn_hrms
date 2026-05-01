@@ -40,10 +40,11 @@ namespace HRMS.Infrastructure.Services
                 
                 Console.WriteLine($"[DEBUG] GetMatrix: Role=DepartmentHead, DeptId={deptIdString}, EmpId={employeeIdString}");
 
-                if (int.TryParse(deptIdString, out int deptIdStr))
+                if (int.TryParse(deptIdString, out int deptIdVal))
                 {
-                    // For DepartmentHead: Strictly filter by DepartmentId
-                    employeesQuery = employeesQuery.Where(e => e.DepartmentId == deptIdStr);
+                    // For Managers: Include sub-departments
+                    var deptIds = await GetDepartmentHierarchyIdsAsync(deptIdVal);
+                    employeesQuery = employeesQuery.Where(e => deptIds.Contains(e.DepartmentId));
 
                     // Exclude the Department Head themselves from the list
                     if (!string.IsNullOrEmpty(employeeIdString) && int.TryParse(employeeIdString, out int employeeId))
@@ -67,8 +68,9 @@ namespace HRMS.Infrastructure.Services
             }
             else if (deptId.HasValue)
             {
-                // For Admin/HrAdmin: Use department filter if provided
-                employeesQuery = employeesQuery.Where(e => e.DepartmentId == deptId.Value);
+                // For Admin/HrAdmin: Use department filter if provided (including sub-depts)
+                var deptIds = await GetDepartmentHierarchyIdsAsync(deptId.Value);
+                employeesQuery = employeesQuery.Where(e => deptIds.Contains(e.DepartmentId));
             }
 
             var employees = await employeesQuery
@@ -95,8 +97,8 @@ namespace HRMS.Infrastructure.Services
                     EmployeeId = emp.Id,
                     FullName = emp.FullName,
                     EmployeeCode = emp.EmployeeCode,
-                    PositionName = emp.Position?.PositionName,
-                    DepartmentName = emp.Department?.DepartmentName,
+                    PositionName = emp.Position?.PositionName ?? string.Empty,
+                    DepartmentName = emp.Department?.DepartmentName ?? string.Empty,
                     Schedules = dates.Select(date =>
                     {
                         var s = empSchedules.FirstOrDefault(x => x.WorkingDate.Date == date.Date);
@@ -149,8 +151,8 @@ namespace HRMS.Infrastructure.Services
             return new WorkScheduleMatrixDto
             {
                 EmployeeId = employee.Id,
-                EmployeeCode = employee.EmployeeCode,
-                FullName = employee.FullName,
+                EmployeeCode = employee.EmployeeCode ?? string.Empty,
+                FullName = employee.FullName ?? string.Empty,
                 DepartmentName = employee.Department?.DepartmentName ?? "N/A",
                 PositionName = employee.Position?.PositionName ?? "N/A",
                 Schedules = dates.Select(date =>
@@ -626,6 +628,15 @@ namespace HRMS.Infrastructure.Services
 
             foreach (var emp in employees)
             {
+                // ── SKIP: Công nhân xưởng PRD-ASS dùng lịch xoay ca riêng (MassWorkerSeeder).
+                // GenerateFromContractAsync KHÔNG được ghi đè lịch rotation của họ bằng ca hợp đồng cố định (S1).
+                // Chỉ PRD-ASS-001 (trưởng xưởng) mới follow ca từ hợp đồng.
+                bool isPrdRotatingWorker = emp.EmployeeCode != null
+                    && emp.EmployeeCode.StartsWith("PRD-ASS-")
+                    && emp.EmployeeCode != "PRD-ASS-001";
+
+                if (isPrdRotatingWorker) continue;
+
                 // 3. Tìm hợp đồng đang active có ghi ca làm
                 var activeContract = emp.Contracts
                     .Where(c => c.Status == ContractStatus.Active && c.ShiftId.HasValue)
@@ -767,14 +778,14 @@ namespace HRMS.Infrastructure.Services
             // 1. Get Prerequisites
             var shifts = await _context.WorkShifts.AsNoTracking().ToListAsync();
             var hcShift = shifts.FirstOrDefault(s => s.ShiftCode == "HC") ?? shifts.FirstOrDefault();
-            var s1 = shifts.FirstOrDefault(s => s.ShiftCode == "S1");
-            var c1 = shifts.FirstOrDefault(s => s.ShiftCode == "C1");
-            var d1 = shifts.FirstOrDefault(s => s.ShiftCode == "D1");
+            var shiftC1 = shifts.FirstOrDefault(s => s.ShiftCode == "C1");
+            var shiftC2 = shifts.FirstOrDefault(s => s.ShiftCode == "C2");
+            var shiftC3 = shifts.FirstOrDefault(s => s.ShiftCode == "C3");
 
-            if (hcShift == null || s1 == null || c1 == null || d1 == null)
-                throw new InvalidOperationException("Thiếu danh mục ca làm việc (HC, S1, C1, D1). Vui lòng kiểm tra lại cấu hình ca.");
+            if (hcShift == null || shiftC1 == null || shiftC2 == null || shiftC3 == null)
+                throw new InvalidOperationException("Thiếu danh mục ca làm việc (HC, C1, C2, C3). Vui lòng kiểm tra lại cấu hình ca.");
 
-            int[] rotatingShiftIds = { s1.Id, c1.Id, d1.Id };
+            int[] rotatingShiftIds = { shiftC1.Id, shiftC2.Id, shiftC3.Id };
 
             // 2. Get All Employees with relevant info
             var employees = await _context.Employees
@@ -821,11 +832,12 @@ namespace HRMS.Infrastructure.Services
 
                     if (isPrdWorker)
                     {
-                        // Logic matching MassWorkerSeeder: Group 0 (002-051), 1 (052-101), 2 (102-151)
-                        string numPart = emp.EmployeeCode.Replace("PRD-ASS-", "");
+                        string numPart = new string(emp.EmployeeCode.Where(char.IsDigit).ToArray());
                         if (int.TryParse(numPart, out int workerNum))
                         {
-                            initialGroup = ((workerNum - 2) / 50) % 3;
+                            int offset = emp.EmployeeCode.Contains("-W-") ? 1 : 2;
+                            initialGroup = ((workerNum - offset) / 50) % 3;
+                            if (initialGroup < 0) initialGroup = 0;
                         }
                     }
 
@@ -840,9 +852,11 @@ namespace HRMS.Infrastructure.Services
                         if (isPrdWorker)
                         {
                             int weekNum = System.Globalization.ISOWeek.GetWeekOfYear(date);
-                            int shiftIndex = (initialGroup + weekNum - 1) % 3;
+                            // Xoay ca mỗi 2 tuần thay vì 1 tuần
+                            int rotationCycle = (weekNum - 1) / 2;
+                            int shiftIndex = (initialGroup + rotationCycle) % 3;
                             assignedShiftId = rotatingShiftIds[shiftIndex];
-                            note = $"Xoay ca tự động (Nhóm {initialGroup + 1}, Tuần {weekNum})";
+                            note = $"Xoay ca 2 tuần/lần (Nhóm {initialGroup + 1}, Tuần {weekNum})";
                         }
                         else
                         {
@@ -899,7 +913,7 @@ namespace HRMS.Infrastructure.Services
             };
         }
 
-        public async Task<WorkScheduleDayDto> GetByDateAsync(int employeeId, DateTime date)
+        public async Task<WorkScheduleDayDto?> GetByDateAsync(int employeeId, DateTime date)
         {
             var schedule = await _context.WorkSchedules
                 .Include(s => s.WorkShift)
@@ -915,6 +929,22 @@ namespace HRMS.Infrastructure.Services
                 ShiftCode = schedule.WorkShift != null ? schedule.WorkShift.ShiftCode : "OFF",
                 IsLocked = schedule.Period?.IsLocked ?? false
             };
+        }
+
+        private async Task<List<int>> GetDepartmentHierarchyIdsAsync(int departmentId)
+        {
+            var result = new List<int> { departmentId };
+            var children = await _context.Departments
+                .Where(d => d.ParentDepartmentId == departmentId && d.IsActive)
+                .Select(d => d.Id)
+                .ToListAsync();
+
+            foreach (var childId in children)
+            {
+                result.AddRange(await GetDepartmentHierarchyIdsAsync(childId));
+            }
+
+            return result.Distinct().ToList();
         }
     }
 }

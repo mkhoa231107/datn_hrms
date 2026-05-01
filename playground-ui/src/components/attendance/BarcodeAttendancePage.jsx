@@ -65,7 +65,7 @@ export default function BarcodeAttendancePage({ onBack }) {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)', padding: '24px', fontFamily: 'Inter, sans-serif', position: 'relative' }}>
+    <div style={{ minHeight: '100vh', background: '#0f172a', padding: '24px', fontFamily: 'Inter, sans-serif', position: 'relative' }}>
       
       {onBack && (
         <button

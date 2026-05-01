@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import SignatureCanvas from 'react-signature-canvas';
 import { Umbrella, Clock, Paperclip, X, Save, Printer, Check, Trash2, Image as ImageIcon } from 'lucide-react';
 import { BASE_URL } from '../../api';
@@ -50,7 +51,11 @@ export default function LeavePaperModal({
     const isDeptHead = roles.includes('DepartmentHead') || roles.includes('Admin');
     const isTeamLead = roles.includes('TeamLeader');
     const canApprove = isDeptHead || isTeamLead;
-    const hasStoredSig = !!user?.signature;
+    const hasStoredSig = !!(user?.signature);
+    // Build correct full URL for stored signature
+    const storedSigUrl = user?.signature
+        ? (user.signature.startsWith('http') ? user.signature : `${BASE_URL}${user.signature}`)
+        : null;
 
     const sigCanvas = useRef(null);
     const approverSigCanvas = useRef(null);
@@ -89,7 +94,10 @@ export default function LeavePaperModal({
 
     const validateForm = () => {
         if (mode !== 'create') return null;
-        if (!form.fromDate || !form.toDate || !form.leaveTypeId) return null;
+        if (!form.leaveTypeId) return "Vui lòng chọn Loại nghỉ phép.";
+        if (!form.fromDate || !form.toDate) return "Vui lòng chọn Thời gian nghỉ (Từ ngày - Đến ngày).";
+        if (!form.reason?.trim()) return "Vui lòng nhập Lý do xin nghỉ.";
+        if (!form.phone?.trim()) return "Vui lòng nhập Số điện thoại liên lạc.";
 
         const start = new Date(form.fromDate);
         const today = new Date();
@@ -177,7 +185,7 @@ export default function LeavePaperModal({
                 return;
             }
 
-            onSubmit({ ...form, requesterSignature: finalSignature });
+            onSubmit({ ...form, leaveTypeId: parseInt(form.leaveTypeId, 10), requesterSignature: finalSignature });
         } else if (mode === 'view' && onSubmit && canApprove) {
             // Approval flow
             const canvas = approverSigCanvas.current.getCanvas();
@@ -215,7 +223,7 @@ export default function LeavePaperModal({
 
     const currentType = mode === 'view' ? (requestData?.leaveTypeName || '...') : (leaveTypes.find(t => t.id === parseInt(form.leaveTypeId))?.name || '...');
 
-    return (
+    return createPortal(
         <div className="leave-paper-overlay">
             <div className="leave-paper-container">
                 <div className="leave-paper-header">
@@ -388,7 +396,12 @@ export default function LeavePaperModal({
                             <div className="sig-canvas-wrap">
                                 {form.requesterSignature ? (
                                     <div className="sig-image-wrap">
-                                        <img src={form.requesterSignature} alt="Selected Signature" className="sig-image" />
+                                        <img 
+                                            src={form.requesterSignature} 
+                                            alt="Selected Signature" 
+                                            className="sig-image"
+                                            onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling && (e.target.nextSibling.style.display = 'block'); }}
+                                        />
                                         <button type="button" onClick={() => setForm({...form, requesterSignature: null})} style={{ fontSize: '11px', padding: '2px 5px', marginTop: '5px' }}>Ký lại thủ công</button>
                                     </div>
                                 ) : (
@@ -401,7 +414,7 @@ export default function LeavePaperModal({
                                         <div style={{ display: 'flex', gap: '10px', marginTop: '5px', justifyContent: 'center' }}>
                                             <button type="button" onClick={handleClearSig} style={{ fontSize: '11px', padding: '2px 5px' }}>Xóa chữ ký</button>
                                             {hasStoredSig && (
-                                                <button type="button" onClick={() => setForm({...form, requesterSignature: user.signature})} style={{ fontSize: '11px', padding: '2px 5px', color: '#1a56db' }}>Sử dụng chữ ký đã lưu</button>
+                                                <button type="button" onClick={() => setForm({...form, requesterSignature: storedSigUrl})} style={{ fontSize: '11px', padding: '2px 5px', color: '#1a56db' }}>Sử dụng chữ ký đã lưu</button>
                                             )}
                                         </div>
                                     </>
@@ -488,6 +501,7 @@ export default function LeavePaperModal({
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

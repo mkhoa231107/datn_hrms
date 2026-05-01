@@ -4,7 +4,10 @@ using Microsoft.EntityFrameworkCore;
 #pragma warning disable EF1002
 using System;
 using System.Linq;
+using System.Text;
+using System.Globalization;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace HRMS.Infrastructure.Seeders
 {
@@ -12,6 +15,7 @@ namespace HRMS.Infrastructure.Seeders
     {
         public static async Task FixUserRolesAsync(HRMSDbContext context)
         {
+            context.ChangeTracker.Clear();
             Console.WriteLine("🛠️ Starting Role Data Fix...");
 
             var employeeRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Employee");
@@ -49,6 +53,7 @@ namespace HRMS.Infrastructure.Seeders
 
         public static async Task FixSpecificManagerRolesAsync(HRMSDbContext context)
         {
+            context.ChangeTracker.Clear();
             Console.WriteLine("🛠️ [FIX] Standardizing Manager vs Admin permissions...");
 
             var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Admin");
@@ -67,7 +72,8 @@ namespace HRMS.Infrastructure.Seeders
                 var currentRoles = await context.UserRoles.Where(ur => ur.UserId == manager.Id).ToListAsync();
                 
                 // 1. Ensure they have DepartmentManager role
-                if (!currentRoles.Any(ur => ur.RoleId == managerRole.Id))
+                if (!currentRoles.Any(ur => ur.RoleId == managerRole.Id) && 
+                    !context.UserRoles.Local.Any(ur => ur.UserId == manager.Id && ur.RoleId == managerRole.Id))
                 {
                     context.UserRoles.Add(new UserRole { UserId = manager.Id, RoleId = managerRole.Id, AssignedAt = DateTime.UtcNow });
                     Console.WriteLine($"   -> 👑 Assigned DepartmentManager role to {manager.Username}");
@@ -112,7 +118,7 @@ namespace HRMS.Infrastructure.Seeders
                     UPDATE e
                     SET e.UserId = u.Id
                     FROM Employees e
-                    INNER JOIN Users u ON (u.Username LIKE 'prd_ass_%' AND e.EmployeeCode = 'PRD-ASS-' + RIGHT('000' + CAST(REPLACE(u.Username, 'prd_ass_', '') AS INT), 3))
+                    INNER JOIN Users u ON (u.Username LIKE 'prd_ass_%' AND ISNUMERIC(REPLACE(u.Username, 'prd_ass_', '')) = 1 AND e.EmployeeCode = 'PRD-ASS-' + RIGHT('000' + CAST(REPLACE(u.Username, 'prd_ass_', '') AS INT), 3))
                     WHERE e.UserId IS NULL OR e.UserId <> u.Id;
 
                     -- Nhóm 2: Nếu sau bước 1 vẫn chưa có UserId, thử với prd-ass-002 (Gạch ngang)
@@ -546,6 +552,7 @@ namespace HRMS.Infrastructure.Seeders
 
         public static async Task FixDeptHeadRolesAsync(HRMSDbContext context)
         {
+            context.ChangeTracker.Clear();
             Console.WriteLine("🛠️ [SEEDER] Đang cấu hình lại phân quyền Trưởng bộ phận cho các tài khoản '01'...");
             
             var headRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentHead");
@@ -556,14 +563,14 @@ namespace HRMS.Infrastructure.Seeders
                 return;
             }
 
-            // Tìm tất cả User có Username kết thúc bằng '01'
+            // Tìm tất cả User có Username kết thúc bằng '01', loại trừ công nhân/nhân viên
             var accounts01 = await context.Users
-                .Where(u => u.Username.EndsWith("01"))
+                .Where(u => u.Username.EndsWith("01") && !u.Username.Contains("_w_") && !u.Username.Contains("_staff_"))
                 .ToListAsync();
 
-            // Tìm tất cả Employee có chức danh 'Trưởng bộ phận' (Dành cho acc_int_01 v.v.)
+            // Tìm tất cả Employee có chức danh 'Trưởng bộ phận' 
             var employeesWithHeadTitle = await context.Employees
-                .Where(e => e.Position.PositionName.Contains("Trưởng bộ phận") || e.EmployeeCode.EndsWith("01"))
+                .Where(e => e.Position.PositionName.Contains("Trưởng bộ phận"))
                 .Select(e => e.UserId)
                 .Where(uid => uid.HasValue)
                 .ToListAsync();
@@ -594,20 +601,44 @@ namespace HRMS.Infrastructure.Seeders
                     var oldRole = currentRoles.FirstOrDefault(ur => ur.RoleId == (employeeRole?.Id ?? 1));
                     if (oldRole != null) context.UserRoles.Remove(oldRole);
 
-                    context.UserRoles.Add(new UserRole { 
-                        UserId = userId, 
-                        RoleId = headRole.Id, 
-                        AssignedAt = DateTime.UtcNow 
-                    });
+                    // Ensure we are not already tracking this role in the Local collection to avoid conflict
+                    if (!context.UserRoles.Local.Any(ur => ur.UserId == userId && ur.RoleId == headRole.Id))
+                    {
+                        context.UserRoles.Add(new UserRole { 
+                            UserId = userId, 
+                            RoleId = headRole.Id, 
+                            AssignedAt = DateTime.UtcNow 
+                        });
+                    }
                     
                     Console.WriteLine($"   -> 👑 Đã nâng cấp code/tài khoản {user.Username} lên Trưởng bộ phận.");
                     updatedCount++;
                 }
             }
 
+            // [CLEANUP] Hạ quyền những nhân viên bị gán nhầm role DepartmentHead (ví dụ prd_ass_w_01)
+            var wronglyPromoted = await context.UserRoles
+                .Where(ur => ur.RoleId == headRole.Id)
+                .Where(ur => ur.User.Username.Contains("_w_") || ur.User.Username.Contains("_staff_") || ur.User.Username.Contains("nhanvien"))
+                .ToListAsync();
+
+            if (wronglyPromoted.Any())
+            {
+                Console.WriteLine($"   -> ⚠️ Phát hiện {wronglyPromoted.Count} tài khoản bị gán nhầm quyền Head. Đang hạ cấp...");
+                foreach (var ur in wronglyPromoted)
+                {
+                    context.UserRoles.Remove(ur);
+                    if (employeeRole != null && !context.UserRoles.Local.Any(x => x.UserId == ur.UserId && x.RoleId == employeeRole.Id))
+                    {
+                        context.UserRoles.Add(new UserRole { UserId = ur.UserId, RoleId = employeeRole.Id, AssignedAt = DateTime.UtcNow });
+                    }
+                }
+                updatedCount += wronglyPromoted.Count;
+            }
+
             if (updatedCount > 0) {
                 await context.SaveChangesAsync();
-                Console.WriteLine($"✅ Đã cập nhật phân quyền cho {updatedCount} Trưởng bộ phận.");
+                Console.WriteLine($"✅ Đã cập nhật/sửa lỗi phân quyền cho {updatedCount} tài khoản.");
             } else {
                 Console.WriteLine("✅ Các Trưởng bộ phận đều đã có phân quyền chính xác.");
             }
@@ -701,6 +732,204 @@ namespace HRMS.Infrastructure.Seeders
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ Error patching schema: {ex.Message}");
+            }
+        }
+
+        public static string GenerateWorkEmail(string fullName, string employeeCode)
+        {
+            if (string.IsNullOrWhiteSpace(fullName)) return "employee@gmail.com";
+            if (string.IsNullOrWhiteSpace(employeeCode)) employeeCode = "emp";
+
+            // 1. Remove diacritics
+            string normalizedString = fullName.Normalize(NormalizationForm.FormD);
+            StringBuilder stringBuilder = new StringBuilder();
+
+            foreach (char c in normalizedString)
+            {
+                UnicodeCategory unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+                {
+                    stringBuilder.Append(c);
+                }
+            }
+            string noDiacritics = stringBuilder.ToString().Normalize(NormalizationForm.FormC).ToLower();
+            noDiacritics = noDiacritics.Replace('đ', 'd');
+
+            // 2. Split into parts
+            var parts = noDiacritics.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return $"{employeeCode.ToLower()}@gmail.com";
+
+            // Last part is First Name (Tên)
+            string firstName = parts.Last();
+            
+            // Initials for work email
+            string initials = "";
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                if (parts[i].Length > 0)
+                    initials += parts[i][0];
+            }
+
+            // Work Pattern: [FirstName][Initials][Code]@gmail.com
+            return $"{firstName}{initials}{employeeCode.ToLower()}@gmail.com";
+        }
+
+        public static string GeneratePersonalEmail(string fullName)
+        {
+            if (string.IsNullOrWhiteSpace(fullName)) return "employee@gmail.com";
+
+            // 1. Remove diacritics
+            string normalizedString = fullName.Normalize(NormalizationForm.FormD);
+            StringBuilder stringBuilder = new StringBuilder();
+
+            foreach (char c in normalizedString)
+            {
+                UnicodeCategory unicodeCategory = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (unicodeCategory != UnicodeCategory.NonSpacingMark)
+                {
+                    stringBuilder.Append(c);
+                }
+            }
+            string noDiacritics = stringBuilder.ToString().Normalize(NormalizationForm.FormC).ToLower();
+            noDiacritics = noDiacritics.Replace('đ', 'd');
+
+            // 2. Split into parts
+            var parts = noDiacritics.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return "employee@gmail.com";
+
+            // Pattern: [FirstName][Surname][MiddleNames]@gmail.com
+            // Example: Nguyễn Văn Tùng -> tungnguyenvan@gmail.com
+            string firstName = parts.Last();
+            string restOfName = "";
+            for (int i = 0; i < parts.Length - 1; i++)
+            {
+                restOfName += parts[i];
+            }
+            
+            return $"{firstName}{restOfName}@gmail.com";
+        }
+
+        public static async Task FixEmployeeEmailsAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Updating employee emails...");
+            
+            var employees = await context.Employees.Include(e => e.User).ToListAsync();
+            int count = 0;
+
+            foreach (var emp in employees)
+            {
+                string workEmail = GenerateWorkEmail(emp.FullName, emp.EmployeeCode);
+                string personalEmail = GeneratePersonalEmail(emp.FullName);
+                
+                bool changed = false;
+                if (emp.Email != workEmail)
+                {
+                    emp.Email = workEmail;
+                    changed = true;
+                }
+
+                if (emp.PersonalEmail != personalEmail)
+                {
+                    emp.PersonalEmail = personalEmail;
+                    changed = true;
+                }
+
+                if (emp.User != null && emp.User.Email != workEmail)
+                {
+                    emp.User.Email = workEmail;
+                    changed = true;
+                }
+
+                if (changed) count++;
+            }
+
+            if (count > 0)
+            {
+                await context.SaveChangesAsync();
+                Console.WriteLine($"✅ Updated emails for {count} employees.");
+            }
+        }
+
+        public static async Task FixMissingEmployeeInfoAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Populating missing employee information...");
+            
+            var employees = await context.Employees.ToListAsync();
+            int count = 0;
+            var rand = new Random();
+
+            foreach (var emp in employees)
+            {
+                bool changed = false;
+
+                if (string.IsNullOrWhiteSpace(emp.Phone) || emp.Phone == "0000000000")
+                {
+                    emp.Phone = "09" + rand.Next(10000000, 99999999).ToString();
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.IdentityNumber))
+                {
+                    emp.IdentityNumber = "0" + rand.Next(10000000, 99999999).ToString().PadRight(11, (char)('0' + rand.Next(10)));
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.IdentityPlace))
+                {
+                    emp.IdentityPlace = "Cục Cảnh sát QLHC về TTXH";
+                    changed = true;
+                }
+
+                if (!emp.IdentityDate.HasValue)
+                {
+                    emp.IdentityDate = new DateTime(2021, 1, 1).AddDays(rand.Next(1000));
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.Ethnicity))
+                {
+                    emp.Ethnicity = "Kinh";
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.Religion))
+                {
+                    emp.Religion = "Không";
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.PlaceOfOrigin) || emp.PlaceOfOrigin == "Hà Nội")
+                {
+                    string[] provinces = { "Hà Nội", "Hải Phòng", "Đà Nẵng", "TP. Hồ Chí Minh", "Cần Thơ", "Nghệ An", "Thanh Hóa", "Hà Tĩnh", "Quảng Ninh", "Bắc Ninh" };
+                    emp.PlaceOfOrigin = provinces[rand.Next(provinces.Length)];
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.PlaceOfBirth))
+                {
+                    emp.PlaceOfBirth = emp.PlaceOfOrigin;
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.Address) || emp.Address == "HQ" || emp.Address == "System")
+                {
+                    emp.Address = $"Số {rand.Next(1, 200)}, Phố {emp.PlaceOfOrigin}, Việt Nam";
+                    changed = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(emp.CurrentAddress))
+                {
+                    emp.CurrentAddress = emp.Address;
+                    changed = true;
+                }
+
+                if (changed) count++;
+            }
+
+            if (count > 0)
+            {
+                await context.SaveChangesAsync();
+                Console.WriteLine($"✅ Populated missing info for {count} employees.");
             }
         }
     }

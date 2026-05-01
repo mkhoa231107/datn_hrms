@@ -281,6 +281,22 @@ namespace HRMS.Infrastructure.Services
             if (dto.StartDate > dto.EndDate)
                 throw new Exception("Ngày kết thúc không được nhỏ hơn ngày bắt đầu.");
 
+            // Validate Overlap/Duplicate
+            // Check if requester or partner has any pending/approved request overlapping this date range
+            var overlappingRequest = await _context.ShiftSwapRequests
+                .Where(r => (r.EmployeeAId == requesterId || r.EmployeeBId == requesterId || 
+                             r.EmployeeAId == dto.PartnerId || r.EmployeeBId == dto.PartnerId)
+                         && r.Status != ShiftSwapRequestStatus.Rejected 
+                         && r.Status != ShiftSwapRequestStatus.Cancelled
+                         && r.StartDate.Date <= dto.EndDate.Date 
+                         && r.EndDate.Date >= dto.StartDate.Date)
+                .FirstOrDefaultAsync();
+
+            if (overlappingRequest != null)
+            {
+                throw new Exception($"Đã có đơn đổi ca khác (Đơn #{overlappingRequest.Id}) trùng lặp thời gian với yêu cầu này.");
+            }
+
             var request = new ShiftSwapRequest
             {
                 EmployeeAId = requesterId,
@@ -546,10 +562,10 @@ namespace HRMS.Infrastructure.Services
                 document.Add(new Paragraph("ĐƠN XIN ĐỔI CA LÀM VIỆC").SetTextAlignment(iText.Layout.Properties.TextAlignment.CENTER).SetFontSize(16).SetBold());
                 document.Add(new Paragraph("\nKính gửi: Ban Giám Đốc và Phòng Hành chính – Nhân sự"));
 
-                document.Add(new Paragraph($"Người làm đơn: {request.EmployeeA.FullName} / Mã NV: {request.EmployeeA.EmployeeCode}"));
-                document.Add(new Paragraph($"Bộ phận: {request.EmployeeA.Department.DepartmentName}"));
+                document.Add(new Paragraph($"Người làm đơn: {request.EmployeeA!.FullName} / Mã NV: {request.EmployeeA.EmployeeCode}"));
+                document.Add(new Paragraph($"Bộ phận: {request.EmployeeA.Department!.DepartmentName}"));
                 
-                document.Add(new Paragraph($"Tôi xin hoán đổi ca làm việc với đồng nghiệp: {request.EmployeeB.FullName} / Mã NV: {request.EmployeeB.EmployeeCode}"));
+                document.Add(new Paragraph($"Tôi xin hoán đổi ca làm việc với đồng nghiệp: {request.EmployeeB!.FullName} / Mã NV: {request.EmployeeB.EmployeeCode}"));
                 document.Add(new Paragraph("Nội dung hoán đổi:"));
                 document.Add(new Paragraph($"- Đổi toàn bộ lịch làm việc của 2 bên."));
                 document.Add(new Paragraph($"- Thời gian thực hiện: Từ ngày {request.StartDate:dd/MM/yyyy} đến ngày {request.EndDate:dd/MM/yyyy}."));

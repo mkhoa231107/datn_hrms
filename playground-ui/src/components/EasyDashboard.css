@@ -1,7 +1,7 @@
 .easy-dashboard-container {
     position: relative;
     min-height: calc(100vh - 64px - 48px);
-    background: linear-gradient(135deg, #F5F3FF 0%, #EDE9FE 100%);
+    background: #F5F3FF;
     border-radius: 0; 
     padding: 0;
     overflow: hidden; /* Prevent container scroll, use content scroll or pagination */

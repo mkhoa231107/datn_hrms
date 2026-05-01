@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import attendanceService from '../../services/attendanceService';
 import api from '../../api';
-import './Attendance.css';
+import { Calendar, Clock, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Filter, Download, Info, Timer } from 'lucide-react';
 
 function fmtDuration(minutes) {
     if (!minutes || minutes <= 0) return "";
@@ -11,17 +11,13 @@ function fmtDuration(minutes) {
     return m > 0 ? `${h}h ${m}p` : `${h}h`;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   HELPERS
-───────────────────────────────────────────────────────────── */
 function getStatusInfo(ci, co, shiftStart, shiftEnd) {
-    if (!ci) return { label: 'Chưa vào ca',    cls: 'st-na', isLate: false, isEarly: false, lateMin: 0, earlyMin: 0 };
-    if (!co) return { label: 'Quên check-out', cls: 'st-miss', isLate: false, isEarly: false, lateMin: 0, earlyMin: 0 };
+    if (!ci) return { label: 'Chưa vào ca', cls: 'badge-danger', isLate: false, isEarly: false, lateMin: 0, earlyMin: 0 };
+    if (!co) return { label: 'Quên check-out', cls: 'badge-warning', isLate: false, isEarly: false, lateMin: 0, earlyMin: 0 };
     
     const dCi = new Date(ci);
     const dCo = new Date(co);
 
-    // Tạo mốc so sánh chính xác dựa trên ngày của check-in
     const baseStart = new Date(dCi);
     const [hS, mS] = (shiftStart || "08:00:00").split(':').map(Number);
     baseStart.setHours(hS, mS, 0, 0);
@@ -30,14 +26,8 @@ function getStatusInfo(ci, co, shiftStart, shiftEnd) {
     const [hE, mE] = (shiftEnd || "17:00:00").split(':').map(Number);
     baseEnd.setHours(hE, mE, 0, 0);
     
-    // Xử lý ca xuyên đêm
     if (baseEnd <= baseStart) baseEnd.setDate(baseEnd.getDate() + 1);
 
-    // Grace Period: 30p trước / 15p sau
-    const graceStart = new Date(baseStart); graceStart.setMinutes(graceStart.getMinutes() - 30);
-    const graceEnd   = new Date(baseEnd);   graceEnd.setMinutes(graceEnd.getMinutes() + 15);
-
-    // Logic Late/Early
     const isLate  = dCi > baseStart;
     const isEarly = dCo < baseEnd;
 
@@ -45,17 +35,17 @@ function getStatusInfo(ci, co, shiftStart, shiftEnd) {
     const earlyMin = isEarly ? Math.floor((baseEnd - dCo) / 60000) : 0;
     
     let label = 'Đúng giờ';
-    let cls = 'st-ok';
+    let cls = 'badge-success';
     
     if (isLate && isEarly) {
-        label = `Trễ ${fmtDuration(lateMin)} & Sớm ${fmtDuration(earlyMin)}`;
-        cls = 'st-late';
+        label = `Trễ & Sớm`;
+        cls = 'badge-danger';
     } else if (isLate) {
         label = `Muộn ${fmtDuration(lateMin)}`;
-        cls = 'st-late';
+        cls = 'badge-danger';
     } else if (isEarly) {
-        label = `Sớm ${fmtDuration(earlyMin)}`;
-        cls = 'st-early';
+        label = `Về sớm ${fmtDuration(earlyMin)}`;
+        cls = 'badge-warning';
     }
     
     return { label, cls, isLate, isEarly, lateMin, earlyMin };
@@ -81,23 +71,19 @@ function fmtTime(ts) {
 const VN_DAYS = ['CN','T2','T3','T4','T5','T6','T7'];
 const ROWS_PER_PAGE = 10;
 
-/* ─────────────────────────────────────────────────────────────
-   MAIN COMPONENT
-───────────────────────────────────────────────────────────── */
 export default function Attendance() {
     const now = new Date();
     const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const [activeTab,     setActiveTab]     = useState('chamcong');   // 'chamcong' | 'lichsu'
+    const [activeTab, setActiveTab] = useState('summary');
     const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
-    const [chipFilter,    setChipFilter]    = useState('all');         // chip filter
-    const [subtabFilter,  setSubtabFilter]  = useState('all');         // history sub-tabs
-    const [history,       setHistory]       = useState([]);
-    const [todayRecords,  setTodayRecords]  = useState([]);
-    const [user,          setUser]          = useState(null);
-    const [clock,         setClock]         = useState(new Date());
-    const [page,          setPage]          = useState(1);
-    const [overtime,      setOvertime]      = useState([]); // { date, startTime, endTime, status }
+    const [history, setHistory] = useState([]);
+    const [todayRecords, setTodayRecords] = useState([]);
+    const [user, setUser] = useState(null);
+    const [clock, setClock] = useState(new Date());
+    const [page, setPage] = useState(1);
+    const [overtime, setOvertime] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         api.get('/auth/me').then(r => setUser(r.data)).catch(() => {});
@@ -108,10 +94,6 @@ export default function Attendance() {
 
     useEffect(() => { loadHistory(selectedMonth); }, [selectedMonth]);
 
-    // Sync chip & subtab
-    const handleSubtab = (val) => { setSubtabFilter(val); setChipFilter(val); setPage(1); };
-    const handleChip   = (val) => { setChipFilter(val); setSubtabFilter(val); setPage(1); };
-
     const loadToday = async () => {
         const d = new Date().toISOString().split('T')[0];
         try {
@@ -121,6 +103,7 @@ export default function Attendance() {
     };
 
     const loadHistory = async (m) => {
+        setLoading(true);
         try {
             const [yr, mo] = m.split('-').map(Number);
             const from = `${yr}-${String(mo).padStart(2,'0')}-01`;
@@ -130,7 +113,6 @@ export default function Attendance() {
             const r = await attendanceService.getMyRecords(from, to);
             if (r?.success) setHistory(r.data || []); else setHistory([]);
 
-            // Fetch OT for the month
             const otR = await attendanceService.getMyOvertime();
             if (otR?.success) {
                 const filteredOt = (otR.data || []).filter(it => {
@@ -141,20 +123,14 @@ export default function Attendance() {
             } else {
                 setOvertime([]);
             }
-        } catch { setHistory([]); setOvertime([]); }
+        } catch { 
+            setHistory([]); 
+            setOvertime([]); 
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const ciRec = todayRecords.find(r => r.type === 'CheckIn');
-    const coRec = todayRecords.find(r => r.type === 'CheckOut');
-    const noneRec = todayRecords.find(r => r.type === 'None'); // Virtual record from backend if no check-in yet
-    
-    // We use noneRec only if we don't have a real CheckIn yet
-    const activeShift = ciRec || coRec || noneRec;
-
-    const isCheckedIn  = !!ciRec;
-    const isCheckedOut = !!coRec;
-
-    /* Group history into per-day rows */
     const grouped = history.reduce((acc, r) => {
         const d = (r.date || '').split('T')[0];
         if (!acc[d]) acc[d] = { checkIns: [], checkOuts: [] };
@@ -163,472 +139,210 @@ export default function Attendance() {
         return acc;
     }, {});
 
-    let maxCi = 1;
-    let maxCo = 1;
-
-    let allRows = Object.entries(grouped)
+    const allRows = Object.entries(grouped)
         .sort(([a],[b]) => b.localeCompare(a))
         .map(([date, rec]) => {
-            // Sort ascending for chronological order
             rec.checkIns.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
             rec.checkOuts.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
-
-            maxCi = Math.max(maxCi, rec.checkIns.length);
-            maxCo = Math.max(maxCo, rec.checkOuts.length);
 
             const ci = rec.checkIns[0];
             const co = rec.checkOuts[rec.checkOuts.length - 1];
 
-            // Lấy giờ ca thực tế từ bản ghi
             const sStart = ci?.shiftStartTime || co?.shiftStartTime || "08:00:00";
             const sEnd   = ci?.shiftEndTime   || co?.shiftEndTime   || "17:00:00";
 
-            let snappedCiTime = null;
-            let snappedCoTime = null;
-
-            if (ci) {
-                const ciDate = new Date(ci.timestamp);
-                const shiftStartDt = new Date(ciDate);
-                const [h, m] = sStart.split(':').map(Number);
-                shiftStartDt.setHours(h, m, 0, 0);
-
-                const graceStart = new Date(shiftStartDt);
-                graceStart.setMinutes(graceStart.getMinutes() - 30);
-
-                // Snap nếu nằm trong grace period
-                snappedCiTime = (ciDate >= graceStart && ciDate <= shiftStartDt) ? shiftStartDt : ciDate;
-            }
-
-            if (co) {
-                const coDate = new Date(co.timestamp);
-                const shiftEndDt = new Date(ci ? new Date(ci.timestamp) : coDate);
-                const [h, m] = sEnd.split(':').map(Number);
-                shiftEndDt.setHours(h, m, 0, 0);
-                
-                // Xử lý ca xuyên đêm cho snapping
-                const sDt = new Date(shiftEndDt); 
-                const [hS, mS] = sStart.split(':').map(Number);
-                sDt.setHours(hS, mS, 0, 0);
-                if (shiftEndDt <= sDt) shiftEndDt.setDate(shiftEndDt.getDate() + 1);
-
-                const graceEnd = new Date(shiftEndDt);
-                graceEnd.setMinutes(graceEnd.getMinutes() + 15);
-
-                // Snap nếu nằm trong grace period
-                snappedCoTime = (coDate >= shiftEndDt && coDate <= graceEnd) ? shiftEndDt : coDate;
-            }
-
             return {
-                date, rec, snappedCiTime, snappedCoTime, ci, co,
-                st: getStatusInfo(snappedCiTime, snappedCoTime, sStart, sEnd)
+                date, rec, ci, co,
+                st: getStatusInfo(ci?.timestamp, co?.timestamp, sStart, sEnd)
             };
         });
 
-    // Apply combined filter (chip = subtab)
-    let filteredRows = [...allRows];
-    if (chipFilter === 'late')   filteredRows = filteredRows.filter(r => r.st.isLate);
-    if (chipFilter === 'early')  filteredRows = filteredRows.filter(r => r.st.isEarly);
-    if (chipFilter === 'miss')   filteredRows = filteredRows.filter(r => r.ci && !r.co);
+    const totalPages = Math.max(1, Math.ceil(allRows.length / ROWS_PER_PAGE));
+    const pageRows = allRows.slice((page-1)*ROWS_PER_PAGE, page*ROWS_PER_PAGE);
 
-    const totalPages = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
-    const safePage   = Math.min(page, totalPages);
-    const pageRows   = filteredRows.slice((safePage-1)*ROWS_PER_PAGE, safePage*ROWS_PER_PAGE);
-
-    // Counts
-    const okCnt    = allRows.filter(r => r.st.cls === 'st-ok').length;
-    const lateCnt  = allRows.filter(r => r.st.isLate).length;
-    const earlyCnt = allRows.filter(r => r.st.isEarly).length;
-    const missCnt  = allRows.filter(r => r.ci && !r.co).length;
-
-    // Tổng hợp thực tế (Aggregate)
-    const totalAdjustedDays = allRows.reduce((acc, r) => {
-        const d = (r.ci && r.co) ? Math.max(0, 1.0 - (r.st.isLate ? 0.5 : 0) - (r.st.isEarly ? 0.5 : 0)) : 0;
-        return acc + d;
+    // KPI Calculations
+    const lateDays = allRows.filter(r => r.st.isLate).length;
+    const absentDays = allRows.filter(r => !r.ci && !r.co).length; // Simplified
+    const totalHours = allRows.reduce((acc, r) => {
+        if (r.ci && r.co) {
+            const h = (new Date(r.co.timestamp) - new Date(r.ci.timestamp)) / 3600000;
+            return acc + Math.min(8, h);
+        }
+        return acc;
     }, 0);
-    const totalAdjustedHours = allRows.reduce((acc, r) => {
-        const h = (r.ci && r.co) ? Math.max(0, 8.0 - (r.st.isLate ? 4.0 : 0) - (r.st.isEarly ? 4.0 : 0)) : 0;
-        return acc + h;
-    }, 0);
-
-    const totalOtHours = overtime
-        .filter(ot => ot.status === 'Approved')
-        .reduce((acc, ot) => {
-            const start = new Date(`1970-01-01T${ot.startTime}`);
-            const end = new Date(`1970-01-01T${ot.endTime}`);
-            return acc + (end - start) / 3600000;
-        }, 0);
 
     return (
-        <div className="att-wrap animate-fade-in">
-
-            {/* ══ TAB BAR ══ */}
-            <div className="att-tab-bar">
-                <div
-                    id="att-tab-chamcong"
-                    className={`att-tab${activeTab === 'chamcong' ? ' att-tab-on' : ''}`}
-                    onClick={() => setActiveTab('chamcong')}
-                >
-                    Chấm công
+        <div className="flex flex-col gap-6 animate-fade-up">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="card flex items-center gap-4 bg-indigo-50">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-100">
+                        <Timer size={24} />
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Tổng giờ tháng này</p>
+                        <h3 className="text-2xl font-extrabold text-indigo-900">{totalHours.toFixed(1)}h</h3>
+                    </div>
                 </div>
-                <div
-                    id="att-tab-lichsu"
-                    className={`att-tab${activeTab === 'lichsu' ? ' att-tab-on' : ''}`}
-                    onClick={() => { setActiveTab('lichsu'); loadHistory(selectedMonth); }}
-                >
-                    Lịch sử
+                <div className="card flex items-center gap-4 bg-amber-50">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-100">
+                        <AlertCircle size={24} />
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-amber-400 uppercase tracking-wider">Số ngày đi trễ</p>
+                        <h3 className="text-2xl font-extrabold text-amber-900">{lateDays} ngày</h3>
+                    </div>
+                </div>
+                <div className="card flex items-center gap-4 bg-rose-50">
+                    <div className="w-12 h-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center shadow-lg shadow-rose-100">
+                        <Calendar size={24} />
+                    </div>
+                    <div>
+                        <p className="text-xs font-bold text-rose-400 uppercase tracking-wider">Số ngày vắng</p>
+                        <h3 className="text-2xl font-extrabold text-rose-900">{absentDays} ngày</h3>
+                    </div>
                 </div>
             </div>
 
-            {/* ══════════════ CHẤM CÔNG TAB ══════════════ */}
-            {activeTab === 'chamcong' && (
-                <>
-                    <div className="att-today-panel">
-                        <div className="att-section-title">Thông tin chấm công hôm nay</div>
-
-                        <table className="att-info-table">
-                            <tbody>
-                                <tr>
-                                    <th>Ngày</th>
-                                    <td>
-                                        <strong>
-                                            {clock.toLocaleDateString('vi-VN', { weekday:'long', day:'numeric', month:'numeric', year:'numeric' })}
-                                        </strong>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Giờ hệ thống</th>
-                                    <td>
-                                        <span className="att-clock-val">
-                                            {clock.toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Giờ vào ca</th>
-                                    <td>
-                                        {fmtTime(ciRec?.timestamp)
-                                            ? <strong>{fmtTime(ciRec.timestamp)}</strong>
-                                            : <span className="att-time-na">--:--</span>}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Giờ ra ca</th>
-                                    <td>
-                                        {fmtTime(coRec?.timestamp)
-                                            ? <strong>{fmtTime(coRec.timestamp)}</strong>
-                                            : <span className="att-time-na">--:--</span>}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Trạng thái</th>
-                                    <td>
-                                        {isCheckedOut
-                                            ? <span className="st-ok">✓ Đủ công</span>
-                                            : isCheckedIn
-                                                ? <span className="st-wip">Đang làm việc</span>
-                                                : <span className="att-time-na">Chưa vào ca</span>}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>Ca làm việc</th>
-                                    <td>
-                                        {activeShift?.shiftName || 'Hành chính'} &nbsp;
-                                        ({(activeShift?.shiftStartTime || '08:00:00').substring(0,5)} – {(activeShift?.shiftEndTime || '17:00:00').substring(0,5)})
-                                    </td>
-                                </tr>
-                                {(ciRec?.otStartTime || coRec?.otStartTime) && (
-                                    <>
-                                        <tr>
-                                            <th style={{ color: '#059669' }}>Tăng ca (Đã duyệt)</th>
-                                            <td style={{ color: '#059669', fontWeight: 'bold' }}>
-                                                {(ciRec?.otStartTime || coRec?.otStartTime).substring(0,5)} – {(ciRec?.otEndTime || coRec?.otEndTime).substring(0,5)}
-                                                &nbsp; (+{(ciRec?.otEndTime && ciRec?.otStartTime ? 
-                                                    (new Date(`1970-01-01T${ciRec.otEndTime}`) - new Date(`1970-01-01T${ciRec.otStartTime}`))/3600000 : 
-                                                    (new Date(`1970-01-01T${coRec.otEndTime}`) - new Date(`1970-01-01T${coRec.otStartTime}`))/3600000).toFixed(1)}h)
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th>Giờ về dự kiến</th>
-                                            <td style={{ color: '#2563eb', fontWeight: 'bold' }}>
-                                                {(ciRec?.otEndTime || coRec?.otEndTime).substring(0,5)}
-                                                <div style={{ fontSize: '11px', fontWeight: 'normal', color: '#64748b' }}>
-                                                    * OT tính làm tròn sàn mỗi 0.5h thực tế.
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    </>
-                                )}
-                            </tbody>
-                        </table>
+            {/* History Table Card */}
+            <div className="card !p-0 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800">Lịch sử chấm công</h3>
+                        <p className="text-xs text-slate-400 font-medium">Chi tiết giờ vào/ra và trạng thái đi làm</p>
                     </div>
-
-                    {/* Monthly summary */}
-                    <div style={{ paddingTop: 14 }}>
-                        <div className="att-section-title">
-                            Tổng hợp tháng {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}
-                        </div>
-                        <div className="att-month-stats">
-                            <div className="att-ms-item">
-                                <span className="att-ms-num ok">{okCnt}</span>
-                                <span className="att-ms-label">Đúng giờ</span>
-                            </div>
-                            <div className="att-ms-item">
-                                <span className="att-ms-num late">{lateCnt}</span>
-                                <span className="att-ms-label">Đi muộn</span>
-                            </div>
-                            <div className="att-ms-item">
-                                <span className="att-ms-num early">{earlyCnt}</span>
-                                <span className="att-ms-label">Về sớm</span>
-                            </div>
-                            <div className="att-ms-item">
-                                <span className="att-ms-num blue">{totalAdjustedDays.toFixed(1)}</span>
-                                <span className="att-ms-label">Tổng công</span>
-                            </div>
-                            <div className="att-ms-item">
-                                <span className="att-ms-num orange">{totalOtHours.toFixed(1)}h</span>
-                                <span className="att-ms-label">Tăng ca (OT)</span>
-                            </div>
-                            <div className="att-ms-item">
-                                <span className="att-ms-num">{allRows.length}</span>
-                                <span className="att-ms-label">Tổng ngày</span>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {/* ══════════════ LỊCH SỬ TAB ══════════════ */}
-            {activeTab === 'lichsu' && (
-                <>
-                    {/* Filter row */}
-                    <div className="att-hist-filter">
-                        <span className="att-filter-label">Tháng/Năm:</span>
-                        <select
-                            id="att-month-select"
-                            className="att-filter-select"
-                            value={selectedMonth}
-                            onChange={e => { setSelectedMonth(e.target.value); setPage(1); }}
-                        >
-                            {getMonthOptions().map(o => (
-                                <option key={o.val} value={o.val}>{o.label}</option>
-                            ))}
-                        </select>
-
-                        <div className="att-chip-bar">
-                            {[
-                                { id:'all',   label:'Tất cả' },
-                                { id:'late',  label:'Đi muộn' },
-                                { id:'early', label:'Về sớm' },
-                                { id:'miss',  label:'Quên check-out' },
-                            ].map(c => (
-                                <div
-                                    key={c.id}
-                                    className={`att-chip${chipFilter === c.id ? ' att-chip-on' : ''}`}
-                                    onClick={() => handleChip(c.id)}
-                                >
-                                    {c.label}
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Summary Block */}
-                        <div className="att-sum-bar">
-                            <div className="att-sum-item">
-                                <span className="att-sum-lbl">Tổng ngày công:</span>
-                                <span className="att-sum-val">{totalAdjustedDays.toFixed(1)}</span>
-                            </div>
-                            <div className="att-sum-item">
-                                <span className="att-sum-lbl">Tổng giờ làm:</span>
-                                <span className="att-sum-val">{totalAdjustedHours.toFixed(1)}h</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* History sub-tabs */}
-                    <div className="att-subtabs">
-                        {[
-                            { id:'all',   label:'Tất cả',       cnt: allRows.length },
-                            { id:'late',  label:'Đi muộn',      cnt: lateCnt },
-                            { id:'early', label:'Về sớm',       cnt: earlyCnt },
-                            { id:'miss',  label:'Quên check-out', cnt: missCnt },
-                        ].map(t => (
-                            <div
-                                key={t.id}
-                                className={`att-subtab${subtabFilter === t.id ? ' att-subtab-on' : ''}`}
-                                onClick={() => handleSubtab(t.id)}
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <select
+                                className="input !py-1.5 !pl-9 !pr-4 text-xs font-bold appearance-none bg-white cursor-pointer"
+                                value={selectedMonth}
+                                onChange={e => { setSelectedMonth(e.target.value); setPage(1); }}
                             >
-                                {t.label} ({t.cnt})
-                            </div>
-                        ))}
+                                {getMonthOptions().map(o => (
+                                    <option key={o.val} value={o.val}>{o.label}</option>
+                                ))}
+                            </select>
+                            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        </div>
+                        <button className="btn btn-ghost !p-2" title="Tải xuống">
+                            <Download size={16} />
+                        </button>
                     </div>
+                </div>
 
-                    {/* Data table */}
-                    <div className="att-table-wrap">
-                        <table className="att-table">
-                            <thead>
-                                <tr>
-                                    <th className="c" style={{ width: 44 }} rowSpan={2}>STT</th>
-                                    <th style={{ width: 120 }} rowSpan={2}>Ngày</th>
-                                    <th className="c bg-slate-50 border-b border-slate-200" colSpan={maxCi + 1}>Giờ Vào (Check-In)</th>
-                                    <th className="c bg-slate-50 border-b border-slate-200 border-l" colSpan={maxCo + 1}>Giờ Ra (Check-Out)</th>
-                                    <th className="c" style={{ width: 80 }} rowSpan={2}>Số Giờ Làm</th>
-                                    <th className="c" style={{ width: 80 }} rowSpan={2}>Số Công</th>
-                                    <th style={{ width: 145 }} rowSpan={2}>Trạng Thái</th>
-                                    <th rowSpan={2}>Ghi chú</th>
-                                </tr>
-                                <tr>
-                                    {Array.from({length: maxCi}).map((_, i) => (
-                                        <th key={`ci-${i}`} className="c bg-slate-50/50 text-[11px] text-slate-500 font-medium">Lần {i+1}</th>
-                                    ))}
-                                    <th className="c bg-blue-50 text-blue-700 font-semibold border-x border-blue-100 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800">Giờ Chốt</th>
-                                    
-                                    {Array.from({length: maxCo}).map((_, i) => (
-                                        <th key={`co-${i}`} className="c bg-slate-50/50 text-[11px] text-slate-500 font-medium border-l">Lần {i+1}</th>
-                                    ))}
-                                    <th className="c bg-orange-50 text-orange-700 font-semibold border-x border-orange-100 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">Giờ Chốt</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pageRows.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7 + maxCi + maxCo} className="att-empty">
-                                            Không có dữ liệu trong tháng này.
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead>
+                            <tr className="bg-slate-50 border-b border-slate-100">
+                                <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ngày</th>
+                                <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ca làm việc</th>
+                                <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Giờ vào</th>
+                                <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Giờ ra</th>
+                                <th className="px-6 py-3 text-left text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Trạng thái</th>
+                                <th className="px-6 py-3 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ghi chú</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {loading ? (
+                                Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i}>
+                                        <td colSpan={6} className="px-6 py-4">
+                                            <div className="h-4 skeleton w-full" />
                                         </td>
                                     </tr>
-                                ) : pageRows.map(({ date, rec, st, snappedCiTime, snappedCoTime, ci, co }, idx) => {
-                                    const dObj    = new Date(date);
-                                    const dayName = VN_DAYS[dObj.getDay()];
-                                    const isWE    = dObj.getDay() === 0; // Only Sunday is a day off
-                                    const isToday = dObj.toDateString() === new Date().toDateString();
-                                    const inT     = fmtTime(snappedCiTime);
-                                    const outT    = fmtTime(snappedCoTime);
-                                    
-                                    const totalH  = (ci && co)
-                                        ? Math.max(0, 8.0 - (st.isLate ? 4.0 : 0) - (st.isEarly ? 4.0 : 0)).toFixed(1)
-                                        : null;
-                                    const note = (ci?.note || co?.note);
-                                    const chipCls = isToday ? 'att-day-chip today'
-                                        : isWE  ? 'att-day-chip weekend'
-                                        : 'att-day-chip';
+                                ))
+                            ) : pageRows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="px-6 py-20 text-center">
+                                        <div className="flex flex-col items-center gap-2">
+                                            <Info size={40} className="text-slate-200" />
+                                            <p className="text-slate-400 font-medium text-sm">Không có dữ liệu trong tháng này</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : pageRows.map((row, idx) => {
+                                const dObj = new Date(row.date);
+                                const isWeekend = dObj.getDay() === 0;
+                                const isToday = dObj.toDateString() === new Date().toDateString();
+                                
+                                return (
+                                    <tr key={row.date} className={`hover:bg-slate-50/80 transition-colors ${isToday ? 'bg-indigo-50/30' : ''}`}>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center font-bold text-xs ${isWeekend ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-500'}`}>
+                                                    <span>{VN_DAYS[dObj.getDay()]}</span>
+                                                    <span className="text-[10px] opacity-70">{dObj.getDate()}</span>
+                                                </div>
+                                                <div className="text-sm font-semibold text-slate-700">
+                                                    {dObj.toLocaleDateString('vi-VN')}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-slate-500 font-medium">
+                                            {row.ci?.shiftName || row.co?.shiftName || 'Hành chính'}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {row.ci ? (
+                                                <span className="text-sm font-bold text-slate-700">{fmtTime(row.ci.timestamp)}</span>
+                                            ) : (
+                                                <span className="text-slate-300">--:--</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            {row.co ? (
+                                                <span className="text-sm font-bold text-slate-700">{fmtTime(row.co.timestamp)}</span>
+                                            ) : (
+                                                <span className="text-slate-300">--:--</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className={`badge ${row.st.cls} text-[10px]`}>
+                                                {row.st.label}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right text-xs text-slate-400 italic">
+                                            {row.ci?.note || row.co?.note || '---'}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
 
-                                    return (
-                                        <tr
-                                            key={date}
-                                            style={isToday ? { background: '#eff6ff' } : {}}
-                                        >
-                                            <td className="c" style={{ color: '#888' }}>
-                                                {(safePage-1)*ROWS_PER_PAGE + idx + 1}
-                                            </td>
-                                            <td>
-                                                <span className={chipCls}>{dayName}</span>
-                                                {dObj.getDate()}/{dObj.getMonth()+1}/{dObj.getFullYear()}
-                                            </td>
-                                            {/* Giờ vào thực tế */}
-                                            {Array.from({length: maxCi}).map((_, i) => (
-                                                <td key={`ci-val-${i}`} className="c text-slate-500 text-sm">
-                                                    {rec.checkIns[i] ? fmtTime(rec.checkIns[i].timestamp) : <span className="att-tn">--:--</span>}
-                                                </td>
-                                            ))}
-                                            {/* Giờ vào Chốt */}
-                                            <td className="c bg-blue-50/30 font-bold text-blue-900 border-x border-blue-50/50 dark:bg-blue-900/10 dark:text-blue-300 dark:border-blue-800/30">
-                                                {inT ? (
-                                                    <div className="flex flex-col items-center leading-tight">
-                                                        <span>{inT}</span>
-                                                        {st.isLate && <span className="text-[11px] text-red-500 font-normal mt-0.5">(trễ {fmtDuration(st.lateMin)})</span>}
-                                                    </div>
-                                                ) : <span className="att-tn">--:--</span>}
-                                            </td>
-
-                                            {/* Giờ ra thực tế */}
-                                            {Array.from({length: maxCo}).map((_, i) => (
-                                                <td key={`co-val-${i}`} className="c text-slate-500 text-sm border-l border-slate-100">
-                                                    {rec.checkOuts[i] ? fmtTime(rec.checkOuts[i].timestamp) : <span className="att-tn">--:--</span>}
-                                                </td>
-                                            ))}
-                                            {/* Giờ ra Chốt */}
-                                            <td className="c bg-orange-50/30 font-bold text-orange-900 border-x border-orange-50/50 dark:bg-orange-900/10 dark:text-orange-300 dark:border-orange-800/30">
-                                                {outT ? (
-                                                    <div className="flex flex-col items-center leading-tight">
-                                                        <span>{outT}</span>
-                                                        {st.isEarly && <span className="text-[11px] text-red-500 font-normal mt-0.5">(sớm {fmtDuration(st.earlyMin)})</span>}
-                                                    </div>
-                                                ) : <span className="att-tn">--:--</span>}
-                                            </td>
-
-                                            <td className="c">
-                                                {totalH
-                                                    ? <strong>{totalH}</strong>
-                                                    : <span className="att-tn">--</span>}
-                                            </td>
-                                            <td className="c">
-                                                {totalH !== null
-                                                    ? <strong className="text-emerald-600">{Math.max(0, 1.0 - (st.isLate ? 0.5 : 0) - (st.isEarly ? 0.5 : 0)).toFixed(1)}</strong>
-                                                    : <span className="att-tn">--</span>}
-                                            </td>
-                                            <td className={st.cls}>{st.label}</td>
-                                            <td>
-                                                {note
-                                                    ? note
-                                                    : <span className="att-ne">--</span>}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination */}
-                    <div className="att-pag-row">
-                        <div>
-                            Tổng số bản ghi: <strong>{filteredRows.length}</strong>
-                        </div>
-                        <div className="att-pag-right">
-                            <span className="att-pag-range">
-                                {filteredRows.length === 0
-                                    ? '0 bản ghi'
-                                    : `${(safePage-1)*ROWS_PER_PAGE+1}–${Math.min(safePage*ROWS_PER_PAGE, filteredRows.length)} bản ghi`}
-                            </span>
-                            <div className="att-pag-nums">
+                <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+                    <p className="text-xs font-medium text-slate-400">
+                        Hiển thị {pageRows.length} trên {allRows.length} kết quả
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            disabled={page === 1}
+                            onClick={() => setPage(p => p - 1)}
+                            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
                                 <button
-                                    id="att-pg-prev"
-                                    className="att-pgbtn"
-                                    onClick={() => setPage(p => Math.max(1, p-1))}
-                                    disabled={safePage === 1}
+                                    key={p}
+                                    onClick={() => setPage(p)}
+                                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${page === p ? 'bg-violet-600 text-white' : 'text-slate-400 hover:bg-slate-100'}`}
                                 >
-                                    ‹
+                                    {p}
                                 </button>
-                                {Array.from({ length: totalPages }, (_, i) => i+1).map(p => (
-                                    <button
-                                        key={p}
-                                        id={`att-pg-${p}`}
-                                        className={`att-pgbtn${safePage === p ? ' att-pgbtn-on' : ''}`}
-                                        onClick={() => setPage(p)}
-                                    >
-                                        {p}
-                                    </button>
-                                ))}
-                                <button
-                                    id="att-pg-next"
-                                    className="att-pgbtn"
-                                    onClick={() => setPage(p => Math.min(totalPages, p+1))}
-                                    disabled={safePage === totalPages}
-                                >
-                                    ›
-                                </button>
-                            </div>
-                            <select
-                                className="att-per-page"
-                                defaultValue={10}
-                            >
-                                <option value={10}>10 / trang</option>
-                                <option value={20}>20 / trang</option>
-                                <option value={50}>50 / trang</option>
-                            </select>
+                            ))}
                         </div>
+                        <button 
+                            disabled={page === totalPages}
+                            onClick={() => setPage(p => p + 1)}
+                            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
                     </div>
-                </>
-            )}
+                </div>
+            </div>
         </div>
     );
 }

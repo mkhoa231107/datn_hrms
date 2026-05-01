@@ -138,6 +138,20 @@ namespace HRMS.API.Controllers
                 return StatusCode(500, new { success = false, message = ex.Message, stack = ex.StackTrace });
             }
         }
+
+        [HttpPost("run-structure-reset-seed")]
+        public async Task<IActionResult> RunStructureResetSeed()
+        {
+            try
+            {
+                await HRMS.Infrastructure.Seeders.StructureResetSeeder.SeedAsync(_context);
+                return Ok(new { success = true, message = "Structure reset seeded successfully." });
+            }
+            catch (System.Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = ex.Message, stack = ex.StackTrace });
+            }
+        }
     }
 
     public record PositionSeedConfig(

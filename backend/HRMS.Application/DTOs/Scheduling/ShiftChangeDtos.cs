@@ -10,7 +10,7 @@ namespace HRMS.Application.DTOs.Scheduling
         public int RequestedShiftId { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public string Reason { get; set; }
+        public string Reason { get; set; } = string.Empty;
     }
 
     /// <summary>
@@ -21,29 +21,29 @@ namespace HRMS.Application.DTOs.Scheduling
         public int Id { get; set; }
 
         public int EmployeeId { get; set; }
-        public string EmployeeName { get; set; }
-        public string EmployeeCode { get; set; }
-        public string DepartmentName { get; set; }
+        public string EmployeeName { get; set; } = string.Empty;
+        public string EmployeeCode { get; set; } = string.Empty;
+        public string DepartmentName { get; set; } = string.Empty;
 
         public int RequestedShiftId { get; set; }
-        public string RequestedShiftName { get; set; }
-        public string RequestedShiftCode { get; set; }
-        public string RequestedShiftTime { get; set; } // "07:30 - 16:30"
+        public string RequestedShiftName { get; set; } = string.Empty;
+        public string RequestedShiftCode { get; set; } = string.Empty;
+        public string RequestedShiftTime { get; set; } = string.Empty; // "07:30 - 16:30"
 
         public int? CurrentShiftId { get; set; }
-        public string CurrentShiftName { get; set; }
+        public string? CurrentShiftName { get; set; }
 
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
-        public string Reason { get; set; }
+        public string Reason { get; set; } = string.Empty;
 
-        public string Status { get; set; }           // "Pending" | "Approved" | "Rejected"
-        public string StatusLabel { get; set; }      // "Chờ duyệt" | "Đã duyệt" | "Đã từ chối"
+        public string Status { get; set; } = string.Empty;           // "Pending" | "Approved" | "Rejected"
+        public string StatusLabel { get; set; } = string.Empty;      // "Chờ duyệt" | "Đã duyệt" | "Đã từ chối"
 
         public int? ApproverId { get; set; }
-        public string ApproverName { get; set; }
+        public string? ApproverName { get; set; }
         public DateTime? ApprovedAt { get; set; }
-        public string RejectReason { get; set; }
+        public string? RejectReason { get; set; }
 
         public DateTime CreatedAt { get; set; }
     }
@@ -53,6 +53,9 @@ namespace HRMS.Application.DTOs.Scheduling
     /// </summary>
     public class RejectShiftChangeDto
     {
-        public string Reason { get; set; }
+        public string Reason { get; set; } = string.Empty;
     }
 }
+
+
+

@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { auditLogService } from '../../api';
 import {
     Activity, Clock, Info,
     RefreshCw, Search, Filter,
     ArrowRight, Calendar, Umbrella,
-    CheckCircle, XCircle, Edit
+    CheckCircle2, XCircle, Edit,
+    User as UserIcon, Shield, Layers,
+    ChevronRight, Eye, Globe, Zap,
+    MoreHorizontal, Hash, Terminal
 } from 'lucide-react';
 
 export default function DeptActivities({ user, onBack }) {
@@ -18,6 +21,7 @@ export default function DeptActivities({ user, onBack }) {
     const [filter, setFilter] = useState('All');
     const [activeDeptTab, setActiveDeptTab] = useState('All');
     const [selectedLog, setSelectedLog] = useState(null);
+    const [showModal, setShowModal] = useState(false);
 
     useEffect(() => { fetchLogs(); }, []);
 
@@ -56,8 +60,8 @@ export default function DeptActivities({ user, onBack }) {
     };
 
     const getActionLabel = (action, entityType) => {
-        if (action.includes('approve')) return 'Phê duyệt đơn';
-        if (action.includes('reject')) return 'Từ chối đơn';
+        if (action.includes('approve')) return `Phê duyệt ${entityType}`;
+        if (action.includes('reject')) return `Từ chối ${entityType}`;
         const method = action.split(' ')[0];
         if (method === 'POST') return `Tạo mới ${entityType}`;
         if (method === 'PUT') return `Cập nhật ${entityType}`;
@@ -66,45 +70,116 @@ export default function DeptActivities({ user, onBack }) {
         return action;
     };
 
-    const getMethodBadge = (action) => {
-        if (action.includes('approve')) return { label: 'DUYỆT', css: 'ef-text-ok' };
-        if (action.includes('reject')) return { label: 'TỪ CHỐI', css: 'ef-text-miss' };
+    const getMethodMeta = (action) => {
+        if (action.includes('approve')) return { label: 'Duyệt', cls: 'badge-success', icon: CheckCircle2 };
+        if (action.includes('reject')) return { label: 'Từ chối', cls: 'badge-danger', icon: XCircle };
         const method = action.split(' ')[0];
-        if (method === 'POST') return { label: 'TẠO MỚI', color: '#0369a1' };
-        if (method === 'PUT') return { label: 'CẬP NHẬT', color: '#b45309' };
-        if (method === 'DELETE') return { label: 'XÓA', css: 'ef-text-miss' };
-        return { label: method, color: '#333' };
+        if (method === 'POST') return { label: 'Tạo mới', cls: 'bg-blue-50 text-blue-600 border-blue-100', icon: Zap };
+        if (method === 'PUT') return { label: 'Cập nhật', cls: 'bg-amber-50 text-amber-600 border-amber-100', icon: Edit };
+        if (method === 'DELETE') return { label: 'Xóa', cls: 'badge-danger', icon: XCircle };
+        return { label: method, cls: 'badge-accent', icon: Activity };
     };
 
-    const filteredLogs = logs.filter(log => {
-        const matchesTab = activeDeptTab === 'All' || log.userDepartmentName?.toLowerCase().includes(activeDeptTab.toLowerCase());
-        const matchesSearch =
-            log.userFullName?.toLowerCase().includes(search.toLowerCase()) ||
-            log.action.toLowerCase().includes(search.toLowerCase()) ||
-            log.entityType.toLowerCase().includes(search.toLowerCase());
-        const matchesFilter = filter === 'All' || log.entityType === filter;
-        return matchesTab && matchesSearch && matchesFilter;
-    });
+    const filteredLogs = useMemo(() => {
+        return logs.filter(log => {
+            const matchesTab = activeDeptTab === 'All' || log.userDepartmentName?.toLowerCase().includes(activeDeptTab.toLowerCase());
+            const matchesSearch =
+                log.userFullName?.toLowerCase().includes(search.toLowerCase()) ||
+                log.action.toLowerCase().includes(search.toLowerCase()) ||
+                log.entityType.toLowerCase().includes(search.toLowerCase());
+            const matchesFilter = filter === 'All' || log.entityType === filter;
+            return matchesTab && matchesSearch && matchesFilter;
+        });
+    }, [logs, activeDeptTab, search, filter]);
+
+    const stats = useMemo(() => {
+        const today = new Date().toLocaleDateString();
+        return {
+            total: logs.length,
+            today: logs.filter(l => new Date(l.createdAt).toLocaleDateString() === today).length,
+            entities: new Set(logs.map(l => l.entityType)).size,
+            activeDept: [...new Set(logs.map(l => l.userDepartmentName))].length
+        };
+    }, [logs]);
 
     const entityTypes = ['All', ...new Set(logs.map(l => l.entityType))];
     const deptTabs = ['All', ...new Set(logs.map(l => l.userDepartmentName).filter(Boolean))];
 
+    const getInitials = (name) => {
+        if (!name) return '??';
+        const parts = name.split(' ');
+        if (parts.length < 2) return name.substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    };
+
+    const handleOpenDetail = (log) => {
+        setSelectedLog(log);
+        setShowModal(true);
+    };
+
     return (
-        <div className="ef-wrap">
-            <div className="ef-toolbar print:hidden">
-                <div className="ef-toolbar-title">
-                    <Activity size={16} style={{ color: '#1a56db' }} />
-                    <strong style={{ textTransform: 'uppercase' }}>NHẬT KÝ HOẠT ĐỘNG {label.toUpperCase()}</strong>
+        <div className="flex flex-col gap-6 animate-fade-up">
+            {/* ── Header ── */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-[8px] bg-indigo-600 text-white flex items-center justify-center shadow-lg relative overflow-hidden">
+                        <Activity size={24} className="relative z-10" />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Nhật ký hoạt động</h3>
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold border border-emerald-100 animate-pulse">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                LIVE
+                            </div>
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium tracking-wide">
+                            {label} &middot; Giám sát toàn bộ thay đổi hệ thống
+                        </p>
+                    </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={fetchLogs} disabled={loading} className="ef-btn">LÀM MỚI</button>
-                    {onBack && <button onClick={onBack} className="ef-btn">ĐÓNG</button>}
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={fetchLogs} 
+                        disabled={loading}
+                        className="btn btn-ghost !py-2 hover:!bg-white"
+                    >
+                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                        Làm mới
+                    </button>
+                    {onBack && (
+                        <button onClick={onBack} className="btn btn-primary !py-2 px-5">
+                            Quay lại
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* Department Tabs */}
-            <div className="ef-toolbar print:hidden" style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', minHeight: '44px' }}>
-                <div style={{ display: 'flex', gap: '8px' }}>
+            {/* ── Summary Cards ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                    { label: 'Tổng hoạt động', val: stats.total, icon: Activity, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: 'Thao tác hôm nay', val: stats.today, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Phòng ban quản lý', val: stats.activeDept, icon: Globe, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'Loại thực thể', val: stats.entities, icon: Layers, color: 'text-rose-600', bg: 'bg-rose-50' },
+                ].map((s, i) => (
+                    <div key={i} className="card !p-4 !rounded-[8px] flex items-center gap-4 group">
+                        <div className={`w-12 h-12 rounded-[8px] ${s.bg} ${s.color} flex items-center justify-center transition-transform group-hover:scale-110`}>
+                            <s.icon size={20} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{s.label}</p>
+                            <p className="text-xl font-black text-slate-700 leading-none">{s.val}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* ── Filter & Tabs Container ── */}
+            <div className="card !p-0 !rounded-[8px] overflow-hidden border-none shadow-xl shadow-indigo-100/20">
+                {/* Tabs Bar - Show for Admin or DepartmentManager (Trưởng phòng), hide for DepartmentHead (Trưởng BP) */}
+                {(roles.includes('Admin') || roles.includes('DepartmentManager')) && (
+                    <div className="bg-slate-50/50 border-b border-slate-100 px-2 flex items-center overflow-x-auto no-scrollbar">
                     {deptTabs.map(deptName => {
                         const count = logs.filter(l => deptName === 'All' ? true : l.userDepartmentName?.toLowerCase().includes(deptName.toLowerCase())).length;
                         const isActive = activeDeptTab === deptName;
@@ -112,174 +187,259 @@ export default function DeptActivities({ user, onBack }) {
                             <button
                                 key={deptName}
                                 onClick={() => setActiveDeptTab(deptName)}
-                                style={{
-                                    padding: '10px 20px',
-                                    fontSize: '12px',
-                                    fontWeight: 'bold',
-                                    border: 'none',
-                                    background: isActive ? '#fff' : 'transparent',
-                                    color: isActive ? '#6366f1' : '#64748b',
-                                    borderBottom: isActive ? '3px solid #6366f1' : '3px solid transparent',
-                                    transition: 'all 0.2s',
-                                    position: 'relative'
-                                }}
+                                className={`px-5 py-4 text-xs font-bold transition-all relative whitespace-nowrap ${
+                                    isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                                }`}
                             >
-                                {deptName}
-                                <span style={{
-                                    marginLeft: '6px',
-                                    fontSize: '10px',
-                                    background: isActive ? '#eef2ff' : '#f1f5f9',
-                                    padding: '2px 6px',
-                                    borderRadius: '10px'
-                                }}>
+                                {deptName === 'All' ? 'Tất cả đơn vị' : deptName}
+                                <span className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] ${
+                                    isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200/50 text-slate-500'
+                                }`}>
                                     {count}
                                 </span>
+                                {isActive && (
+                                    <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-indigo-600 rounded-full animate-in fade-in zoom-in duration-300" />
+                                )}
                             </button>
                         );
                     })}
                 </div>
-            </div>
+                )}
 
-            <div className="ef-toolbar print:hidden">
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <Search size={14} style={{ position: 'absolute', left: '10px', color: '#94a3b8' }} />
-                    <input
-                        type="text"
-                        placeholder="Tìm kiếm người thực hiện, hành động..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="ef-input"
-                        style={{ width: '300px', paddingLeft: '32px' }}
-                    />
+                {/* Filters Bar */}
+                <div className="p-4 flex flex-col md:flex-row md:items-center gap-4 bg-white/50 backdrop-blur-md">
+                    <div className="relative flex-1 group">
+                        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
+                        <input
+                            type="text"
+                            placeholder="Tìm kiếm người thực hiện, hành động hoặc mã bản ghi..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="input !pl-11 !py-2.5 !bg-slate-50/50 border-transparent hover:border-slate-200 focus:!bg-white"
+                        />
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                            <Filter size={14} className="text-slate-400" />
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Đối tượng:</span>
+                            <select
+                                value={filter}
+                                onChange={(e) => setFilter(e.target.value)}
+                                className="bg-transparent border-none text-xs font-bold text-slate-600 outline-none cursor-pointer min-w-[120px]"
+                            >
+                                {entityTypes.map(type => (
+                                    <option key={type} value={type}>{type === 'All' ? 'Tất cả' : type}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                
-                <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '12px', fontWeight: 'bold' }}>LOẠI ĐỐI TƯỢNG:</span>
-                <select
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="ef-select"
-                    style={{ width: '150px' }}
-                >
-                    {entityTypes.map(type => (
-                        <option key={type} value={type}>{type === 'All' ? 'Tất cả' : type}</option>
-                    ))}
-                </select>
 
-                <div style={{ flex: 1 }}></div>
-                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'medium' }}>
-                    <Activity size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-                    {activeDeptTab}: <strong>{filteredLogs.length}</strong>
-                </div>
-            </div>
-
-            <div className="ef-table-wrap">
-                <table className="ef-table no-top-border">
-                    <thead>
-                        <tr>
-                            <th style={{ width: '25%' }}>NGƯỜI THỰC HIỆN</th>
-                            <th className="c" style={{ width: '18%' }}>THỜI GIAN</th>
-                            <th style={{ width: '22%' }}>HÀNH ĐỘNG</th>
-                            <th style={{ width: '15%' }}>ĐỐI TƯỢNG</th>
-                            <th className="c" style={{ width: '10%' }}>TRẠNG THÁI</th>
-                            <th className="c" style={{ width: '10%' }}>XEM</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading && logs.length === 0 ? (
-                            <tr><td colSpan="6" className="ef-empty">Đang tải biểu nhật ký...</td></tr>
-                        ) : filteredLogs.length === 0 ? (
-                            <tr><td colSpan="6" className="ef-empty">Không có dữ liệu hoạt động.</td></tr>
-                        ) : filteredLogs.map((log) => {
-                            const badge = getMethodBadge(log.action);
-                            return (
-                                <tr key={log.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedLog(log)}>
-                                    <td>
-                                        <div style={{ fontWeight: 'bold' }}>{log.userFullName}</div>
-                                        <div style={{ fontSize: '10px', color: '#888' }}>{log.userRoleName || 'NHÂN VIÊN'}</div>
-                                    </td>
-                                    <td className="c">{new Date(log.createdAt).toLocaleString('vi-VN')}</td>
-                                    <td>
-                                        <div style={{ fontSize: '12px', color: '#333' }}>
-                                            {getActionLabel(log.action, log.entityType)}
-                                            {log.entityId && (
-                                                <span style={{ marginLeft: '4px', fontWeight: 'bold', color: '#888' }}>
-                                                    #{log.entityId}
-                                                </span>
-                                            )}
+                {/* Table Content */}
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                                <th className="px-6 py-4 text-left">Người thực hiện</th>
+                                <th className="px-6 py-4 text-left">Thời gian</th>
+                                <th className="px-6 py-4 text-left">Nội dung hành động</th>
+                                <th className="px-6 py-4 text-left">Thực thể</th>
+                                <th className="px-6 py-4 text-center">Trạng thái</th>
+                                <th className="px-6 py-4 text-right"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {loading && logs.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="px-6 py-20 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="w-10 h-10 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
+                                            <p className="text-sm text-slate-400 font-medium">Đang tải nhật ký...</p>
                                         </div>
                                     </td>
-                                    <td>{log.entityType}</td>
-                                    <td className="c">
-                                        <span className={badge.css} style={{ fontSize: '10px', fontWeight: 'bold', color: badge.color }}>
-                                            {badge.label}
-                                        </span>
-                                    </td>
-                                    <td className="c">
-                                        <button className="ef-btn" style={{ padding: '2px 8px', fontSize: '10px' }}>XEM</button>
+                                </tr>
+                            ) : filteredLogs.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="px-6 py-20 text-center">
+                                        <div className="flex flex-col items-center gap-2 opacity-30">
+                                            <Activity size={48} />
+                                            <p className="text-sm font-bold">Không tìm thấy hoạt động nào</p>
+                                        </div>
                                     </td>
                                 </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
+                            ) : filteredLogs.map((log) => {
+                                const meta = getMethodMeta(log.action);
+                                const ActionIcon = meta.icon;
+                                return (
+                                    <tr 
+                                        key={log.id} 
+                                        onClick={() => handleOpenDetail(log)}
+                                        className="hover:bg-indigo-50/30 transition-colors cursor-pointer group"
+                                    >
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-black border border-white shadow-sm">
+                                                    {getInitials(log.userFullName)}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-bold text-slate-700">{log.userFullName}</div>
+                                                    <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                                                        <Shield size={10} />
+                                                        {log.userRoleName || 'NHÂN VIÊN'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-xs font-bold text-slate-600">
+                                                {new Date(log.createdAt).toLocaleDateString('vi-VN')}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400 font-medium">
+                                                {new Date(log.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col gap-1">
+                                                <div className="text-xs font-semibold text-slate-700">
+                                                    {getActionLabel(log.action, log.entityType)}
+                                                </div>
+                                                {log.entityId && (
+                                                    <div className="inline-flex items-center px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold text-slate-500 w-fit">
+                                                        #{log.entityId}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-xs font-bold text-slate-400">{log.entityType}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex justify-center">
+                                                <div className={`px-3 py-1 rounded-full border text-[10px] font-bold flex items-center gap-1.5 ${meta.cls}`}>
+                                                    <ActionIcon size={10} />
+                                                    {meta.label}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button className="w-8 h-8 rounded-lg bg-white border border-slate-100 text-slate-300 flex items-center justify-center hover:text-indigo-600 hover:border-indigo-100 hover:shadow-sm transition-all group-hover:bg-white">
+                                                <ChevronRight size={14} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
+            {/* ── Slide-over Detail Modal ── */}
             {selectedLog && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#fff', width: '500px', border: '1px solid #1a56db', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                        <div style={{ background: '#1a56db', color: '#fff', padding: '10px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <strong style={{ fontSize: '12px' }}>CHI TIẾT HOẠT ĐỘNG #{selectedLog.id}</strong>
-                            <button onClick={() => setSelectedLog(null)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}><XCircle size={14} /></button>
-                        </div>
-                        <div style={{ padding: '15px', maxHeight: '70vh', overflowY: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', marginBottom: '15px' }}>
-                                <tbody>
-                                    <tr>
-                                        <td style={{ padding: '8px', background: '#f5f5f5', border: '1px solid #ddd', width: '35%', fontWeight: 'bold' }}>Người thao tác</td>
-                                        <td style={{ padding: '8px', border: '1px solid #ddd' }}>{selectedLog.userFullName} ({selectedLog.userRoleName})</td>
-                                    </tr>
-                                    <tr>
-                                        <td style={{ padding: '8px', background: '#f5f5f5', border: '1px solid #ddd', fontWeight: 'bold' }}>Thời gian</td>
-                                        <td style={{ padding: '8px', border: '1px solid #ddd' }}>{new Date(selectedLog.createdAt).toLocaleString('vi-VN')}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style={{ padding: '8px', background: '#f5f5f5', border: '1px solid #ddd', fontWeight: 'bold' }}>Hành động</td>
-                                        <td style={{ padding: '8px', border: '1px solid #ddd' }}>{selectedLog.action}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style={{ padding: '8px', background: '#f5f5f5', border: '1px solid #ddd', fontWeight: 'bold' }}>Đối tượng</td>
-                                        <td style={{ padding: '8px', border: '1px solid #ddd' }}>{selectedLog.entityType} {selectedLog.entityId ? `#${selectedLog.entityId}` : ''}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style={{ padding: '8px', background: '#f5f5f5', border: '1px solid #ddd', fontWeight: 'bold' }}>IP / Agent</td>
-                                        <td style={{ padding: '8px', border: '1px solid #ddd' }}>{selectedLog.ipAddress}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-
-                            {selectedLog.newValue && (
+                <div 
+                    className={`fixed inset-0 z-[1000] flex justify-end transition-opacity duration-300 ${
+                        showModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                    }`}
+                >
+                    {/* Backdrop */}
+                    <div 
+                        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                        onClick={() => setShowModal(false)}
+                    />
+                    
+                    {/* Content Container */}
+                    <div 
+                        className={`relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col transition-transform duration-300 ease-out ${
+                            showModal ? 'translate-x-0' : 'translate-x-full'
+                        }`}
+                    >
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-[8px] bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                                    <Info size={20} />
+                                </div>
                                 <div>
-                                    <strong style={{ fontSize: '11px', color: '#555' }}>DỮ LIỆU PAYLOAD:</strong>
-                                    <pre style={{
-                                        padding: '10px',
-                                        background: '#f9f9f9',
-                                        border: '1px solid #ddd',
-                                        color: '#333',
-                                        fontSize: '11px',
-                                        marginTop: '5px',
-                                        whiteSpace: 'pre-wrap',
-                                        wordBreak: 'break-all'
-                                    }}>
-                                        {(() => {
-                                            try { return JSON.stringify(JSON.parse(selectedLog.newValue), null, 2); }
-                                            catch { return selectedLog.newValue; }
-                                        })()}
-                                    </pre>
+                                    <h4 className="text-base font-bold text-slate-800">Chi tiết hoạt động</h4>
+                                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">LOG ID: #{selectedLog.id}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setShowModal(false)}
+                                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors"
+                            >
+                                <XCircle size={18} />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                            {/* Performer Info */}
+                            <div className="space-y-3">
+                                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Người thực hiện</h5>
+                                <div className="flex items-center gap-4 p-4 rounded-[8px] bg-slate-50 border border-slate-100">
+                                    <div className="w-12 h-12 rounded-full bg-white text-indigo-600 flex items-center justify-center text-lg font-black shadow-sm">
+                                        {getInitials(selectedLog.userFullName)}
+                                    </div>
+                                    <div>
+                                        <div className="text-sm font-bold text-slate-700">{selectedLog.userFullName}</div>
+                                        <div className="text-xs font-medium text-slate-400">{selectedLog.userDepartmentName || 'N/A'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Activity Summary */}
+                            <div className="space-y-4">
+                                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Thông tin chung</h5>
+                                <div className="grid grid-cols-1 gap-3">
+                                    {[
+                                        { label: 'Thời gian', val: new Date(selectedLog.createdAt).toLocaleString('vi-VN'), icon: Clock },
+                                        { label: 'Hành động', val: selectedLog.action, icon: Terminal },
+                                        { label: 'Thực thể', val: `${selectedLog.entityType} ${selectedLog.entityId ? '#' + selectedLog.entityId : ''}`, icon: Hash },
+                                        { label: 'Địa chỉ IP', val: selectedLog.ipAddress || 'Internal System', icon: Globe },
+                                    ].map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-3 rounded-[8px] border border-slate-50 bg-white shadow-sm">
+                                            <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
+                                                <item.icon size={14} />
+                                                {item.label}
+                                            </div>
+                                            <div className="text-xs font-bold text-slate-600">{item.val}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Payload Data */}
+                            {selectedLog.newValue && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Dữ liệu Payload (JSON)</h5>
+                                        <button className="text-[10px] font-bold text-indigo-600 hover:underline">Sao chép</button>
+                                    </div>
+                                    <div className="relative group">
+                                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Terminal size={12} className="text-slate-400" />
+                                        </div>
+                                        <pre className="p-4 rounded-[8px] bg-slate-900 text-slate-300 text-[11px] leading-relaxed overflow-x-auto font-mono custom-scrollbar">
+                                            {(() => {
+                                                try { return JSON.stringify(JSON.parse(selectedLog.newValue), null, 2); }
+                                                catch { return selectedLog.newValue; }
+                                            })()}
+                                        </pre>
+                                    </div>
                                 </div>
                             )}
                         </div>
-                        <div style={{ padding: '10px 15px', background: '#f9f9f9', borderTop: '1px solid #ddd', textAlign: 'right' }}>
-                            <button onClick={() => setSelectedLog(null)} className="ef-btn">ĐÓNG</button>
+
+                        {/* Modal Footer */}
+                        <div className="p-6 border-t border-slate-100 bg-slate-50/50">
+                            <button 
+                                onClick={() => setShowModal(false)}
+                                className="btn btn-primary w-full shadow-lg shadow-indigo-100"
+                            >
+                                Đóng chi tiết
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -287,3 +447,4 @@ export default function DeptActivities({ user, onBack }) {
         </div>
     );
 }
+

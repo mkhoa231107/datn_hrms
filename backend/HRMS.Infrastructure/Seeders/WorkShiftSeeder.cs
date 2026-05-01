@@ -16,39 +16,73 @@ namespace HRMS.Infrastructure.Seeders
 
             var shiftDefs = new[] {
                 (Code: "HC", Name: "Hành chính", Start: new TimeSpan(8, 0, 0), End: new TimeSpan(17, 30, 0), Break: 90, Overnight: false),
-                (Code: "S1", Name: "Ca 1",     Start: new TimeSpan(6, 0, 0), End: new TimeSpan(14, 0, 0), Break: 30, Overnight: false),
-                (Code: "C1", Name: "Ca 2",     Start: new TimeSpan(14, 0, 0), End: new TimeSpan(22, 0, 0), Break: 30, Overnight: false),
-                (Code: "D1", Name: "Ca 3",       Start: new TimeSpan(22, 0, 0), End: new TimeSpan(6, 0, 0), Break: 30, Overnight: true)
+                (Code: "C1", Name: "Ca 1 (Sáng)", Start: new TimeSpan(6, 0, 0), End: new TimeSpan(14, 0, 0), Break: 30, Overnight: false),
+                (Code: "C2", Name: "Ca 2 (Chiều)", Start: new TimeSpan(14, 0, 0), End: new TimeSpan(22, 0, 0), Break: 30, Overnight: false),
+                (Code: "C3", Name: "Ca 3 (Đêm)",  Start: new TimeSpan(22, 0, 0), End: new TimeSpan(6, 0, 0), Break: 30, Overnight: true)
             };
 
             // 1. Cleanup: Handle dependencies and remove non-standard shifts
-            var allShifts = await context.WorkShifts.ToListAsync();
-            var standardCodes = new[] { "HC", "S1", "C1", "D1" };
-            var hcShift = allShifts.FirstOrDefault(s => s.ShiftCode == "HC");
+            var standardCodes = new[] { "HC", "C1", "C2", "C3" };
+            var hcShift = await context.WorkShifts.FirstOrDefaultAsync(s => s.ShiftCode == "HC");
 
-            foreach (var s in allShifts)
+            // Identify IDs to remove
+            var nonStandardShiftIds = await context.WorkShifts
+                .Where(s => !standardCodes.Contains(s.ShiftCode))
+                .Select(s => s.Id)
+                .ToListAsync();
+
+            if (nonStandardShiftIds.Any())
             {
-                if (!standardCodes.Contains(s.ShiftCode))
+                if (hcShift != null)
                 {
-                    // Update ShiftTemplateDetails to use HC shift instead of deleting them to avoid FK errors
-                    var templates = await context.ShiftTemplateDetails.Where(std => std.WorkShiftId == s.Id).ToListAsync();
-                    if (hcShift != null)
-                    {
-                        foreach (var t in templates) t.WorkShiftId = hcShift.Id;
-                    }
-                    else
-                    {
-                        context.ShiftTemplateDetails.RemoveRange(templates);
-                    }
+                    // Update templates to use HC
+                    await context.ShiftTemplateDetails
+                        .Where(std => std.WorkShiftId.HasValue && nonStandardShiftIds.Contains(std.WorkShiftId.Value))
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(t => t.WorkShiftId, (int?)hcShift.Id));
 
-                    // Also cleanup WorkSchedules using this shift
-                    var schedules = await context.WorkSchedules.Where(ws => ws.WorkShiftId == s.Id).ToListAsync();
-                    context.WorkSchedules.RemoveRange(schedules);
+                    // Update contracts to use HC
+                    await context.EmployeeContracts
+                        .Where(c => c.ShiftId.HasValue && nonStandardShiftIds.Contains(c.ShiftId.Value))
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(c => c.ShiftId, (int?)hcShift.Id));
 
-                    context.WorkShifts.Remove(s);
+                    // Update employees to use HC
+                    await context.Employees
+                        .Where(e => e.ShiftId.HasValue && nonStandardShiftIds.Contains(e.ShiftId.Value))
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(e => e.ShiftId, (int?)hcShift.Id));
+
+                    // Update positions to use HC
+                    await context.Positions
+                        .Where(p => p.DefaultShiftId.HasValue && nonStandardShiftIds.Contains(p.DefaultShiftId.Value))
+                        .ExecuteUpdateAsync(setters => setters.SetProperty(p => p.DefaultShiftId, (int?)hcShift.Id));
                 }
+                else
+                {
+                    // If no HC, nullify everything
+                    await context.ShiftTemplateDetails.Where(std => std.WorkShiftId.HasValue && nonStandardShiftIds.Contains(std.WorkShiftId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.WorkShiftId, (int?)null));
+                    await context.EmployeeContracts.Where(c => c.ShiftId.HasValue && nonStandardShiftIds.Contains(c.ShiftId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.ShiftId, (int?)null));
+                    await context.Employees.Where(e => e.ShiftId.HasValue && nonStandardShiftIds.Contains(e.ShiftId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.ShiftId, (int?)null));
+                    await context.Positions.Where(p => p.DefaultShiftId.HasValue && nonStandardShiftIds.Contains(p.DefaultShiftId.Value)).ExecuteUpdateAsync(s => s.SetProperty(x => x.DefaultShiftId, (int?)null));
+                }
+
+                // Delete requests that point to these shifts (easier than nullifying complex state)
+                await context.ShiftSwapRequests
+                    .Where(r => (r.TargetShiftId.HasValue && nonStandardShiftIds.Contains(r.TargetShiftId.Value)))
+                    .ExecuteDeleteAsync();
+                
+                await context.ShiftChangeRequests
+                    .Where(r => nonStandardShiftIds.Contains(r.RequestedShiftId) || (r.CurrentShiftId.HasValue && nonStandardShiftIds.Contains(r.CurrentShiftId.Value)))
+                    .ExecuteDeleteAsync();
+
+                // Delete schedules using these shifts
+                await context.WorkSchedules
+                    .Where(ws => ws.WorkShiftId.HasValue && nonStandardShiftIds.Contains(ws.WorkShiftId.Value))
+                    .ExecuteDeleteAsync();
+
+                // Delete the shifts themselves
+                await context.WorkShifts
+                    .Where(s => nonStandardShiftIds.Contains(s.Id))
+                    .ExecuteDeleteAsync();
             }
-            await context.SaveChangesAsync();
 
             // 2. Ensure standard shifts exist with correct names
             foreach (var (code, name, start, end, breakMin, overnight) in shiftDefs)
@@ -108,23 +142,23 @@ namespace HRMS.Infrastructure.Seeders
             }
             if (!await context.ShiftTemplates.AnyAsync())
             {
-                var s1 = await context.WorkShifts.FirstAsync(s => s.ShiftCode == "S1");
                 var c1 = await context.WorkShifts.FirstAsync(s => s.ShiftCode == "C1");
-                var d1 = await context.WorkShifts.FirstAsync(s => s.ShiftCode == "D1");
+                var c2 = await context.WorkShifts.FirstAsync(s => s.ShiftCode == "C2");
+                var c3 = await context.WorkShifts.FirstAsync(s => s.ShiftCode == "C3");
 
                 var template = new ShiftTemplate
                 {
-                    TemplateName = "Xoay ca 2-2-2 (S-C-D-O)",
+                    TemplateName = "Xoay ca 2-2-2 (C1-C2-C3)",
                     CycleDays = 8,
                     OrganizationId = org.Id,
                     Details = new List<ShiftTemplateDetail>
                     {
-                        new ShiftTemplateDetail { DayNumber = 1, WorkShiftId = s1.Id },
-                        new ShiftTemplateDetail { DayNumber = 2, WorkShiftId = s1.Id },
-                        new ShiftTemplateDetail { DayNumber = 3, WorkShiftId = c1.Id },
-                        new ShiftTemplateDetail { DayNumber = 4, WorkShiftId = c1.Id },
-                        new ShiftTemplateDetail { DayNumber = 5, WorkShiftId = d1.Id },
-                        new ShiftTemplateDetail { DayNumber = 6, WorkShiftId = d1.Id },
+                        new ShiftTemplateDetail { DayNumber = 1, WorkShiftId = c1.Id },
+                        new ShiftTemplateDetail { DayNumber = 2, WorkShiftId = c1.Id },
+                        new ShiftTemplateDetail { DayNumber = 3, WorkShiftId = c2.Id },
+                        new ShiftTemplateDetail { DayNumber = 4, WorkShiftId = c2.Id },
+                        new ShiftTemplateDetail { DayNumber = 5, WorkShiftId = c3.Id },
+                        new ShiftTemplateDetail { DayNumber = 6, WorkShiftId = c3.Id },
                         new ShiftTemplateDetail { DayNumber = 7, WorkShiftId = null }, // OFF
                         new ShiftTemplateDetail { DayNumber = 8, WorkShiftId = null }  // OFF
                     }

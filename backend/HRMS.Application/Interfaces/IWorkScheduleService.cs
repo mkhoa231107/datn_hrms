@@ -43,6 +43,6 @@ namespace HRMS.Application.Interfaces
         Task<AutoScheduleResultDto> GenerateGlobalAutoScheduleAsync(int year, bool overwrite);
         
         // Get single schedule by date
-        Task<WorkScheduleDayDto> GetByDateAsync(int employeeId, DateTime date);
+        Task<WorkScheduleDayDto?> GetByDateAsync(int employeeId, DateTime date);
     }
 }

@@ -188,7 +188,7 @@ export default function PayrollSettings({ onBack }) {
                         </div>
 
                         <div className="space-y-6">
-                            <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 p-8 rounded-3xl shadow-xl text-white">
+                            <div className="bg-indigo-700 p-8 rounded-3xl shadow-xl text-white">
                                 <h3 className="font-bold text-lg mb-4">Lưu cấu hình tham số</h3>
                                 <p className="text-indigo-100 text-sm mb-8 leading-relaxed">
                                     Mọi thay đổi được áp dụng cho bảng lương từ thời điểm lưu trở đi. Bảng lương cũ đã chốt không bị ảnh hưởng.

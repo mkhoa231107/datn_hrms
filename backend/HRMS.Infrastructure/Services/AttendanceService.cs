@@ -1168,9 +1168,10 @@ namespace HRMS.Infrastructure.Services
                 result.DateHeaders.Add(d.ToString("dd/MM"));
             }
 
-            // 2. Lấy danh sách nhân viên trong phòng ban
+            // 2. Lấy danh sách nhân viên trong phòng ban (bao gồm cả phòng ban con)
+            var deptIds = await GetDepartmentHierarchyIdsAsync(departmentId);
             var employees = await _context.Employees
-                .Where(e => e.DepartmentId == departmentId)
+                .Where(e => deptIds.Contains(e.DepartmentId))
                 .OrderBy(e => e.FullName)
                 .ToListAsync();
 
@@ -1414,7 +1415,7 @@ namespace HRMS.Infrastructure.Services
         public async Task<string> ExportAndCleanupOldAttendanceAsync(int month, int year)
         {
             // Placeholder for data retention logic
-            return $"Đã thực hiện lưu trữ và dọn dẹp dữ liệu chấm công tháng {month}/{year}.";
+            return await Task.FromResult($"Đã thực hiện lưu trữ và dọn dẹp dữ liệu chấm công tháng {month}/{year}.");
         }
 
         public async Task<bool> PublishOvertimePlanAsync(int planId, int userId)
@@ -1511,4 +1512,3 @@ namespace HRMS.Infrastructure.Services
         }
     }
 }
-

@@ -129,7 +129,7 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
 
     return (
         <div className="bg-gray-100 min-h-screen p-4 md:p-8">
-            <div className="max-w-4xl mx-auto mb-4 flex justify-between items-center">
+            <div className="w-full mb-6 flex justify-between items-center px-4">
                 <button onClick={onBack} className="flex items-center gap-2 text-gray-600 hover:text-black font-bold uppercase text-xs">
                     <ArrowLeft size={16} /> Quay lại
                 </button>
@@ -140,7 +140,7 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
                 </div>
             </div>
 
-            <div className="bg-white shadow-xl relative overflow-hidden">
+            <div className="bg-white shadow-xl relative overflow-hidden max-w-4xl mx-auto">
                 {/* Status Badge Overlay */}
                 <div className={`absolute top-12 right-[-40px] rotate-45 px-12 py-1 text-[10px] font-bold uppercase tracking-widest text-white shadow-md z-10
                     ${request.status === 'Approved' ? 'bg-green-600' : request.status === 'Rejected' ? 'bg-red-600' : 'bg-blue-600'}`}>

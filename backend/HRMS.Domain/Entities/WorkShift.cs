@@ -11,7 +11,7 @@ namespace HRMS.Domain.Entities
         public int Id { get; set; }
         
         public string ShiftName { get; set; } // Tên ca: Sáng, Chiều, Đêm, Hành chính
-        public string ShiftCode { get; set; } // Mã ca: HC, S1, C1, D1...
+        public string ShiftCode { get; set; } // Mã ca: HC, C1, C2, C3...
         
         public TimeSpan StartTime { get; set; }
         public TimeSpan EndTime { get; set; }

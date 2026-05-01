@@ -57,6 +57,30 @@ namespace HRMS.API.Controllers
 
         // ==================== EMPLOYEE ENDPOINTS ====================
 
+        [HttpGet("fix-balances")]
+        [AllowAnonymous]
+        public async Task<IActionResult> FixBalances([FromServices] HRMS.Infrastructure.Data.HRMSDbContext _context)
+        {
+            var year = DateTime.Now.Year;
+            var employees = _context.Employees.ToList();
+            var leaveTypes = _context.LeaveTypes.ToList();
+            var existingBalances = _context.LeaveBalances.Where(b => b.Year == year).ToList();
+            var existingMap = new HashSet<(int, int)>(existingBalances.Select(b => (b.EmployeeId, b.LeaveTypeId)));
+            int count = 0;
+            foreach(var emp in employees) {
+                foreach(var lt in leaveTypes) {
+                    if (!existingMap.Contains((emp.Id, lt.Id))) {
+                        _context.LeaveBalances.Add(new HRMS.Domain.Entities.LeaveBalance {
+                            EmployeeId = emp.Id, LeaveTypeId = lt.Id, Year = year, TotalDays = lt.DefaultDaysPerYear, UsedDays = 0, CreatedAt = DateTime.UtcNow
+                        });
+                        count++;
+                    }
+                }
+            }
+            if (count > 0) await _context.SaveChangesAsync();
+            return Ok(new { success = true, seeded = count, message = $"Seeded {count} balances" });
+        }
+
         /// <summary>Số dư ngày phép của tôi trong năm</summary>
         [HttpGet("my-balance")]
         public async Task<IActionResult> GetMyBalance([FromQuery] int? year)

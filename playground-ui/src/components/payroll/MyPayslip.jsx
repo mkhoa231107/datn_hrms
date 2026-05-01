@@ -1,24 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { toast } from 'react-hot-toast';
-import { Calculator, Download, ChevronRight, Printer, AlertTriangle, RefreshCw, HandCoins, Calendar, Info } from 'lucide-react';
+import { Calculator, Download, ChevronRight, Printer, AlertTriangle, RefreshCw, HandCoins, Calendar, Info, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 const fmt = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val ?? 0);
-
-function Breadcrumb({ items }) {
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#64748b' }}>
-            {items.map((item, i) => (
-                <React.Fragment key={i}>
-                    {i > 0 && <ChevronRight size={12} style={{ color: '#cbd5e1' }} />}
-                    <span style={{ color: i === items.length - 1 ? '#1e293b' : '#94a3b8', fontWeight: i === items.length - 1 ? 600 : 400 }}>
-                        {item}
-                    </span>
-                </React.Fragment>
-            ))}
-        </div>
-    );
-}
 
 export default function MyPayslip({ user, onBack }) {
     const [periods, setPeriods] = useState([]);
@@ -36,7 +21,6 @@ export default function MyPayslip({ user, onBack }) {
             const response = await api.get('/Payroll/periods');
             const data = response.data?.data || response.data || [];
             if (Array.isArray(data)) {
-                // Sắp xếp kỳ lương mới nhất lên đầu
                 const sorted = data.sort((a, b) => b.id - a.id);
                 setPeriods(sorted);
                 if (sorted.length > 0) {
@@ -70,209 +54,248 @@ export default function MyPayslip({ user, onBack }) {
         fetchPayslip(id);
     };
 
-    const selectedPeriodName = periods.find(p => p.id == selectedPeriodId)?.name || 'Kỳ lương';
-
-    const breadcrumb = ['Cá nhân', 'Bảng lương', selectedPeriodName];
+    const selectedPeriod = periods.find(p => p.id == selectedPeriodId);
+    const selectedPeriodName = selectedPeriod?.name || 'Kỳ lương';
 
     if (initialFetch) {
         return (
-            <div className="ef-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '300px' }}>
-                <RefreshCw size={24} className="animate-spin" style={{ color: '#94a3b8' }} />
+            <div className="flex flex-col items-center justify-center py-40 gap-4">
+                <RefreshCw size={40} className="text-violet-500 animate-spin" />
+                <p className="text-slate-400 font-bold text-sm">Đang tải dữ liệu lương...</p>
             </div>
         );
     }
 
     return (
-        <div className="ef-wrap animate-fade-in pb-20">
-            {/* ── Toolbar ── */}
-            <div className="ef-toolbar print:hidden" style={{ borderBottom: '1px solid #e2e8f0' }}>
-                <div className="ef-toolbar-title">
-                    <HandCoins size={15} style={{ color: '#475569' }} />
-                    <strong style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#1e293b' }}>
-                        Phiếu Lương Cá Nhân
-                    </strong>
+        <div className="flex flex-col gap-6 animate-fade-up max-w-5xl mx-auto pb-10">
+            {/* Header / Actions */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4 print:hidden">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-violet-600 text-white flex items-center justify-center shadow-lg shadow-violet-100">
+                        <Wallet size={20} />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Phiếu lương chi tiết</h3>
+                        <p className="text-xs text-slate-400 font-medium">Báo cáo thu nhập và khấu trừ hàng tháng</p>
+                    </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <button onClick={() => window.print()} className="ef-btn">
-                        <Printer size={13} /> In phiếu lương
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <select
+                            className="input !py-1.5 !pl-9 !pr-4 text-xs font-bold appearance-none bg-white cursor-pointer w-56"
+                            value={selectedPeriodId}
+                            onChange={e => handleSelectPeriod(e.target.value)}
+                        >
+                            {periods.map(p => (
+                                <option key={p.id} value={p.id}>
+                                    {p.name} {p.status === 'Locked' ? '🔒' : '📝'}
+                                </option>
+                            ))}
+                        </select>
+                        <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                    <button onClick={() => window.print()} className="btn btn-ghost !p-2 text-slate-600">
+                        <Printer size={18} />
                     </button>
                 </div>
             </div>
 
-            {/* ── Breadcrumb ── */}
-            <div className="print:hidden" style={{ padding: '8px 16px', borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
-                <Breadcrumb items={breadcrumb} />
-            </div>
-
-            {/* ── Filter Row ── */}
-            <div className="print:hidden" style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', background: '#fff', display: 'flex', gap: '20px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                        <Calendar size={11} style={{ display: 'inline', marginRight: '4px' }} /> Chọn kỳ lương
-                    </label>
-                    <select
-                        className="ef-select"
-                        style={{ width: '260px' }}
-                        value={selectedPeriodId}
-                        onChange={e => handleSelectPeriod(e.target.value)}
-                    >
-                        {periods.length === 0 && <option value="">— Chưa có kỳ lương —</option>}
-                        {periods.map(p => (
-                            <option key={p.id} value={p.id}>
-                                {p.name} {p.status === 'Locked' ? '(Đã chốt)' : '(Dự toán)'}
-                            </option>
-                        ))}
-                    </select>
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <RefreshCw size={32} className="text-violet-500 animate-spin" />
+                    <p className="text-slate-400 font-bold text-xs">Đang truy xuất dữ liệu chi tiết...</p>
                 </div>
-                {loading && <RefreshCw size={15} className="animate-spin" style={{ color: '#94a3b8', marginBottom: '6px' }} />}
-            </div>
+            ) : payslip ? (
+                <>
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="card flex flex-col gap-4 bg-indigo-50 relative overflow-hidden">
+                            <div className="absolute -right-4 -bottom-4 opacity-10">
+                                <TrendingUp size={100} className="text-indigo-600" />
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-500 text-white flex items-center justify-center">
+                                    <ArrowUpRight size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Tổng thu nhập</p>
+                                    <h3 className="text-xl font-black text-indigo-900">{fmt(payslip.grossSalary)}</h3>
+                                </div>
+                            </div>
+                        </div>
 
-            {/* ── Payload ── */}
-            {!loading && payslip ? (
-                <div className="print-section" style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
-                    {/* Header Paga */}
-                    <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                        <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Phiếu Lương Chi Tiết
-                        </h2>
-                        <p style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>{selectedPeriodName}</p>
+                        <div className="card flex flex-col gap-4 bg-rose-50 relative overflow-hidden">
+                            <div className="absolute -right-4 -bottom-4 opacity-10">
+                                <TrendingDown size={100} className="text-rose-600" />
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center">
+                                    <ArrowDownRight size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-rose-400 uppercase tracking-widest">Khấu trừ & Thuế</p>
+                                    <h3 className="text-xl font-black text-rose-900">{fmt(payslip.totalDeductions)}</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="card flex flex-col gap-4 bg-violet-600 text-white relative overflow-hidden shadow-xl shadow-violet-100 border-none">
+                            <div className="absolute -right-4 -bottom-4 opacity-20">
+                                <HandCoins size={100} className="text-white" />
+                            </div>
+                            <div className="flex items-center gap-3 relative z-10">
+                                <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                                    <HandCoins size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-violet-100 uppercase tracking-widest">Thực lĩnh (NET)</p>
+                                    <h3 className="text-2xl font-black">{fmt(payslip.netSalary)}</h3>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Employee Info */}
-                    <div style={{ background: '#f8fafc', padding: '16px 20px', borderRadius: '6px', border: '1px solid #e2e8f0', marginBottom: '24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        <div>
-                            <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>Họ tên nhân viên</div>
-                            <div style={{ fontSize: '14px', color: '#1e293b', fontWeight: 500 }}>{payslip.employeeName}</div>
+                    {/* Detailed Payslip View */}
+                    <div className="card !p-0 overflow-hidden border-2 border-slate-100">
+                        {/* Company / Employee Info Header */}
+                        <div className="px-8 py-10 bg-slate-50/50 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center text-white font-black text-xl">HR</div>
+                                    <div>
+                                        <h2 className="text-lg font-black text-slate-800 tracking-tight">HRMS SYSTEM CORP</h2>
+                                        <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">{selectedPeriodName}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs font-bold">
+                                    <span className={`px-2 py-1 rounded-md ${selectedPeriod?.status === 'Locked' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                        {selectedPeriod?.status === 'Locked' ? 'CHỐT SỔ' : 'DỰ TOÁN'}
+                                    </span>
+                                    <span className="text-slate-300">|</span>
+                                    <span className="text-slate-500">ID: #{payslip.employeeCode}</span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-6 bg-white/60 p-6 rounded-2xl border border-slate-100">
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nhân viên</p>
+                                    <p className="text-sm font-bold text-slate-700">{payslip.employeeName}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Phòng ban</p>
+                                    <p className="text-sm font-bold text-slate-700">{payslip.departmentName}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Chức vụ</p>
+                                    <p className="text-sm font-bold text-slate-700">{payslip.positionName}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hình thức</p>
+                                    <p className="text-sm font-bold text-slate-700">Chuyển khoản</p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>Mã nhân viên</div>
-                            <div style={{ fontSize: '14px', color: '#1e293b', fontWeight: 500, fontFamily: 'monospace' }}>{payslip.employeeCode}</div>
+
+                        {/* Breakdown Ledger */}
+                        <div className="p-8">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                                {/* Earnings Column */}
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                                        <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+                                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">CÁC KHOẢN THU NHẬP</h4>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {[
+                                            { label: 'Lương cơ bản (HĐLĐ)', val: payslip.basicSalary, sub: 'Mức lương cố định' },
+                                            { label: 'Lương thực tế (Công)', val: payslip.actualWorkingSalary, sub: 'Tính theo ngày công thực tế', highlight: true },
+                                            { label: 'Lương tăng ca (OT)', val: payslip.overtimePay, sub: 'Tiền làm thêm giờ đã duyệt' },
+                                            { label: 'Phụ cấp & Thưởng', val: (payslip.totalAllowances || 0) + (payslip.bonus || 0), sub: 'Ăn trưa, xăng xe, thưởng KPI' },
+                                        ].map((item, idx) => (
+                                            <div key={idx} className="flex items-center justify-between group">
+                                                <div>
+                                                    <p className={`text-sm font-bold ${item.highlight ? 'text-violet-600' : 'text-slate-700'}`}>{item.label}</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium">{item.sub}</p>
+                                                </div>
+                                                <span className={`text-sm font-black ${item.highlight ? 'text-violet-600' : 'text-slate-600'}`}>{fmt(item.val)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-6 pt-4 border-t-2 border-slate-50 flex items-center justify-between">
+                                        <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Tổng thu nhập (A)</span>
+                                        <span className="text-lg font-black text-slate-800">{fmt(payslip.grossSalary)}</span>
+                                    </div>
+                                </div>
+
+                                {/* Deductions Column */}
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                                        <div className="w-1.5 h-6 bg-rose-500 rounded-full" />
+                                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">CÁC KHOẢN KHẤU TRỪ</h4>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {[
+                                            { label: 'BHXH (8%)', val: payslip.socialInsurance },
+                                            { label: 'BHYT (1.5%)', val: payslip.healthInsurance },
+                                            { label: 'BHTN (1%)', val: payslip.unemploymentInsurance },
+                                            { label: 'Thuế TNCN (Tạm tính)', val: payslip.personalIncomeTax, warning: true },
+                                            { label: 'Khấu trừ khác', val: payslip.otherDeductions, sub: 'Vi phạm, trễ giờ, v.v.' },
+                                        ].map((item, idx) => (
+                                            <div key={idx} className="flex items-center justify-between">
+                                                <div>
+                                                    <p className={`text-sm font-bold ${item.warning ? 'text-rose-500' : 'text-slate-700'}`}>{item.label}</p>
+                                                    <p className="text-[10px] text-slate-400 font-medium">{item.sub || 'Theo quy định nhà nước'}</p>
+                                                </div>
+                                                <span className={`text-sm font-black ${item.warning ? 'text-rose-500' : 'text-slate-600'}`}>({fmt(item.val)})</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-6 pt-4 border-t-2 border-slate-50 flex items-center justify-between">
+                                        <span className="text-sm font-black text-slate-400 uppercase tracking-widest">Tổng khấu trừ (B)</span>
+                                        <span className="text-lg font-black text-slate-800">({fmt(payslip.totalDeductions)})</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>Phòng ban</div>
-                            <div style={{ fontSize: '14px', color: '#1e293b', fontWeight: 500 }}>{payslip.departmentName}</div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '2px' }}>Chức danh</div>
-                            <div style={{ fontSize: '14px', color: '#1e293b', fontWeight: 500 }}>{payslip.positionName}</div>
+
+                        {/* Net Footer */}
+                        <div className="px-8 py-8 bg-violet-600 text-white flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="space-y-1">
+                                <h3 className="text-xl font-black uppercase tracking-tight">Thực lĩnh chuyển khoản (A - B)</h3>
+                                <p className="text-xs text-violet-200 font-bold opacity-80 uppercase tracking-widest">Thanh toán qua ngân hàng vào ngày 05 hàng tháng</p>
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-3xl font-black tracking-tight">{fmt(payslip.netSalary)}</span>
+                                <span className="text-[10px] font-bold text-violet-200 bg-white/10 px-2 py-0.5 rounded mt-1">ĐÃ BAO GỒM TẤT CẢ PHỤ CẤP</span>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Summary Boxes */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '32px' }}>
-                        <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '6px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>Tổng thu nhập</div>
-                            <div style={{ fontSize: '18px', color: '#1e293b', fontWeight: 700 }}>{fmt(payslip.grossSalary)}</div>
+                    <div className="flex items-start gap-4 p-6 bg-slate-50 rounded-2xl border border-slate-100 print:hidden">
+                        <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-slate-400 flex-shrink-0">
+                            <Info size={20} />
                         </div>
-                        <div style={{ border: '1px solid #e2e8f0', padding: '16px', borderRadius: '6px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '4px' }}>Tổng khấu trừ</div>
-                            <div style={{ fontSize: '18px', color: '#475569', fontWeight: 700 }}>{fmt(payslip.totalDeductions)}</div>
-                        </div>
-                        <div style={{ border: '1px solid #cbd5e1', background: '#f8fafc', padding: '16px', borderRadius: '6px', textAlign: 'center' }}>
-                            <div style={{ fontSize: '11px', color: '#475569', textTransform: 'uppercase', fontWeight: 700, marginBottom: '4px' }}>Thực lĩnh (NET)</div>
-                            <div style={{ fontSize: '20px', color: '#0f172a', fontWeight: 800 }}>{fmt(payslip.netSalary)}</div>
+                        <div className="space-y-1">
+                            <p className="text-xs font-bold text-slate-700">Thông tin hỗ trợ</p>
+                            <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                                Phiếu lương này được trích xuất tự động từ hệ thống quản lý nhân sự. Nếu có bất kỳ thắc mắc nào về số ngày công, mức lương hoặc các khoản khấu trừ, vui lòng liên hệ bộ phận <strong>C&B (Phòng Nhân Sự)</strong> trước ngày 08 hàng tháng để được hỗ trợ giải đáp.
+                            </p>
                         </div>
                     </div>
-
-                    {/* Ledger Table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                        <thead>
-                            <tr>
-                                <th style={{ textAlign: 'left', padding: '10px 12px', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>Khoản mục</th>
-                                <th style={{ textAlign: 'right', padding: '10px 12px', borderBottom: '2px solid #e2e8f0', color: '#475569', fontWeight: 600, width: '200px' }}>Thành tiền</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {/* A. THU NHẬP */}
-                            <tr>
-                                <td colSpan={2} style={{ padding: '12px 12px 8px', fontWeight: 700, color: '#1e293b', fontSize: '12px', textTransform: 'uppercase' }}>
-                                    A. Thu nhập (Earnings)
-                                </td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Lương cơ bản (Theo HĐLĐ)</td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569', fontWeight: 500 }}>{fmt(payslip.basicSalary)}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Lương thực tế (Theo ngày công)</td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e293b', fontWeight: 600 }}>{fmt(payslip.actualWorkingSalary)}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Lương làm thêm giờ (Overtime)</td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e293b', fontWeight: 600 }}>{fmt(payslip.overtimePay)}</td>
-                            </tr>
-                            {(payslip.totalAllowances > 0 || payslip.bonus > 0) && (
-                                <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                    <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Phụ cấp & Thưởng</td>
-                                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e293b', fontWeight: 600 }}>{fmt((payslip.totalAllowances || 0) + (payslip.bonus || 0))}</td>
-                                </tr>
-                            )}
-                            <tr>
-                                <td style={{ padding: '12px 12px', fontWeight: 600, color: '#334155' }}>Tổng cộng thu nhập</td>
-                                <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>{fmt(payslip.grossSalary)}</td>
-                            </tr>
-
-                            {/* B. KHẤU TRỪ */}
-                            <tr>
-                                <td colSpan={2} style={{ padding: '24px 12px 8px', fontWeight: 700, color: '#1e293b', fontSize: '12px', textTransform: 'uppercase' }}>
-                                    B. Khấu trừ (Deductions)
-                                </td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Bảo hiểm Xã hội (BHXH)</td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569' }}>{fmt(payslip.socialInsurance)}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Bảo hiểm Y tế (BHYT)</td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569' }}>{fmt(payslip.healthInsurance)}</td>
-                            </tr>
-                            <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Bảo hiểm Thất nghiệp (BHTN)</td>
-                                <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569' }}>{fmt(payslip.unemploymentInsurance)}</td>
-                            </tr>
-                            {payslip.personalIncomeTax > 0 && (
-                                <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                    <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Thuế TNCN (Tạm thu)</td>
-                                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569' }}>{fmt(payslip.personalIncomeTax)}</td>
-                                </tr>
-                            )}
-                            {payslip.otherDeductions > 0 && (
-                                <tr style={{ borderBottom: '1px dashed #e2e8f0' }}>
-                                    <td style={{ padding: '10px 12px 10px 24px', color: '#475569' }}>Trừ khác (Đi trễ, vi phạm,...)</td>
-                                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569' }}>{fmt(payslip.otherDeductions)}</td>
-                                </tr>
-                            )}
-                            <tr>
-                                <td style={{ padding: '12px 12px', fontWeight: 600, color: '#334155' }}>Tổng cộng khấu trừ</td>
-                                <td style={{ padding: '12px 12px', textAlign: 'right', fontWeight: 600, color: '#475569' }}>{fmt(payslip.totalDeductions)}</td>
-                            </tr>
-
-                             {/* TOTAL NET */}
-                             <tr>
-                                <td style={{ padding: '16px 12px', fontWeight: 700, color: '#0f172a', fontSize: '14px', borderTop: '2px solid #cbd5e1' }}>
-                                    THỰC LĨNH CHUYỂN KHOẢN (NET)
-                                </td>
-                                <td style={{ padding: '16px 12px', textAlign: 'right', fontWeight: 800, color: '#0f172a', fontSize: '16px', borderTop: '2px solid #cbd5e1' }}>
-                                    {fmt(payslip.netSalary)}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                     <div className="print:hidden" style={{ marginTop: '32px', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', color: '#475569', lineHeight: '1.5' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: '#1e293b', marginBottom: '4px' }}>
-                            <Info size={14} /> Ghi chú bảng lương
-                        </div>
-                        Số liệu trên được tính toán tự động dựa trên mức lương HĐLĐ, ngày công phê duyệt và công thức từ Phòng Nhân Sự. Mọi thắc mắc liên quan (công, tăng ca, bảo hiểm), vui lòng liên hệ nhân sự phụ trách trong vòng 03 ngày làm việc kể từ lúc nhận phiếu lương.
+                </>
+            ) : (
+                <div className="card flex flex-col items-center justify-center py-32 gap-6 text-center">
+                    <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">
+                        <AlertTriangle size={40} />
                     </div>
+                    <div className="space-y-2">
+                        <h4 className="text-lg font-bold text-slate-800">Không tìm thấy phiếu lương</h4>
+                        <p className="text-sm text-slate-400 max-w-sm font-medium">Dữ liệu lương cho kỳ này có thể chưa được chốt hoặc chưa được phê duyệt để hiển thị cho nhân viên.</p>
+                    </div>
+                    <button onClick={fetchPeriods} className="btn btn-primary !px-8">
+                        Thử lại
+                    </button>
                 </div>
-            ) : !loading && !payslip ? (
-                <div style={{ padding: '64px 24px', textAlign: 'center' }}>
-                    <AlertTriangle size={40} style={{ margin: '0 auto 14px', color: '#cbd5e1' }} />
-                    <p style={{ fontSize: '14px', color: '#94a3b8', marginBottom: '6px' }}>Không có dữ liệu bảng lương</p>
-                    <p style={{ fontSize: '12px', color: '#cbd5e1' }}>Kỳ lương này chưa được chốt hoặc bạn không có dữ liệu để hiển thị.</p>
-                </div>
-            ) : null}
+            )}
         </div>
     );
 }

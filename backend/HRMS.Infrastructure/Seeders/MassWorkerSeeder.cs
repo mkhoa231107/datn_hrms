@@ -54,135 +54,122 @@ namespace HRMS.Infrastructure.Seeders
             int workerPosId = posWorker.Id;
 
             var shifts = await context.WorkShifts.ToListAsync();
-            int s1 = shifts.FirstOrDefault(s => s.ShiftCode == "S1")?.Id ?? 0;
             int c1 = shifts.FirstOrDefault(s => s.ShiftCode == "C1")?.Id ?? 0;
-            int d1 = shifts.FirstOrDefault(s => s.ShiftCode == "D1")?.Id ?? 0;
+            int c2 = shifts.FirstOrDefault(s => s.ShiftCode == "C2")?.Id ?? 0;
+            int c3 = shifts.FirstOrDefault(s => s.ShiftCode == "C3")?.Id ?? 0;
             
-            if (s1 == 0 || c1 == 0 || d1 == 0)
+            if (c1 == 0 || c2 == 0 || c3 == 0)
             {
-                Console.WriteLine("⚠️ WorkShifts (S1, C1, D1) not found. Skipping Mass Seed.");
+                Console.WriteLine("⚠️ WorkShifts (C1, C2, C3) not found. Skipping Mass Seed.");
                 return;
             }
 
-            // 2. Skip seeding if data already exists to preserve testing data
-            if (await context.Employees.AnyAsync(e => e.EmployeeCode == "PRD-ASS-001"))
+            bool workersExist = await context.Employees.AnyAsync(e => e.EmployeeCode == "PRD-ASS-001");
+            if (workersExist)
             {
-                Console.WriteLine("⏩ PRD-ASS workers already exist. Skipping seeding to preserve your test data.");
-                return;
+                Console.WriteLine("⏩ PRD-ASS workers already exist. Skipping employee seeding, but will regenerate schedules...");
             }
-
-            // 2. Fetch prerequisites (No cleanup to preserve persistence)
-            context.ChangeTracker.Clear();
-            dept = await context.Departments.FirstOrDefaultAsync(d => d.DepartmentCode == "PRD-ASS");
-            if (dept == null) return; // Should not happen if cleanup is correct
-            orgId = await context.Organizations.Select(o => o.Id).FirstOrDefaultAsync();
-            mgrPosId = (await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "PRD-MGR"))?.Id ?? 0;
-            workerPosId = (await context.Positions.FirstOrDefaultAsync(p => p.PositionCode == "PRD-ASS-W"))?.Id ?? 0;
-            shifts = await context.WorkShifts.ToListAsync();
-            s1 = shifts.FirstOrDefault(s => s.ShiftCode == "S1")?.Id ?? 0;
-            c1 = shifts.FirstOrDefault(s => s.ShiftCode == "C1")?.Id ?? 0;
-            d1 = shifts.FirstOrDefault(s => s.ShiftCode == "D1")?.Id ?? 0;
-            
-            if (s1 == 0 || c1 == 0 || d1 == 0) return;
-
-            // 3. Seed 151 Personnel (001: Mgr, 002-151: Workers)
-            string hash = BCrypt.Net.BCrypt.HashPassword("123456");
-            using (var trans = await context.Database.BeginTransactionAsync())
+            else
             {
-                try
+                // 3. Seed 151 Personnel (001: Mgr, 002-151: Workers)
+                string hash = BCrypt.Net.BCrypt.HashPassword("123456");
+                using (var trans = await context.Database.BeginTransactionAsync())
                 {
-                    var employeeRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Employee");
-                    
-                    for (int i = 1; i <= 151; i++)
+                    try
                     {
-                        string code = $"PRD-ASS-{i:D3}";
-                        string username = $"prd_ass_{i:D2}";
-                        string email = $"{username}@techvn.com";
-                        // Use index i for deterministic names instead of Random
-                        string fullName = $"{Surnames[i % Surnames.Length]} {MiddleNames[i % MiddleNames.Length]} {FirstNames[i % FirstNames.Length]}";
+                        var employeeRole = await context.Roles.FirstOrDefaultAsync(r => r.RoleName == "Employee");
                         
-                        int currentPosId = (i == 1) ? mgrPosId : workerPosId;
-                        decimal salary = (i == 1) ? 22000000 : 7000000;
-                        DateTime dob = new DateTime(1985 + (i % 20), (i % 12) + 1, (i % 27) + 1);
-
-                        // 1. Create User
-                        var user = new User
+                        for (int i = 1; i <= 151; i++)
                         {
-                            Username = username,
-                            PasswordHash = hash,
-                            Email = email,
-                            FullName = fullName,
-                            IsActive = true,
-                            CreatedAt = DateTime.UtcNow
-                        };
-                        context.Users.Add(user);
-                        await context.SaveChangesAsync();
+                            string code = $"PRD-ASS-{i:D3}";
+                            string username = $"prd_ass_{i:D2}";
+                            // Use deterministic name first to generate correct email
+                            string fullName = $"{Surnames[i % Surnames.Length]} {MiddleNames[i % MiddleNames.Length]} {FirstNames[i % FirstNames.Length]}";
+                            string email = DataFixSeeder.GenerateWorkEmail(fullName, code);
+                            
+                            int currentPosId = (i == 1) ? mgrPosId : workerPosId;
+                            decimal salary = (i == 1) ? 22000000 : 7000000;
+                            DateTime dob = new DateTime(1985 + (i % 20), (i % 12) + 1, (i % 27) + 1);
 
-                        // 2. Assign Role
-                        if (employeeRole != null)
-                        {
-                            context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = employeeRole.Id, AssignedAt = DateTime.UtcNow });
+                            // 1. Create User
+                            var user = new User
+                            {
+                                Username = username,
+                                PasswordHash = hash,
+                                Email = email,
+                                FullName = fullName,
+                                IsActive = true,
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            context.Users.Add(user);
+                            await context.SaveChangesAsync();
+
+                            // 2. Assign Role
+                            if (employeeRole != null)
+                            {
+                                context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = employeeRole.Id, AssignedAt = DateTime.UtcNow });
+                            }
+
+                            // 3. Create Employee
+                            var emp = new Employee
+                            {
+                                EmployeeCode = code,
+                                FullName = fullName,
+                                Gender = "Nam",
+                                Email = email,
+                                JoinDate = new DateTime(2026, 1, 1),
+                                Status = Domain.Enums.EmployeeStatus.Active,
+                                OrganizationId = orgId,
+                                DepartmentId = deptId,
+                                PositionId = currentPosId,
+                                UserId = user.Id,
+                                CreatedAt = DateTime.UtcNow,
+                                IsActive = true,
+                                DateOfBirth = dob,
+                                PlaceOfBirth = "Hà Nội",
+                                PlaceOfOrigin = "Hà Nội",
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            context.Employees.Add(emp);
+                            await context.SaveChangesAsync();
+
+                            // 4. Create Contract
+                            var contract = new EmployeeContract
+                            {
+                                EmployeeId = emp.Id,
+                                ContractNumber = $"HDLD/2026/{code}",
+                                ContractType = Domain.Enums.ContractType.FixedTerm,
+                                StartDate = new DateTime(2026, 1, 1),
+                                EndDate = new DateTime(2027, 1, 1),
+                                BasicSalary = salary,
+                                IsActive = true,
+                                Status = Domain.Enums.ContractStatus.Active,
+                                CreatedAt = DateTime.UtcNow,
+                                ShiftId = c1,
+                                TargetDepartmentId = deptId,
+                                TargetPositionId = currentPosId,
+                                UpdatedAt = DateTime.UtcNow
+                            };
+                            context.EmployeeContracts.Add(contract);
+
+                            if (i == 1) // Set as Dept Manager
+                            {
+                                dept.ManagerId = emp.Id;
+                            }
+
+                            if (i % 20 == 0) Console.WriteLine($"   -> Processed {i}/151...");
                         }
-
-                        // 3. Create Employee
-                        var emp = new Employee
-                        {
-                            EmployeeCode = code,
-                            FullName = fullName,
-                            Gender = "Nam",
-                            Email = email,
-                            JoinDate = new DateTime(2026, 1, 1),
-                            Status = Domain.Enums.EmployeeStatus.Active,
-                            OrganizationId = orgId,
-                            DepartmentId = deptId,
-                            PositionId = currentPosId,
-                            UserId = user.Id,
-                            CreatedAt = DateTime.UtcNow,
-                            IsActive = true,
-                            DateOfBirth = dob,
-                            PlaceOfBirth = "Hà Nội",
-                            PlaceOfOrigin = "Hà Nội",
-                            UpdatedAt = DateTime.UtcNow
-                        };
-                        context.Employees.Add(emp);
                         await context.SaveChangesAsync();
-
-                        // 4. Create Contract
-                        var contract = new EmployeeContract
-                        {
-                            EmployeeId = emp.Id,
-                            ContractNumber = $"HDLD/2026/{code}",
-                            ContractType = Domain.Enums.ContractType.FixedTerm,
-                            StartDate = new DateTime(2026, 1, 1),
-                            EndDate = new DateTime(2027, 1, 1),
-                            BasicSalary = salary,
-                            IsActive = true,
-                            Status = Domain.Enums.ContractStatus.Active,
-                            CreatedAt = DateTime.UtcNow,
-                            ShiftId = s1,
-                            TargetDepartmentId = deptId,
-                            TargetPositionId = currentPosId,
-                            UpdatedAt = DateTime.UtcNow
-                        };
-                        context.EmployeeContracts.Add(contract);
-
-                        if (i == 1) // Set as Dept Manager
-                        {
-                            dept.ManagerId = emp.Id;
-                        }
-
-                        if (i % 20 == 0) Console.WriteLine($"   -> Processed {i}/151...");
+                        await trans.CommitAsync();
+                        Console.WriteLine("✅ 151 Personnel created and committed.");
                     }
-                    await context.SaveChangesAsync();
-                    await trans.CommitAsync();
-                    Console.WriteLine("✅ 151 Personnel created and committed.");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ Error seeding personnel: {ex.Message}");
-                    if (ex.InnerException != null) Console.WriteLine($"   Inner: {ex.InnerException.Message}");
-                    await trans.RollbackAsync();
-                    throw;
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ Error seeding personnel: {ex.Message}");
+                        if (ex.InnerException != null) Console.WriteLine($"   Inner: {ex.InnerException.Message}");
+                        await trans.RollbackAsync();
+                        throw;
+                    }
                 }
             }
 
@@ -203,11 +190,25 @@ namespace HRMS.Infrastructure.Seeders
                 .OrderBy(e => e.EmployeeCode)
                 .ToListAsync();
 
+            var empIds = allEmployees.Select(e => e.Id).ToList();
+            
+            // CHECK: If any schedules already exist for these employees in 2026, skip regeneration
+            // to avoid wiping out manual changes like shift swaps.
+            bool schedulesExist = await context.WorkSchedules
+                .AnyAsync(s => empIds.Contains(s.EmployeeId) && s.WorkingDate.Year == 2026);
+
+            if (schedulesExist)
+            {
+                Console.WriteLine("⏩ Work schedules for 2026 already exist. Skipping regeneration to preserve manual changes.");
+                return;
+            }
+
+            // If we are here, no schedules exist, so we proceed to generate them
             using (var trans = await context.Database.BeginTransactionAsync())
             {
                 try
                 {
-                    int[] shiftIds = { s1, c1, d1 }; // S1, C1, D1
+                    int[] shiftIds = { c1, c2, c3 }; // C1 (Sáng), C2 (Chiều), C3 (Đêm)
                     var hcShiftId = await context.WorkShifts.Where(s => s.ShiftCode == "HC").Select(s => s.Id).FirstOrDefaultAsync();
                     int count = 0;
 
@@ -218,10 +219,12 @@ namespace HRMS.Infrastructure.Seeders
                         
                         if (isWorker)
                         {
-                            string numPart = emp.EmployeeCode.Replace("PRD-ASS-", "");
+                            string numPart = new string(emp.EmployeeCode.Where(char.IsDigit).ToArray());
                             if (int.TryParse(numPart, out int workerNum))
                             {
-                                initialGroup = ((workerNum - 2) / 50) % 3; // Group 0 (002-051), 1 (052-101), 2 (102-151)
+                                int offset = emp.EmployeeCode.Contains("-W-") ? 1 : 2;
+                                initialGroup = ((workerNum - offset) / 50) % 3;
+                                if (initialGroup < 0) initialGroup = 0;
                             }
                         }
 
@@ -238,9 +241,10 @@ namespace HRMS.Infrastructure.Seeders
                                 if (isWorker)
                                 {
                                     int weekNum = System.Globalization.ISOWeek.GetWeekOfYear(date);
-                                    int shiftIndex = (initialGroup + weekNum - 1) % 3;
+                                    int rotationCycle = (weekNum - 1) / 2;
+                                    int shiftIndex = (initialGroup + rotationCycle) % 3;
                                     assignedShiftId = shiftIds[shiftIndex];
-                                    note = $"Xoay ca tự động (Nhóm {initialGroup + 1}, Tuần {weekNum})";
+                                    note = $"Xoay ca 2 tuần/lần (Nhóm {initialGroup + 1}, Tuần {weekNum})";
                                 }
                                 else
                                 {

@@ -12,3 +12,5 @@ namespace HRMS.Application.DTOs.Users
         public List<int> RoleIds { get; set; } = new();
     }
 }
+
+

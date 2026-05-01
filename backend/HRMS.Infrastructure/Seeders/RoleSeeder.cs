@@ -55,7 +55,9 @@ namespace HRMS.Infrastructure.Seeders
                     var roleMappings = await context.UserRoles.Where(ur => ur.RoleId == roleToRemove.Id).ToListAsync();
                     foreach (var mapping in roleMappings)
                     {
-                        if (fallbackRole != null && !await context.UserRoles.AnyAsync(ur => ur.UserId == mapping.UserId && ur.RoleId == fallbackRole.Id))
+                        if (fallbackRole != null && 
+                            !await context.UserRoles.AnyAsync(ur => ur.UserId == mapping.UserId && ur.RoleId == fallbackRole.Id) &&
+                            !context.UserRoles.Local.Any(ur => ur.UserId == mapping.UserId && ur.RoleId == fallbackRole.Id))
                         {
                             context.UserRoles.Add(new UserRole { UserId = mapping.UserId, RoleId = fallbackRole.Id, AssignedAt = System.DateTime.UtcNow, CreatedAt = System.DateTime.UtcNow });
                         }
