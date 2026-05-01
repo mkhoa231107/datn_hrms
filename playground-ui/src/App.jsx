@@ -52,6 +52,7 @@ import OvertimePlanList from './components/overtime/OvertimePlanList';
 import OvertimeGrid from './components/overtime/OvertimeGrid';
 import MyOvertimeSchedule from './components/overtime/MyOvertimeSchedule';
 import AccountantDashboard from './components/dashboard/AccountantDashboard';
+import AttendanceSummaryReport from './components/attendance/AttendanceSummaryReport';
 
 
 // Default tab per role when first logged in
@@ -443,6 +444,11 @@ export default function App() {
           {tab('attendance-management') && (
             <RoleGuard user={user} allowedRoles={['CnbSpecialist']}>
               <AttendanceManagement onBack={() => setActiveTab('me')} />
+            </RoleGuard>
+          )}
+          {tab('attendance-report') && (
+            <RoleGuard user={user} allowedRoles={['CnbSpecialist', 'Admin', 'Accountant']}>
+              <AttendanceSummaryReport />
             </RoleGuard>
           )}
           {tab('insurance-management') && (

@@ -50,6 +50,7 @@ const ROLE_MENUS = {
     CnbSpecialist: [
         { id: 'employees',             label: 'Nhân viên',         icon: Users },
         { id: 'attendance-management', label: 'Quản lý chấm công', icon: Clock },
+        { id: 'attendance-report',     label: 'BC chấm công',      icon: BarChart2 },
         { id: 'insurance-management',  label: 'Bảo hiểm xã hội',  icon: Shield },
         { id: 'admin-contracts',       label: 'Quản lý hợp đồng', icon: FileSpreadsheet },
         { id: 'team-shift-approvals',  label: 'Duyệt đổi ca',     icon: ArrowLeftRight },
