@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { 
     Check, X, RefreshCw, ArrowLeft, ArrowRightLeft, 
     Calendar, Clock, AlertCircle,
-    ChevronRight, CheckCircle2
+    ChevronRight, CheckCircle2, ChevronLeft
 } from 'lucide-react';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 import shiftChangeService from '../../services/shiftChangeService';
 import shiftSwapService from '../../services/shiftSwapService';
 import ShiftSwapRequestDetail from '../request/ShiftSwapRequestDetail';
@@ -22,6 +23,9 @@ export default function ShiftChangeApproval({ user, onBack }) {
     const [confirmApproveId, setConfirmApproveId] = useState(null);
     const [approvingId, setApprovingId] = useState(null);
     const [selectedDept, setSelectedDept] = useState('all');
+    const [page, setPage] = useState(1);
+    const PER_PAGE = 10;
+    const { isMobile } = useBreakpoint();
 
     useEffect(() => {
         fetchRequests();
@@ -114,84 +118,97 @@ export default function ShiftChangeApproval({ user, onBack }) {
         return dept === selectedDept;
     });
 
+    const visibleRequests = filteredRequests.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+    const totalPages = Math.ceil(filteredRequests.length / PER_PAGE);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setPage(1);
+    }, [activeTab, selectedDept]);
+
     return (
-        <div className="flex flex-col gap-6 animate-fade-up pb-10">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-[8px] bg-violet-600 text-white flex items-center justify-center shadow-lg">
-                        <ArrowRightLeft size={20} />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-800 uppercase tracking-tight">Phê duyệt đổi ca</h3>
-                        <p className="text-xs text-slate-400 font-medium">Quản lý yêu cầu thay đổi và hoán đổi ca làm việc</p>
+        <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">
+            {/* Standard Module Header */}
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                        <ArrowRightLeft className="text-violet-600" size={28} />
+                        Phê duyệt đổi ca & hoán đổi
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-slate-400 text-sm">Quản lý yêu cầu thay đổi lịch làm việc</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span className="text-slate-400 text-sm">Phòng ban & Bộ phận</span>
                     </div>
                 </div>
-                {onBack && (
-                    <button onClick={onBack} className="btn btn-ghost !py-2 text-xs">
-                        <ArrowLeft size={14} /> Quay lại
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={fetchRequests}
+                        className="btn btn-ghost !p-2.5 shadow-sm"
+                        title="Làm mới"
+                    >
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                     </button>
-                )}
+                    {onBack && (
+                        <button onClick={onBack} className="btn btn-primary !py-2.5 px-5">
+                            Quay lại
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* KPI Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="card !rounded-[8px] flex items-center gap-4 border-l-4 border-l-amber-500">
-                    <div className="w-12 h-12 rounded-[8px] bg-amber-50 text-amber-600 flex items-center justify-center">
+            {/* Standard KPI Cards */}
+            <div className={isMobile ? 'kpi-scroll mb-8' : 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'}>
+                <div className="card !p-6 flex items-center gap-5 border-l-4 border-l-amber-500">
+                    <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
                         <Clock size={24} />
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chờ xử lý</p>
-                        <h3 className="text-xl font-black text-slate-800">{stats.pending} Đơn</h3>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Chờ xử lý</p>
+                        <h2 className="text-3xl font-black text-slate-800 stat-value">{stats.pending}</h2>
                     </div>
                 </div>
-                <div className="card !rounded-[8px] flex items-center gap-4 border-l-4 border-l-blue-500">
-                    <div className="w-12 h-12 rounded-[8px] bg-blue-50 text-blue-600 flex items-center justify-center">
+                <div className="card !p-6 flex items-center gap-5 border-l-4 border-l-blue-500">
+                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
                         <ArrowRightLeft size={24} />
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hoán đổi (Swap)</p>
-                        <h3 className="text-xl font-black text-slate-800">{stats.swaps} Đơn</h3>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Hoán đổi (Swap)</p>
+                        <h2 className="text-3xl font-black text-blue-600 stat-value">{stats.swaps}</h2>
                     </div>
                 </div>
-                <div className="card !rounded-[8px] flex items-center gap-4 border-l-4 border-l-emerald-500">
-                    <div className="w-12 h-12 rounded-[8px] bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <div className="card !p-6 flex items-center gap-5 border-l-4 border-l-emerald-500">
+                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0">
                         <CheckCircle2 size={24} />
                     </div>
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đổi ca (Change)</p>
-                        <h3 className="text-xl font-black text-slate-800">{stats.changes} Đơn</h3>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Đổi ca (Change)</p>
+                        <h2 className="text-3xl font-black text-emerald-600 stat-value">{stats.changes}</h2>
                     </div>
                 </div>
             </div>
 
-            {/* Main Tabs */}
-            <div className="card !p-0 !rounded-[8px] overflow-hidden border-2 border-slate-100">
-                <div className="flex border-b border-slate-100 bg-slate-50/50">
-                    <button 
-                        onClick={() => setActiveTab('pending')}
-                        className={`px-8 py-4 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'pending' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        Đang chờ xử lý
-                        {activeTab === 'pending' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-violet-600" />}
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('history')}
-                        className={`px-8 py-4 text-xs font-black uppercase tracking-widest transition-all relative ${activeTab === 'history' ? 'text-violet-600' : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        Lịch sử phê duyệt
-                        {activeTab === 'history' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-violet-600" />}
-                    </button>
-                </div>
+            {/* Standard TabFilter */}
+            <TabFilter 
+                tabs={[
+                    { id: 'pending', label: 'ĐANG CHỜ XỬ LÝ' },
+                    { id: 'history', label: 'LỊCH SỬ PHÊ DUYỆT' }
+                ]}
+                activeTabId={activeTab}
+                onTabChange={setActiveTab}
+                className="mb-8"
+            />
 
-                <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                    <table className="w-full border-collapse table-sticky-head">
+            {/* Main Table Container */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
+                <div className="table-mobile-scroll">
+                    <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-slate-50/30">
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Nhân sự</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Yêu cầu</th>
-                                <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Lý do</th>
-                                <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-40">Thao tác</th>
+                            <tr className="bg-slate-50/50">
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nhân sự</th>
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Yêu cầu thay đổi</th>
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Lý do & Phản hồi</th>
+                                <th className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center w-40">Thao tác</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
@@ -213,7 +230,7 @@ export default function ShiftChangeApproval({ user, onBack }) {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredRequests.map(r => (
+                                visibleRequests.map(r => (
                                     <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
@@ -291,6 +308,30 @@ export default function ShiftChangeApproval({ user, onBack }) {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Pagination Footer */}
+                <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+                    <p className="text-xs font-medium text-slate-400">
+                        Hiển thị {visibleRequests.length} trên {filteredRequests.length} yêu cầu
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            disabled={page === 1} 
+                            onClick={() => setPage(p => p - 1)} 
+                            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 transition-all shadow-sm"
+                        >
+                            <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-xs font-bold text-slate-600 px-2 text-center min-w-[100px]">Trang {page} / {totalPages || 1}</span>
+                        <button 
+                            disabled={page >= totalPages} 
+                            onClick={() => setPage(p => p + 1)} 
+                            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 transition-all shadow-sm"
+                        >
+                            <ChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 

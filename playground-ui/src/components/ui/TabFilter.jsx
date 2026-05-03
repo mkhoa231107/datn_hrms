@@ -34,10 +34,11 @@ const TabFilter = ({ tabs, activeTabId, onTabChange, className = "" }) => {
     if (!tabs || tabs.length === 0) return null;
 
     return (
-        <div 
-            ref={containerRef} 
-            className={`flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl w-fit relative overflow-hidden ${className}`}
-        >
+        <div className={`max-w-full overflow-x-auto ${className}`} style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <div 
+                ref={containerRef} 
+                className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl w-max relative overflow-hidden"
+            >
             {/* Sliding Background Pill */}
             <div 
                 className="absolute top-1 bottom-1 bg-white rounded-lg shadow-sm transition-all duration-300 ease-in-out z-0"
@@ -71,6 +72,7 @@ const TabFilter = ({ tabs, activeTabId, onTabChange, className = "" }) => {
                     </button>
                 );
             })}
+            </div>
         </div>
     );
 };

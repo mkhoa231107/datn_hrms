@@ -30,6 +30,7 @@ namespace HRMS.Application.DTOs.Scheduling
         public int? ShiftId { get; set; }
         public string ShiftCode { get; set; } = string.Empty;
         public bool IsLocked { get; set; }
+        public double OTHours { get; set; }
     }
 
     public class BulkAssignDto

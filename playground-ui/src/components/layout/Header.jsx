@@ -81,13 +81,21 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px', flexShrink: 0 }}>
                     <button
                         onClick={onToggleSidebar}
+                        className="hover-trigger transition-all duration-200"
                         style={{
                             padding: '10px', borderRadius: 'var(--r-md)',
                             border: 'none', background: 'transparent',
                             color: 'var(--text-secondary)', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             minHeight: '44px', minWidth: '44px',
-                            transition: 'background 0.2s ease, color 0.2s ease',
+                        }}
+                        onMouseEnter={e => { 
+                            e.currentTarget.style.background = 'var(--accent-subtle)'; 
+                            e.currentTarget.style.color = 'var(--accent)'; 
+                        }}
+                        onMouseLeave={e => { 
+                            e.currentTarget.style.background = 'transparent'; 
+                            e.currentTarget.style.color = 'var(--text-secondary)'; 
                         }}
                         title="Bật/Tắt thanh điều hướng"
                     >
@@ -141,6 +149,18 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 transition: 'background 0.18s ease, color 0.18s ease',
                             }}
+                            onMouseEnter={e => {
+                                if (!showNotifications) {
+                                    e.currentTarget.style.background = 'var(--accent-subtle)';
+                                    e.currentTarget.style.color = 'var(--accent)';
+                                }
+                            }}
+                            onMouseLeave={e => {
+                                if (!showNotifications) {
+                                    e.currentTarget.style.background = 'transparent';
+                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                }
+                            }}
                             title="Thông báo"
                         >
                             <Bell size={18} />
@@ -173,23 +193,21 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
                         {initials}
                     </div>
 
-                    {!isMobile && (
-                        <button
-                            onClick={onLogout}
-                            style={{
-                                padding: '10px', borderRadius: 'var(--r-md)', border: 'none',
-                                background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
-                                minHeight: '44px', minWidth: '44px',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                transition: 'all 0.18s ease',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#DC2626'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                            title="Đăng xuất"
-                        >
-                            <LogOut size={18} />
-                        </button>
-                    )}
+                    <button
+                        onClick={onLogout}
+                        style={{
+                            padding: '10px', borderRadius: 'var(--r-md)', border: 'none',
+                            background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+                            minHeight: '44px', minWidth: '44px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.18s ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#DC2626'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                        title="Đăng xuất"
+                    >
+                        <LogOut size={18} />
+                    </button>
                 </div>
             </header>
 

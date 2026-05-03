@@ -245,6 +245,7 @@ export default function App() {
           activeTab={activeTab} 
           sidebarOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
+          onLogout={handleLogout}
           hasUnsignedContract={hasUnsignedContract}
           onTabChange={handleTabChange}
         />

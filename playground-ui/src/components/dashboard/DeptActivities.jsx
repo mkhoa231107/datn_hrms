@@ -9,9 +9,11 @@ import {
     ChevronRight, Eye, Globe, Zap,
     MoreHorizontal, Hash, Terminal, ChevronLeft
 } from 'lucide-react';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 import TabFilter from '../ui/TabFilter';
 
 export default function DeptActivities({ user, onBack }) {
+    const { isMobile } = useBreakpoint();
     const roles = user?.roles || [];
     const isTeamLeader = roles.includes('TeamLeader');
     const label = isTeamLeader ? 'Tổ' : (roles.includes('DepartmentHead') || roles.includes('DepartmentManager') ? 'Phòng ban' : 'Đơn vị');
@@ -124,58 +126,55 @@ export default function DeptActivities({ user, onBack }) {
     };
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-up">
-            {/* ── Header ── */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-[8px] bg-indigo-600 text-white flex items-center justify-center shadow-lg relative overflow-hidden">
-                        <Activity size={24} className="relative z-10" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Nhật ký hoạt động</h3>
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold border border-emerald-100 animate-pulse">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                LIVE
-                            </div>
+        <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">
+            {/* Standard Module Header */}
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                        <Activity className="text-indigo-600" size={28} />
+                        Nhật ký hoạt động hệ thống
+                        <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold border border-emerald-100 animate-pulse ml-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                            LIVE
                         </div>
-                        <p className="text-xs text-slate-400 font-medium tracking-wide">
-                            {label} &middot; Giám sát toàn bộ thay đổi hệ thống
-                        </p>
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-slate-400 text-sm">{label} &middot; Giám sát toàn bộ thay đổi</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span className="text-slate-400 text-sm">Cập nhật thời gian thực</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                     <button 
-                        onClick={fetchLogs} 
-                        disabled={loading}
-                        className="btn btn-ghost !py-2 hover:!bg-white"
+                        onClick={fetchLogs}
+                        className="btn btn-ghost !p-2.5 shadow-sm"
+                        title="Làm mới"
                     >
-                        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-                        Làm mới
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                     </button>
                     {onBack && (
-                        <button onClick={onBack} className="btn btn-primary !py-2 px-5">
+                        <button onClick={onBack} className="btn btn-primary !py-2.5 px-5">
                             Quay lại
                         </button>
                     )}
                 </div>
             </div>
 
-            {/* ── Summary Cards ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Standard KPI Cards */}
+            <div className={isMobile ? 'kpi-scroll mb-8' : 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8'}>
                 {[
-                    { label: 'Tổng hoạt động', val: stats.total, icon: Activity, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                    { label: 'Thao tác hôm nay', val: stats.today, icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50' },
-                    { label: 'Phòng ban quản lý', val: stats.activeDept, icon: Globe, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                    { label: 'Loại thực thể', val: stats.entities, icon: Layers, color: 'text-rose-600', bg: 'bg-rose-50' },
+                    { label: 'Tổng hoạt động', val: stats.total, icon: Activity, border: 'border-l-indigo-500', color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                    { label: 'Thao tác hôm nay', val: stats.today, icon: Zap, border: 'border-l-amber-500', color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Đơn vị quản lý', val: stats.activeDept, icon: Globe, border: 'border-l-emerald-500', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                    { label: 'Loại thực thể', val: stats.entities, icon: Layers, border: 'border-l-rose-500', color: 'text-rose-600', bg: 'bg-rose-50' },
                 ].map((s, i) => (
-                    <div key={i} className="card !p-4 !rounded-[8px] flex items-center gap-4 group">
-                        <div className={`w-12 h-12 rounded-[8px] ${s.bg} ${s.color} flex items-center justify-center transition-transform group-hover:scale-110`}>
-                            <s.icon size={20} />
+                    <div key={i} className={`card !p-6 flex items-center gap-5 border-l-4 ${s.border}`}>
+                        <div className={`w-12 h-12 ${s.bg} ${s.color} rounded-xl flex items-center justify-center shrink-0`}>
+                            <s.icon size={24} />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{s.label}</p>
-                            <p className="text-xl font-black text-slate-700 leading-none">{s.val}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{s.label}</p>
+                            <h2 className="text-3xl font-black text-slate-800 stat-value">{s.val}</h2>
                         </div>
                     </div>
                 ))}

@@ -27,8 +27,6 @@ namespace HRMS.Infrastructure.Data
         public DbSet<ContractBatch> ContractBatches { get; set; }
         public DbSet<EmployeeBankAccount> EmployeeBankAccounts { get; set; }
         public DbSet<EmployeeEmergencyContact> EmployeeEmergencyContacts { get; set; }
-        public DbSet<JobAssignment> JobAssignments { get; set; }
-        public DbSet<TaskUpdate> TaskUpdates { get; set; }
         public DbSet<EmployeeDocument> EmployeeDocuments { get; set; }
         
         // Scheduling Module
@@ -48,9 +46,6 @@ namespace HRMS.Infrastructure.Data
         public DbSet<OvertimeRequest> OvertimeRequests { get; set; }
         public DbSet<EmployeeOvertime> EmployeeOvertimes { get; set; }
         
-        // New Overtime module
-        public DbSet<OvertimePlan> OvertimePlans { get; set; }
-        public DbSet<OvertimeAssignment> OvertimeAssignments { get; set; }
 
         // Leave Module
         public DbSet<LeaveType> LeaveTypes { get; set; }
@@ -297,27 +292,7 @@ namespace HRMS.Infrastructure.Data
                 .WithMany(e => e.EmergencyContacts)
                 .HasForeignKey(eec => eec.EmployeeId);
 
-            // JobAssignment configurations
-            modelBuilder.Entity<JobAssignment>()
-                .HasOne(ja => ja.Employee)
-                .WithMany()
-                .HasForeignKey(ja => ja.EmployeeId)
-                .OnDelete(DeleteBehavior.Restrict);
 
-            modelBuilder.Entity<JobAssignment>()
-                .HasOne(ja => ja.Manager)
-                .WithMany()
-                .HasForeignKey(ja => ja.ManagerId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<TaskUpdate>()
-                .HasOne(tu => tu.JobAssignment)
-                .WithMany(ja => ja.Updates)
-                .HasForeignKey(tu => tu.JobAssignmentId);
-
-            modelBuilder.Entity<JobAssignment>()
-                .Property(ja => ja.EvaluationScore)
-                .HasPrecision(18, 2);
 
             // ============================================
             // SCHEDULING MODULE CONFIGURATIONS
@@ -403,45 +378,6 @@ namespace HRMS.Infrastructure.Data
             modelBuilder.Entity<TimeAttendanceRecord>()
                 .HasIndex(t => new { t.EmployeeId, t.Date });
 
-            // OvertimePlan Configuration
-            modelBuilder.Entity<OvertimePlan>()
-                .HasOne(op => op.Department)
-                .WithMany()
-                .HasForeignKey(op => op.DepartmentId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<OvertimePlan>()
-                .Property(op => op.TotalBudgetHours)
-                .HasPrecision(18, 2);
-
-            modelBuilder.Entity<OvertimePlan>()
-                .HasOne(op => op.CreatedBy)
-                .WithMany()
-                .HasForeignKey(op => op.CreatedById)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // OvertimeAssignment Configuration
-            modelBuilder.Entity<OvertimeAssignment>()
-                .HasOne(oa => oa.OvertimePlan)
-                .WithMany(op => op.Assignments)
-                .HasForeignKey(oa => oa.OvertimePlanId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            modelBuilder.Entity<OvertimeAssignment>()
-                .HasOne(oa => oa.Employee)
-                .WithMany()
-                .HasForeignKey(oa => oa.EmployeeId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<OvertimeAssignment>()
-                .Property(oa => oa.AssignedMaxHours)
-                .HasPrecision(18, 2);
-
-            modelBuilder.Entity<OvertimeAssignment>()
-                .HasOne(oa => oa.AssignedBy)
-                .WithMany()
-                .HasForeignKey(oa => oa.AssignedById)
-                .OnDelete(DeleteBehavior.Restrict);
 
             // TimeAttendanceRecord: Employee relationship
             modelBuilder.Entity<TimeAttendanceRecord>()

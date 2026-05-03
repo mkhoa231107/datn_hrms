@@ -164,7 +164,7 @@ export default function MyContract({ user, onSignSuccess, onBack }) {
             )}
 
             {/* ── KPI Cards (CNB_HR pattern) ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 print:hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 print:hidden">
                 {[
                     { icon: Hash, label: 'Số hợp đồng', value: contract.contractNumber, color: 'indigo' },
                     { icon: Tag, label: 'Loại hợp đồng', value: typeName?.toUpperCase(), color: 'violet' },
@@ -188,7 +188,7 @@ export default function MyContract({ user, onSignSuccess, onBack }) {
                 <div className="px-6 py-3 bg-slate-50/50 border-b border-slate-100">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thông tin chi tiết hợp đồng</span>
                 </div>
-                <div className="p-6 grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[
                         { label: 'Họ và tên NLĐ', value: contract.employeeName || user?.fullName || '—', icon: User },
                         { label: 'Phòng ban / Chức vụ', value: `${contract.departmentName || '—'} / ${contract.positionName || '—'}`, icon: Building2 },
@@ -217,7 +217,7 @@ export default function MyContract({ user, onSignSuccess, onBack }) {
                         <Shield size={14} className="text-slate-400" />
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nội dung hợp đồng lao động</span>
                     </div>
-                    <div className="p-8 [&_p]:text-justify [&_span]:text-justify [&_li]:text-justify" style={{ minHeight: '700px' }}>
+                    <div className="p-4 sm:p-8 [&_p]:text-justify [&_span]:text-justify [&_li]:text-justify" style={{ minHeight: '700px' }}>
                         <ContractTemplate contract={contract} />
                         <div className="mt-10 pt-4 border-t border-slate-100">
                             <p className="text-[10px] text-slate-400 font-medium italic text-center">

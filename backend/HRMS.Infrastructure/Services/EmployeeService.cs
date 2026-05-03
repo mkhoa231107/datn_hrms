@@ -158,9 +158,8 @@ namespace HRMS.Infrastructure.Services
             if (departmentId.HasValue)
             {
                 var deptIds = await GetDepartmentHierarchyIdsAsync(departmentId.Value);
-                // Nếu lọc theo phòng ban (thường là Trưởng phòng), loại bỏ những người có Role 'Admin'
-                query = query.Where(e => deptIds.Contains(e.DepartmentId) && 
-                                        !e.User.UserRoles.Any(ur => ur.Role.RoleName == "Admin"));
+                // Hiển thị tất cả nhân viên trong phòng ban (bao gồm cả nhân viên chưa có User)
+                query = query.Where(e => deptIds.Contains(e.DepartmentId));
             }
 
             var employees = await query

@@ -103,9 +103,7 @@ namespace HRMS.Infrastructure.Services
         public async Task<IEnumerable<ShiftChangeRequestDto>> GetPendingRequestsForDeptAsync(ClaimsPrincipal user)
         {
              var roles = user.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToList();
-             bool isHR = roles.Any(r => r == "Admin" || r == "HrAdmin" || r == "CnbSpecialist");
-
-             if (isHR)
+             if (roles.Contains("Admin"))
              {
                  return await GetRequestDtosQuery(r => r.Status == ShiftChangeRequestStatus.Pending).ToListAsync();
              }
@@ -119,9 +117,7 @@ namespace HRMS.Infrastructure.Services
         public async Task<IEnumerable<ShiftChangeRequestDto>> GetAllRequestsForDeptAsync(ClaimsPrincipal user)
         {
              var roles = user.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value).ToList();
-             bool isHR = roles.Any(r => r == "Admin" || r == "HrAdmin" || r == "CnbSpecialist");
-
-             if (isHR)
+             if (roles.Contains("Admin"))
              {
                  return await GetRequestDtosQuery(_ => true).ToListAsync();
              }

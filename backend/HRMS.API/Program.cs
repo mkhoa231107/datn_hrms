@@ -71,7 +71,6 @@ builder.Services.AddScoped<IAuthorizationHandler, DepartmentScopeHandler>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IContractService, ContractService>();
-builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IWorkShiftService, WorkShiftService>();

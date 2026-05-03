@@ -2,7 +2,6 @@ using AutoMapper;
 using HRMS.Application.DTOs.Auth;
 using HRMS.Application.DTOs.Contract;
 using HRMS.Application.DTOs.Contracts;
-using HRMS.Application.DTOs.Jobs;
 using HRMS.Application.DTOs.Employees;
 using HRMS.Application.DTOs.Departments;
 using HRMS.Application.DTOs.Scheduling;
@@ -48,13 +47,6 @@ namespace HRMS.Application.Mappings
 
             CreateMap<ContractBatchCreateDto, ContractBatch>();
 
-            // JOB MAPPINGS
-            CreateMap<JobCreateDto, JobAssignment>();
-            CreateMap<JobAssignment, JobResponseDto>()
-                .ForMember(dest => dest.EmployeeName, opt => opt.MapFrom(src => src.Employee.FullName))
-                .ForMember(dest => dest.ManagerName, opt => opt.MapFrom(src => src.Manager.FullName))
-                .ForMember(dest => dest.Updates, opt => opt.MapFrom(src => src.Updates));
-            CreateMap<TaskUpdate, TaskUpdateDto>();
 
             // EMPLOYEE MAPPINGS
             CreateMap<Employee, EmployeeProfileDto>()

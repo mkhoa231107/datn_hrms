@@ -125,17 +125,13 @@ namespace HRMS.Infrastructure.Services
         {
             var resultList = new List<ShiftSwapRequest>();
 
-            // DepartmentHead: Trưởng bộ phận xem đơn đổi ca của nhân viên trong phòng ban mình quản lý
-            // Logic: tìm department mà approverId là ManagerId của dept đó
-            if (roles.Contains("DepartmentHead") || roles.Contains("DepartmentManager"))
+            if (roles.Contains("DepartmentHead") || roles.Contains("DepartmentManager") || roles.Contains("Admin"))
             {
-                // Tìm tất cả departments mà người này là Manager
                 var managedDeptIds = await _context.Departments
-                    .Where(d => d.ManagerId == approverId && d.IsActive)
+                    .Where(d => (d.ManagerId == approverId || roles.Contains("Admin")) && d.IsActive)
                     .Select(d => d.Id)
                     .ToListAsync();
 
-                // Nếu không tìm thấy qua ManagerId, fallback: lấy department của chính approver
                 if (!managedDeptIds.Any())
                 {
                     var approverDeptId = await _context.Employees
@@ -152,42 +148,11 @@ namespace HRMS.Infrastructure.Services
                         .Include(r => r.EmployeeA).ThenInclude(e => e.Department)
                         .Include(r => r.EmployeeB).ThenInclude(e => e.Department)
                         .Include(r => r.Manager)
-                        .Include(r => r.HR)
                         .Where(r => r.Status == ShiftSwapRequestStatus.PendingManager
                             && managedDeptIds.Contains(r.EmployeeA.DepartmentId))
                         .ToListAsync();
                     resultList.AddRange(deptRequests);
                 }
-            }
-
-            // HR role: xem đơn đang chờ xác nhận HR
-            bool isHR = roles.Contains("HR") || roles.Contains("Admin") || roles.Contains("CnbSpecialist") || roles.Contains("Accountant");
-            if (!isHR)
-            {
-                var approverDeptId = await _context.Employees
-                    .Where(e => e.Id == approverId)
-                    .Select(e => e.DepartmentId)
-                    .FirstOrDefaultAsync();
-                // IDs: 3 (Hành chính - Nhân sự), 6 (Tuyển dụng), 7 (Lương thưởng)
-                if (approverDeptId == 3 || approverDeptId == 6 || approverDeptId == 7)
-                {
-                    isHR = true;
-                }
-            }
-
-            if (isHR)
-            {
-                var hrRequests = await _context.ShiftSwapRequests
-                    .Include(r => r.EmployeeA).ThenInclude(e => e.Department)
-                    .Include(r => r.EmployeeB).ThenInclude(e => e.Department)
-                    .Include(r => r.Manager)
-                    .Include(r => r.HR)
-                    .Where(r => r.Status == ShiftSwapRequestStatus.PendingHR)
-                    .ToListAsync();
-                // Tránh duplicate nếu user có cả 2 roles
-                foreach (var req in hrRequests)
-                    if (!resultList.Any(x => x.Id == req.Id))
-                        resultList.Add(req);
             }
 
             return resultList
@@ -198,27 +163,12 @@ namespace HRMS.Infrastructure.Services
         public async Task<IEnumerable<ShiftSwapRequestDto>> GetApprovalHistoryAsync(int approverId, List<string> roles)
         {
             var resultList = new List<ShiftSwapRequest>();
-            var isManager = roles.Contains("DepartmentHead") || roles.Contains("DepartmentManager");
+            var isManager = roles.Contains("DepartmentHead") || roles.Contains("DepartmentManager") || roles.Contains("Admin");
             
-            // Check if HR
-            var isHR = roles.Contains("Admin") || roles.Contains("HR") || roles.Contains("CnbSpecialist") || roles.Contains("Accountant");
-            if (!isHR)
-            {
-                var approverDeptId = await _context.Employees
-                    .Where(e => e.Id == approverId)
-                    .Select(e => e.DepartmentId)
-                    .FirstOrDefaultAsync();
-                if (approverDeptId == 3 || approverDeptId == 6 || approverDeptId == 7)
-                {
-                    isHR = true;
-                }
-            }
-
             if (isManager)
             {
-                // Find departments this user manages
                 var managedDeptIds = await _context.Departments
-                    .Where(d => d.ManagerId == approverId)
+                    .Where(d => (d.ManagerId == approverId || roles.Contains("Admin")))
                     .Select(d => d.Id)
                     .ToListAsync();
                     
@@ -237,26 +187,11 @@ namespace HRMS.Infrastructure.Services
                         .Include(r => r.EmployeeA).ThenInclude(e => e.Department)
                         .Include(r => r.EmployeeB).ThenInclude(e => e.Department)
                         .Include(r => r.Manager)
-                        .Include(r => r.HR)
                         .Where(r => (r.Status == ShiftSwapRequestStatus.Approved || r.Status == ShiftSwapRequestStatus.Rejected) 
                                     && r.EmployeeA != null && managedDeptIds.Contains(r.EmployeeA.DepartmentId))
                         .ToListAsync();
                     resultList.AddRange(managerRequests);
                 }
-            }
-
-            if (isHR)
-            {
-                var hrRequests = await _context.ShiftSwapRequests
-                    .Include(r => r.EmployeeA).ThenInclude(e => e.Department)
-                    .Include(r => r.EmployeeB).ThenInclude(e => e.Department)
-                    .Include(r => r.Manager)
-                    .Include(r => r.HR)
-                    .Where(r => r.Status == ShiftSwapRequestStatus.Approved || r.Status == ShiftSwapRequestStatus.Rejected)
-                    .ToListAsync();
-                foreach (var req in hrRequests)
-                    if (!resultList.Any(x => x.Id == req.Id))
-                        resultList.Add(req);
             }
 
             return resultList
@@ -390,13 +325,43 @@ namespace HRMS.Infrastructure.Services
 
             if (approved)
             {
-                request.Status = ShiftSwapRequestStatus.PendingHR;
-                request.ManagerId = managerId;
-                request.SignatureManager = signatureManager;
-                request.SignedAtManager = DateTime.UtcNow;
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    request.Status = ShiftSwapRequestStatus.Approved;
+                    request.ManagerId = managerId;
+                    request.SignatureManager = signatureManager;
+                    request.SignedAtManager = DateTime.UtcNow;
 
-                // Notify HR (Assuming there's a way to find HR or a general HR notification)
-                // For now, let's assume we notify specifically the C&B team if possible, or just log.
+                    // UPDATE WORK SCHEDULES (SWAP IN THE BLOCK) - Logic moved from ConfirmByHR
+                    for (DateTime date = request.StartDate.Date; date <= request.EndDate.Date; date = date.AddDays(1))
+                    {
+                        var shiftA = await GetAssignedShiftIdAsync(request.EmployeeAId, date);
+                        var shiftB = await GetAssignedShiftIdAsync(request.EmployeeBId, date);
+
+                        var assignToA = request.TargetShiftId ?? shiftB;
+                        var assignToB = shiftA;
+
+                        if (assignToA != null || assignToB != null)
+                        {
+                            await UpdateScheduleAsync(request.EmployeeAId, date, assignToA, $"Hoán đổi ca cho {request.EmployeeB.FullName} (Đơn #{request.Id})");
+                            await UpdateScheduleAsync(request.EmployeeBId, date, assignToB, $"Hoán đổi ca cho {request.EmployeeA.FullName} (Đơn #{request.Id})");
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    // Notify both
+                    var msg = "Đổi ca thành công. Lịch làm việc mới đã được cập nhật.";
+                    await _notificationService.CreateNotificationAsync(new Application.DTOs.Notification.CreateNotificationDto { EmployeeId = request.EmployeeAId, Title = "Đổi ca thành công", Message = msg, Type = "ShiftSwap", RelatedId = request.Id.ToString() });
+                    await _notificationService.CreateNotificationAsync(new Application.DTOs.Notification.CreateNotificationDto { EmployeeId = request.EmployeeBId, Title = "Đổi ca thành công", Message = msg, Type = "ShiftSwap", RelatedId = request.Id.ToString() });
+                }
+                catch (Exception)
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
             }
             else
             {

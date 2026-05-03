@@ -57,22 +57,35 @@ namespace HRMS.Infrastructure.Services
             using var client = new SmtpClient();
             try
             {
-                // Accept all SSL certificates (for troubleshooting)
+                // Accept all SSL certificates (for troubleshooting local dev issues)
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
+                Console.WriteLine($"[EMAIL] Connecting to {emailSettings["SmtpServer"]}:{emailSettings["SmtpPort"]}...");
                 await client.ConnectAsync(
                     emailSettings["SmtpServer"], 
                     int.Parse(emailSettings["SmtpPort"] ?? "587"), 
-                    SecureSocketOptions.Auto);
+                    SecureSocketOptions.StartTls); // Explicitly use StartTls for port 587
 
+                Console.WriteLine($"[EMAIL] Authenticating as {emailSettings["SenderEmail"]}...");
                 await client.AuthenticateAsync(emailSettings["SenderEmail"], emailSettings["SenderPassword"]);
+                
+                Console.WriteLine($"[EMAIL] Sending email to {to}...");
                 await client.SendAsync(message);
+                
                 await client.DisconnectAsync(true);
+                Console.WriteLine("[EMAIL] Email sent successfully!");
             }
             catch (Exception ex)
             {
-                // Log error but don't crash the whole process for now
-                Console.WriteLine($"Email sending failed: {ex.Message}");
+                // Log detailed error
+                Console.WriteLine("================================================");
+                Console.WriteLine($"[EMAIL FATAL ERROR] To: {to}");
+                Console.WriteLine($"Error Message: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner Error: {ex.InnerException.Message}");
+                }
+                Console.WriteLine("================================================");
                 throw;
             }
         }

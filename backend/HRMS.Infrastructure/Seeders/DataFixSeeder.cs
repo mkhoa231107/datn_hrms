@@ -251,11 +251,7 @@ namespace HRMS.Infrastructure.Seeders
                         try { await context.Database.ExecuteSqlRawAsync($"DELETE FROM {tbl} WHERE EmployeeId = {eid}"); } catch {}
                     }
                     
-                    // TaskUpdates qua JobAssignment
-                    try {
-                        await context.Database.ExecuteSqlRawAsync($"DELETE FROM TaskUpdates WHERE JobAssignmentId IN (SELECT Id FROM JobAssignments WHERE EmployeeId = {eid})");
-                        await context.Database.ExecuteSqlRawAsync($"DELETE FROM JobAssignments WHERE EmployeeId = {eid}");
-                    } catch {}
+
 
                     // C. XOÁ DỮ LIỆU PHỤ THUỘC (UserId)
                     if (data.UserId.HasValue) {
@@ -699,40 +695,8 @@ namespace HRMS.Infrastructure.Seeders
 
         public static async Task FixOvertimeSchemaAsync(HRMSDbContext context)
         {
-            Console.WriteLine("🛠️ [FIX] Checking and patching Overtime Schema (Priority)...");
-
-            try
-            {
-                var sqlPatch = @"
-                    -- Thêm cột Description vào OvertimePlans nếu chưa có
-                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.OvertimePlans') AND name = 'Description')
-                    BEGIN
-                        ALTER TABLE dbo.OvertimePlans ADD [Description] NVARCHAR(MAX) NULL;
-                        PRINT '✅ Added [Description] to OvertimePlans';
-                    END
-
-                    -- Thêm cột IsConfirmed vào OvertimeAssignments nếu chưa có
-                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.OvertimeAssignments') AND name = 'IsConfirmed')
-                    BEGIN
-                        ALTER TABLE dbo.OvertimeAssignments ADD [IsConfirmed] BIT NOT NULL DEFAULT 0;
-                        PRINT '✅ Added [IsConfirmed] to OvertimeAssignments';
-                    END
-
-                    -- Thêm cột ConfirmedAt vào OvertimeAssignments nếu chưa có
-                    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.OvertimeAssignments') AND name = 'ConfirmedAt')
-                    BEGIN
-                        ALTER TABLE dbo.OvertimeAssignments ADD [ConfirmedAt] DATETIME2 NULL;
-                        PRINT '✅ Added [ConfirmedAt] to OvertimeAssignments';
-                    END
-                ";
-
-                await context.Database.ExecuteSqlRawAsync(sqlPatch);
-                Console.WriteLine("✅ Overtime Schema priority check completed.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Error patching schema: {ex.Message}");
-            }
+            // Removed: OvertimePlans and OvertimeAssignments have been decommissioned.
+            await Task.CompletedTask;
         }
 
         public static string GenerateWorkEmail(string fullName, string employeeCode)

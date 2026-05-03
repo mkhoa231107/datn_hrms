@@ -278,7 +278,7 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
                             <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
                                 {approvalOnly && tab === 'pending' ? 'Danh sách chờ xét duyệt' : 'Lịch sử yêu cầu'}
                             </h3>
-                            <span className="px-2 py-0.5 bg-slate-200 text-slate-600 text-[10px] font-black rounded-full uppercase">{rawData.length} đơn</span>
+                            <span className="px-3 py-1 bg-slate-200 text-slate-600 text-[10px] font-black rounded-full uppercase whitespace-nowrap">{rawData.length} đơn</span>
                         </div>
                         
                         <div className="flex flex-wrap items-center gap-3">

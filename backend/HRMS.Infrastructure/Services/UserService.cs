@@ -36,6 +36,9 @@ namespace HRMS.Infrastructure.Services
             FullName = u.FullName ?? u.Username,
             Email = u.Email,
             IsActive = u.IsActive,
+            DepartmentId = u.Employee?.DepartmentId,
+            DepartmentName = u.Employee?.Department?.DepartmentName,
+            PositionName = u.Employee?.Position?.PositionName,
             Roles = u.UserRoles.Where(ur => ur.Role != null).Select(ur => new RoleDto
             {
                 Id = ur.Role.Id,
@@ -50,6 +53,10 @@ namespace HRMS.Infrastructure.Services
             var query = _context.Users
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
+                .Include(u => u.Employee)
+                    .ThenInclude(e => e.Department)
+                .Include(u => u.Employee)
+                    .ThenInclude(e => e.Position)
                 .AsNoTracking()
                 .AsQueryable();
 

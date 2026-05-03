@@ -21,7 +21,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpGet("department/{departmentId}")]
-        [Authorize(Roles = "Admin,DepartmentHead")]
+        [Authorize(Roles = "Admin,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> GetDepartmentInsurance(int departmentId)
         {
             try
@@ -50,7 +50,7 @@ namespace HRMS.API.Controllers
         }
 
         [HttpPost("employee/{employeeId}")]
-        [Authorize(Roles = "Admin,DepartmentHead")]
+        [Authorize(Roles = "Admin,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> UpdateEmployeeInsurance(int employeeId, [FromBody] UpdateEmployeeInsuranceDto dto)
         {
             try

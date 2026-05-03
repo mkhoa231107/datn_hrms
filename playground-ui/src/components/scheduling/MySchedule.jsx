@@ -197,25 +197,25 @@ export default function MySchedule({ user, onBack }) {
                                     <div
                                         key={idx}
                                         onClick={() => setSelectedDay(day)}
-                                        className={`h-28 border-r border-b border-slate-100 last:border-r-0 p-3 transition-all cursor-pointer group relative ${isTodayDate ? 'bg-indigo-50/30' : 'bg-white'} ${isSelected ? 'ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-slate-50'}`}
+                                        className={`h-24 md:h-28 border-r border-b border-slate-100 last:border-r-0 p-1 md:p-3 transition-all cursor-pointer group relative ${isTodayDate ? 'bg-indigo-50/30' : 'bg-white'} ${isSelected ? 'ring-2 ring-inset ring-indigo-500 z-10' : 'hover:bg-slate-50'}`}
                                     >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className={`text-xs font-black ${isTodayDate ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
+                                        <div className="flex justify-between items-start mb-1 md:mb-2">
+                                            <span className={`text-[10px] md:text-xs font-black ${isTodayDate ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>
                                                 {new Date(day.date).getDate()}
                                             </span>
                                             {isTodayDate && <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 shadow-lg shadow-indigo-200" />}
                                         </div>
-                                        <div className="flex flex-col items-center gap-1.5">
+                                        <div className="flex flex-col items-center gap-1 md:gap-1.5">
                                             {normCode !== 'OFF' ? (
-                                                <div className={`px-2 py-1 rounded-lg border text-[10px] font-black w-full text-center shadow-sm transition-transform group-hover:scale-105 ${meta.cls}`}>
+                                                <div className={`px-1 md:px-2 py-0.5 md:py-1 rounded md:rounded-lg border text-[8px] md:text-[10px] font-black w-full text-center shadow-sm transition-transform group-hover:scale-105 ${meta.cls}`}>
                                                     {normCode}
                                                 </div>
                                             ) : (
-                                                <div className="text-[9px] font-black text-rose-300 uppercase tracking-widest mt-2 border border-rose-100 border-dashed px-2 py-0.5 rounded">NGHỈ</div>
+                                                <div className="text-[8px] md:text-[9px] font-black text-rose-300 uppercase md:tracking-widest mt-1 md:mt-2 border border-rose-100 border-dashed px-1 md:px-2 py-0.5 rounded w-full text-center truncate">NGHỈ</div>
                                             )}
                                             {day.otHours > 0 && (
-                                                <div className="px-1.5 py-0.5 rounded bg-amber-500 text-white text-[8px] font-black uppercase shadow-sm">
-                                                    +{day.otHours}H OT
+                                                <div className="px-1 md:px-1.5 py-0.5 rounded bg-amber-500 text-white text-[7px] md:text-[8px] font-black uppercase shadow-sm truncate w-full text-center">
+                                                    +{day.otHours}H
                                                 </div>
                                             )}
                                         </div>

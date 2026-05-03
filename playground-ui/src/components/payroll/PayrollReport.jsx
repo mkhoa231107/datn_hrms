@@ -283,21 +283,21 @@ export default function PayrollReport() {
                         <span className="text-slate-400 text-sm">{filtered.length} bản ghi</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={fetchReport} className="btn btn-ghost shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={fetchReport} className="btn btn-ghost shadow-sm flex-1 md:flex-none whitespace-nowrap !py-2.5">
                         <RefreshCw className={loading ? 'animate-spin' : ''} size={16} /> Làm mới
                     </button>
                     <button 
                         onClick={() => setShowSendConfirm(true)}
                         disabled={!selectedPeriod || filtered.length === 0}
-                        className="btn btn-ghost border-violet-200 text-violet-700 hover:bg-violet-50 shadow-sm"
+                        className="btn btn-ghost border-violet-200 text-violet-700 hover:bg-violet-50 shadow-sm flex-1 md:flex-none whitespace-nowrap !py-2.5"
                     >
-                        <Send size={16} /> Gửi phiếu lương
+                        <Send size={16} /> Gửi phiếu
                     </button>
                     <button 
                         onClick={exportExcel} 
                         disabled={exporting || filtered.length === 0} 
-                        className="btn btn-primary shadow-lg shadow-violet-200"
+                        className="btn btn-primary shadow-lg shadow-violet-200 flex-1 md:flex-none whitespace-nowrap !py-2.5"
                     >
                         {exporting ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
                         Xuất Excel

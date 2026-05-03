@@ -4,6 +4,7 @@ using HRMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HRMS.Infrastructure.Migrations
 {
     [DbContext(typeof(HRMSDbContext))]
-    partial class HRMSDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260502031137_AddPositionAllowanceFields")]
+    partial class AddPositionAllowanceFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -832,6 +835,66 @@ namespace HRMS.Infrastructure.Migrations
                     b.ToTable("EmployeeOvertimes");
                 });
 
+            modelBuilder.Entity("HRMS.Domain.Entities.JobAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CompletionPercentage")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("EvaluationScore")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("InstructionFileUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ManagerId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Weight")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("ManagerId");
+
+                    b.ToTable("JobAssignments");
+                });
+
             modelBuilder.Entity("HRMS.Domain.Entities.LeaveBalance", b =>
                 {
                     b.Property<int>("Id")
@@ -1058,6 +1121,98 @@ namespace HRMS.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Organizations");
+                });
+
+            modelBuilder.Entity("HRMS.Domain.Entities.OvertimeAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AssignedById")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("AssignedMaxHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("EmployeeId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsNotified")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("OvertimePlanId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedById");
+
+                    b.HasIndex("EmployeeId");
+
+                    b.HasIndex("OvertimePlanId");
+
+                    b.ToTable("OvertimeAssignments");
+                });
+
+            modelBuilder.Entity("HRMS.Domain.Entities.OvertimePlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CreatedById")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DepartmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("TotalBudgetHours")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("OvertimePlans");
                 });
 
             modelBuilder.Entity("HRMS.Domain.Entities.OvertimeRequest", b =>
@@ -1416,6 +1571,18 @@ namespace HRMS.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal>("DefaultPositionAllowance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DefaultResponsibilityAllowance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("DefaultSeniorityAllowance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int?>("DefaultShiftId")
                         .HasColumnType("int");
 
@@ -1730,6 +1897,33 @@ namespace HRMS.Infrastructure.Migrations
                     b.HasIndex("WorkShiftId");
 
                     b.ToTable("ShiftTemplateDetails");
+                });
+
+            modelBuilder.Entity("HRMS.Domain.Entities.TaskUpdate", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AttachmentUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("JobAssignmentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UpdateContent")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdateTime")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobAssignmentId");
+
+                    b.ToTable("TaskUpdates");
                 });
 
             modelBuilder.Entity("HRMS.Domain.Entities.TimeAdjustmentRequest", b =>
@@ -2234,6 +2428,25 @@ namespace HRMS.Infrastructure.Migrations
                     b.Navigation("OvertimeRequest");
                 });
 
+            modelBuilder.Entity("HRMS.Domain.Entities.JobAssignment", b =>
+                {
+                    b.HasOne("HRMS.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRMS.Domain.Entities.Employee", "Manager")
+                        .WithMany()
+                        .HasForeignKey("ManagerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("Manager");
+                });
+
             modelBuilder.Entity("HRMS.Domain.Entities.LeaveBalance", b =>
                 {
                     b.HasOne("HRMS.Domain.Entities.Employee", "Employee")
@@ -2288,6 +2501,51 @@ namespace HRMS.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Employee");
+                });
+
+            modelBuilder.Entity("HRMS.Domain.Entities.OvertimeAssignment", b =>
+                {
+                    b.HasOne("HRMS.Domain.Entities.Employee", "AssignedBy")
+                        .WithMany()
+                        .HasForeignKey("AssignedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRMS.Domain.Entities.Employee", "Employee")
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("HRMS.Domain.Entities.OvertimePlan", "OvertimePlan")
+                        .WithMany("Assignments")
+                        .HasForeignKey("OvertimePlanId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AssignedBy");
+
+                    b.Navigation("Employee");
+
+                    b.Navigation("OvertimePlan");
+                });
+
+            modelBuilder.Entity("HRMS.Domain.Entities.OvertimePlan", b =>
+                {
+                    b.HasOne("HRMS.Domain.Entities.Employee", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HRMS.Domain.Entities.Department", "Department")
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("Department");
                 });
 
             modelBuilder.Entity("HRMS.Domain.Entities.OvertimeRequest", b =>
@@ -2534,6 +2792,17 @@ namespace HRMS.Infrastructure.Migrations
                     b.Navigation("WorkShift");
                 });
 
+            modelBuilder.Entity("HRMS.Domain.Entities.TaskUpdate", b =>
+                {
+                    b.HasOne("HRMS.Domain.Entities.JobAssignment", "JobAssignment")
+                        .WithMany("Updates")
+                        .HasForeignKey("JobAssignmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("JobAssignment");
+                });
+
             modelBuilder.Entity("HRMS.Domain.Entities.TimeAdjustmentRequest", b =>
                 {
                     b.HasOne("HRMS.Domain.Entities.Employee", "Employee")
@@ -2648,6 +2917,11 @@ namespace HRMS.Infrastructure.Migrations
                     b.Navigation("Subordinates");
                 });
 
+            modelBuilder.Entity("HRMS.Domain.Entities.JobAssignment", b =>
+                {
+                    b.Navigation("Updates");
+                });
+
             modelBuilder.Entity("HRMS.Domain.Entities.LeaveType", b =>
                 {
                     b.Navigation("LeaveBalances");
@@ -2662,6 +2936,11 @@ namespace HRMS.Infrastructure.Migrations
                     b.Navigation("Employees");
 
                     b.Navigation("PayrollSettings");
+                });
+
+            modelBuilder.Entity("HRMS.Domain.Entities.OvertimePlan", b =>
+                {
+                    b.Navigation("Assignments");
                 });
 
             modelBuilder.Entity("HRMS.Domain.Entities.PayrollPeriod", b =>

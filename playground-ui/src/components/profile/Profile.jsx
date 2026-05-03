@@ -144,7 +144,7 @@ export default function Profile({ mode = 'me', employeeId = null, onBack }) {
                             <div>
                                 <h1 className="text-2xl font-bold text-slate-800">{profile.fullName}</h1>
                                 <div className="flex items-center gap-3 mt-1">
-                                    <span className="badge badge-accent uppercase tracking-wider">{profile.employeeCode}</span>
+                                    <span className="badge badge-accent uppercase tracking-wide text-[10px] px-2 py-0.5 whitespace-nowrap">{profile.employeeCode}</span>
                                     <span className="text-slate-400">•</span>
                                     <span className="text-slate-500 font-medium flex items-center gap-1.5">
                                         <Briefcase size={14} className="text-violet-500" />

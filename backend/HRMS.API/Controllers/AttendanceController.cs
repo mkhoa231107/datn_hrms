@@ -40,15 +40,8 @@ namespace HRMS.API.Controllers
 
             if (userDeptCode == "HR") return;
 
-            if (int.TryParse(userDeptIdStr, out int userDeptId))
-            {
-                if (userDeptId != targetDeptId)
-                    throw new UnauthorizedAccessException("Bạn không có quyền truy cập dữ liệu của bộ phận này.");
-            }
-            else
-            {
-                throw new UnauthorizedAccessException("Không xác định được bộ phận của bạn.");
-            }
+            // Bỏ qua kiểm tra equals chặt chẽ ở Controller.
+            // Service layer (GetDepartmentTimesheetsAsync) sẽ tự động lấy phòng ban cha và các phòng ban con.
         }
 
         /// <summary>
@@ -305,7 +298,7 @@ namespace HRMS.API.Controllers
         /// [MANAGER] Xem danh sách bảng tổng hợp công của phòng ban
         /// </summary>
         [HttpGet("department/{departmentId}/timesheets/{periodId}")]
-        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> GetDepartmentTimesheets(int departmentId, int periodId)
         {
             try
@@ -324,7 +317,7 @@ namespace HRMS.API.Controllers
         /// [MANAGER] Xem bảng lưới chấm công chi tiết của phòng ban
         /// </summary>
         [HttpGet("department/{departmentId}/grid/{periodId}")]
-        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> GetAttendanceGrid(int departmentId, int periodId)
         {
             try
@@ -343,7 +336,7 @@ namespace HRMS.API.Controllers
         /// [MANAGER] Chốt công (Cấp Trưởng phòng/Admin)
         /// </summary>
         [HttpPost("timesheet/{summaryId}/approve")]
-        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> ApproveTimesheet(int summaryId)
         {
             try
@@ -369,7 +362,7 @@ namespace HRMS.API.Controllers
         /// [MANAGER] Chốt nhanh tất cả bảng tổng hợp công của bộ phận
         /// </summary>
         [HttpPost("department/{departmentId}/timesheets/{periodId}/approve-all")]
-        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> ApproveAllTimesheets(int departmentId, int periodId)
         {
             try
@@ -393,7 +386,7 @@ namespace HRMS.API.Controllers
         /// [MANAGER] Tổng hợp dữ liệu công cho nhân viên (Chạy trước khi Chốt/Duyệt)
         /// </summary>
         [HttpPost("finalize/{periodId}")]
-        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,CnbSpecialist")]
         public async Task<IActionResult> FinalizeAttendance(int periodId)
         {
             try
@@ -447,31 +440,6 @@ namespace HRMS.API.Controllers
             }
         }
 
-        /// <summary>
-        /// Lấy danh sách tăng ca của tôi (Dùng cho trang chuyên cần cá nhân)
-        /// </summary>
-        [HttpGet("my-overtime")]
-        public async Task<IActionResult> GetMyOvertime([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate)
-        {
-            try
-            {
-                var employeeId = GetEmployeeId();
-                // Nếu không truyền ngày, lấy mặc định cả năm nay để frontend tự filter
-                var start = fromDate ?? new DateTime(DateTime.Today.Year, 1, 1);
-                var end = toDate ?? new DateTime(DateTime.Today.Year, 12, 31);
-                
-                var records = await _attendanceService.GetMyOvertimeAssignmentsAsync(employeeId, start, end);
-                return Ok(new { success = true, data = records });
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { success = false, message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
-            }
-        }
 
         /// <summary>
         /// [TEST] Tạo dữ liệu mẫu full công

@@ -144,6 +144,7 @@ namespace HRMS.Infrastructure.Services
                 .Where(s => s.EmployeeId == employeeId && s.PeriodId == periodId)
                 .ToListAsync();
 
+
             var dates = Enumerable.Range(0, (period.EndDate - period.StartDate).Days + 1)
                 .Select(d => period.StartDate.AddDays(d))
                 .ToList();
@@ -158,12 +159,14 @@ namespace HRMS.Infrastructure.Services
                 Schedules = dates.Select(date =>
                 {
                     var s = schedules.FirstOrDefault(sh => sh.WorkingDate.Date == date.Date);
+
                     return new WorkScheduleDayDto
                     {
                         Date = date,
                         ShiftId = s?.WorkShiftId,
                         ShiftCode = s?.WorkShift != null ? s.WorkShift.ShiftCode : (s != null ? "OFF" : ""),
-                        IsLocked = period.IsLocked
+                        IsLocked = period.IsLocked,
+                        OTHours = 0 // Logic cũ dùng OvertimeAssignments đã bị loại bỏ
                     };
                 }).ToList()
             };
@@ -433,7 +436,7 @@ namespace HRMS.Infrastructure.Services
         {
             var periods = await _context.SchedulePeriods
                 .Where(p => p.OrganizationId == organizationId)
-                .OrderByDescending(p => p.StartDate)
+                .OrderBy(p => p.StartDate)
                 .ToListAsync();
             return _mapper.Map<IEnumerable<SchedulePeriodDto>>(periods);
         }

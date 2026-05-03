@@ -2,7 +2,7 @@ import React from 'react';
 import {
     UserCircle, Clock, Umbrella, Calendar, ArrowLeftRight,
     DollarSign, FileSpreadsheet, Shield, Users, BarChart2,
-    UserPlus, Settings, Activity, X, CheckSquare
+    UserPlus, Settings, Activity, X, CheckSquare, LogOut
 } from 'lucide-react';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 
@@ -72,18 +72,16 @@ const ROLE_MENUS = {
     ],
 };
 
-export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onClose, hasUnsignedContract }) {
+export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onClose, onLogout, hasUnsignedContract }) {
     const roles = user?.roles || [];
     const primaryRole = getPrimaryRole(roles);
     const menuItems = ROLE_MENUS[primaryRole] || ROLE_MENUS.Employee;
     const { isMobile, isTablet } = useBreakpoint();
 
     // On mobile: fully hidden unless sidebarOpen (overlay drawer)
-    // On tablet: icon-only (64px), always visible
-    // On desktop: full sidebar (192px), always visible
-
-    const isIconOnly = isTablet;
-    const isHidden = isMobile && !sidebarOpen;
+    // On tablet/desktop: toggle between full (192px) and icon-only (64px)
+    const isIconOnly = isTablet ? !sidebarOpen : (!isMobile && !sidebarOpen);
+    const isHidden = false; // We use CSS transform/width to handle visibility/collapse
 
     if (isHidden) return (
         <>
@@ -109,7 +107,7 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
             <nav
                 className={isIconOnly ? 'sidebar-icon-only' : ''}
                 style={{
-                    width: isMobile ? '240px' : isTablet ? '64px' : '192px',
+                    width: isMobile ? '240px' : (isIconOnly ? '64px' : '192px'),
                     flexShrink: 0,
                     display: 'flex',
                     flexDirection: 'column',
@@ -159,31 +157,59 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
                 )}
 
                 {/* Nav items */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: isIconOnly ? '8px 0' : '8px 0', position: 'relative' }}>
-                    {/* Animated active highlight — only on full sidebar */}
-                    {!isIconOnly && (() => {
+                <div 
+                    className="sidebar-items-container"
+                    style={{ 
+                        flex: 1, 
+                        overflowY: 'auto', 
+                        padding: '8px 0', 
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: isIconOnly ? '4px' : '0px'
+                    }}
+                >
+                    {/* Animated active highlight */}
+                    {(() => {
                         const activeIndex = menuItems.findIndex(item => item.id === activeTab);
+                        if (activeIndex === -1) return null;
+
+                        // Dimensions matching CSS/Inline styles
+                        // Dimensions matching CSS/Inline styles
+                        const itemHeight = isMobile ? 48 : (isIconOnly ? 48 : 38);
+                        const itemGap = isIconOnly ? 4 : 0; 
+                        const containerPadding = 8;
+                        
+                        const indicatorTop = containerPadding;
+                        const step = itemHeight + itemGap;
+
                         return (
                             <>
                                 <div style={{
-                                    position: 'absolute', left: '8px', right: '8px', top: 8,
-                                    height: '38px', background: 'var(--accent-subtle)',
+                                    position: 'absolute', 
+                                    left: '8px', 
+                                    right: '8px', 
+                                    top: indicatorTop,
+                                    height: `${itemHeight}px`, 
+                                    background: 'var(--accent-subtle)',
                                     borderRadius: 'var(--r-md)',
-                                    transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-                                    transform: `translateY(${activeIndex * 38}px)`,
-                                    opacity: activeIndex === -1 ? 0 : 1,
+                                    transition: 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+                                    transform: `translateY(${activeIndex * step}px)`,
+                                    opacity: 1,
                                     pointerEvents: 'none', zIndex: 0,
                                 }} />
-                                <div style={{
-                                    position: 'absolute', left: 0, top: 8,
-                                    width: '3px', height: '38px',
-                                    background: 'var(--accent)', borderRadius: '0 4px 4px 0',
-                                    boxShadow: '0 0 10px var(--accent-light)',
-                                    transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-                                    transform: `translateY(${activeIndex * 38}px)`,
-                                    opacity: activeIndex === -1 ? 0 : 1,
-                                    pointerEvents: 'none', zIndex: 1,
-                                }} />
+                                {!isIconOnly && (
+                                    <div style={{
+                                        position: 'absolute', left: 0, top: indicatorTop,
+                                        width: '3px', height: `${itemHeight}px`,
+                                        background: 'var(--accent)', borderRadius: '0 4px 4px 0',
+                                        boxShadow: '0 0 10px var(--accent-light)',
+                                        transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)',
+                                        transform: `translateY(${activeIndex * step}px)`,
+                                        opacity: 1,
+                                        pointerEvents: 'none', zIndex: 1,
+                                    }} />
+                                )}
                             </>
                         );
                     })()}
@@ -234,10 +260,35 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
 
                 {/* Footer — hidden on icon-only mode */}
                 {!isIconOnly && (
-                    <div className="nav-footer-text" style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981', animation: 'pulse 2s infinite' }} />
-                            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 500 }}>Backend Online</span>
+                    <div style={{ borderTop: '1px solid var(--border)' }}>
+                        <button
+                            onClick={onLogout}
+                            style={{
+                                width: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px',
+                                padding: '12px 16px',
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#EF4444',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'background 0.2s ease',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        >
+                            <LogOut size={16} />
+                            <span>Đăng xuất</span>
+                        </button>
+                        
+                        <div className="nav-footer-text" style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', opacity: 0.8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981', animation: 'pulse 2s infinite' }} />
+                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 500 }}>Backend Online</span>
+                            </div>
                         </div>
                     </div>
                 )}

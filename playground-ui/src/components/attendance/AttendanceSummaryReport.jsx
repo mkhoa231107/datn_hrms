@@ -223,15 +223,22 @@ export default function AttendanceSummaryReport() {
                         <span className="text-slate-400 text-sm">Hỗ trợ xuất Excel</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button 
+                        onClick={fetchReport}
+                        className="btn btn-ghost !p-2.5 shadow-sm"
+                        title="Làm mới"
+                    >
+                        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                    </button>
                     {records.length > 0 && (
                         <button
                             onClick={exportExcel}
                             disabled={exporting}
-                            className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2.5 shadow-sm"
+                            className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2.5 shadow-sm flex-1 md:flex-none whitespace-nowrap"
                         >
                             {exporting ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
-                            Xuất báo cáo Excel
+                            Xuất Excel
                         </button>
                     )}
                 </div>

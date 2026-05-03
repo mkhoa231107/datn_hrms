@@ -19,6 +19,8 @@ const Fill = ({ children, width = 'auto', bold = false }) => (
     display: 'inline-block',
     borderBottom: '1px solid #000',
     minWidth: width,
+    maxWidth: '100%',
+    wordBreak: 'break-word',
     fontWeight: bold ? '700' : 'inherit',
     paddingBottom: '1px',
   }}>
@@ -66,15 +68,13 @@ export default function ContractTemplate({ contract }) {
 
   return (
     <div
+      className="p-5 sm:p-12 md:p-16 mx-auto w-full max-w-[900px] overflow-hidden"
       style={{
         fontFamily: '"Times New Roman", Times, serif',
         fontSize: '12pt',
         lineHeight: '1.65',
         color: '#000',
         background: '#fff',
-        padding: '48px 64px 64px',
-        maxWidth: '900px',
-        margin: '0 auto',
       }}
     >
       {/* ── National header ── */}
@@ -112,7 +112,7 @@ export default function ContractTemplate({ contract }) {
       <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>
         Bên A: Người sử dụng lao động
       </p>
-      <div style={{ paddingLeft: '20px', marginBottom: '16px' }}>
+      <div className="pl-3 sm:pl-5 mb-4">
         <p>Công ty: <strong>CÔNG TY CỔ PHẦN CÔNG NGHỆ TECHVN</strong></p>
         <p>Địa chỉ: 123 Đường Láng, Phường Láng Thượng, Quận Đống Đa, TP. Hà Nội</p>
         <p>Điện thoại: (024) 3766 88XX</p>
@@ -126,9 +126,9 @@ export default function ContractTemplate({ contract }) {
       <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '6px' }}>
         Bên B: Người lao động
       </p>
-      <div style={{ paddingLeft: '20px', marginBottom: '16px' }}>
+      <div className="pl-3 sm:pl-5 mb-4">
         <p>Ông/bà: <strong style={{ textTransform: 'uppercase', fontSize: '13pt' }}>{p.name}</strong></p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 24px' }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-6">
           <p>Quốc tịch: <Fill width="120px">Việt Nam</Fill></p>
           <p>Ngày sinh: <Fill width="120px">{p.dob}</Fill></p>
         </div>
@@ -136,10 +136,10 @@ export default function ContractTemplate({ contract }) {
         <p>Quê quán: <Fill width="300px">{p.placeOfOrigin}</Fill></p>
         <p>Địa chỉ thường trú: <Fill width="300px">{p.address}</Fill></p>
         <p>Địa chỉ tạm trú: <Fill width="300px">{p.tmpAddress}</Fill></p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px 16px' }}>
-          <p style={{ gridColumn: '1 / 2' }}>Số CMND/CCCD: <Fill width="100px">{p.cccd}</Fill></p>
-          <p style={{ gridColumn: '2 / 3' }}>Cấp ngày: <Fill width="80px">{p.cccdDate}</Fill></p>
-          <p style={{ gridColumn: '3 / 4' }}>Tại: <Fill width="100px">{p.cccdPlace}</Fill></p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4">
+          <p className="sm:col-span-1">Số CMND/CCCD: <Fill width="100px">{p.cccd}</Fill></p>
+          <p className="sm:col-span-1">Cấp ngày: <Fill width="80px">{p.cccdDate}</Fill></p>
+          <p className="sm:col-span-1">Tại: <Fill width="100px">{p.cccdPlace}</Fill></p>
         </div>
       </div>
 
@@ -163,10 +163,10 @@ export default function ContractTemplate({ contract }) {
         </p>
         <p>- Địa điểm làm việc: <Fill width="260px">{p.location}</Fill></p>
         <p>- Bộ phận công tác:</p>
-        <p style={{ paddingLeft: '24px' }}>
+        <p className="pl-4 sm:pl-6">
           + Phòng: <Fill width="260px">{p.dept}</Fill>
         </p>
-        <p style={{ paddingLeft: '24px' }}>
+        <p className="pl-4 sm:pl-6">
           + Chức danh chuyên môn (vị trí công tác):{' '}
           <Fill width="200px">{p.position}</Fill>
         </p>
@@ -228,7 +228,7 @@ export default function ContractTemplate({ contract }) {
           <Fill width="80px">Chủ Nhật</Fill>
         </p>
         <p>- Từ ngày Thứ <Fill width="40px">Hai</Fill> đến ngày Thứ <Fill width="60px">Bảy</Fill> hàng tuần:</p>
-        <p style={{ paddingLeft: '24px' }}>
+        <p className="pl-4 sm:pl-6">
           + Ca làm việc hiện tại: <strong>{p.shiftName}</strong> ({p.shiftTime})
         </p>
         <p style={{ marginTop: '6px', textAlign: 'justify' }}>
@@ -393,7 +393,7 @@ export default function ContractTemplate({ contract }) {
       {/* ══════════════════════════════════════════════
           SIGNATURES
       ══════════════════════════════════════════════ */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginTop: '48px' }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 sm:gap-6 mt-12">
         {/* Employee side */}
         <div style={{ textAlign: 'center' }}>
           <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>
@@ -416,7 +416,7 @@ export default function ContractTemplate({ contract }) {
         </div>
 
         {/* Employer side */}
-        <div style={{ textAlign: 'center', borderLeft: '1px solid #e5e7eb', paddingLeft: '16px' }}>
+        <div className="text-center sm:border-l border-slate-200 sm:pl-4">
           <p style={{ fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>
             Người sử dụng lao động
           </p>
@@ -479,7 +479,7 @@ function Section({ title, children }) {
   return (
     <section style={{ marginBottom: '14px' }}>
       <p style={{ fontWeight: '700', marginBottom: '8px' }}>{title}</p>
-      <div style={{ paddingLeft: '8px' }}>{children}</div>
+      <div className="pl-2 sm:pl-4">{children}</div>
     </section>
   );
 }

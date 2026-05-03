@@ -22,17 +22,26 @@ namespace HRMS.Infrastructure.Services
 
         public async Task<List<EmployeeInsuranceDto>> GetDepartmentInsuranceAsync(int departmentId)
         {
+            var deptIds = departmentId == 0 
+                ? new List<int>() 
+                : await GetDepartmentHierarchyIdsAsync(departmentId);
+
             var query = _context.Employees
                 .Include(e => e.Department)
                 .AsQueryable();
 
             if (departmentId > 0)
             {
-                query = query.Where(e => e.DepartmentId == departmentId);
+                query = query.Where(e => deptIds.Contains(e.DepartmentId));
             }
 
             var employees = await query.ToListAsync();
-            var insuranceList = await _context.EmployeeInsurances.ToListAsync();
+            var empIds = employees.Select(e => e.Id).ToList();
+            
+            // Optimization: Only fetch insurance for the employees in the result
+            var insuranceList = await _context.EmployeeInsurances
+                .Where(i => empIds.Contains(i.EmployeeId))
+                .ToListAsync();
 
             return employees.Select(e => {
                 var ins = insuranceList.FirstOrDefault(i => i.EmployeeId == e.Id);
@@ -55,6 +64,22 @@ namespace HRMS.Infrastructure.Services
                     Note = ins?.Note
                 };
             }).ToList();
+        }
+
+        private async Task<List<int>> GetDepartmentHierarchyIdsAsync(int departmentId)
+        {
+            var result = new List<int> { departmentId };
+            var childIds = await _context.Departments
+                .Where(d => d.ParentDepartmentId == departmentId)
+                .Select(d => d.Id)
+                .ToListAsync();
+
+            foreach (var childId in childIds)
+            {
+                result.AddRange(await GetDepartmentHierarchyIdsAsync(childId));
+            }
+
+            return result;
         }
 
         public async Task<EmployeeInsuranceDto?> GetEmployeeInsuranceAsync(int employeeId)

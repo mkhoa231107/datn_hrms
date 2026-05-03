@@ -202,7 +202,7 @@ export default function TimesheetApproval({ user, onBack }) {
                     </div>
                     <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng nhân sự</p>
-                        <h3 className="text-2xl font-black text-slate-800">{stats.total}</h3>
+                        <h3 className="text-3xl font-black text-slate-800 stat-value">{stats.total}</h3>
                     </div>
                 </div>
                 <div className="card flex items-center gap-4 border-l-4 border-l-emerald-500">
@@ -211,7 +211,7 @@ export default function TimesheetApproval({ user, onBack }) {
                     </div>
                     <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Đã chốt công</p>
-                        <h3 className="text-2xl font-black text-slate-800">{stats.approved}</h3>
+                        <h3 className="text-3xl font-black text-emerald-600 stat-value">{stats.approved}</h3>
                     </div>
                 </div>
                 <div className="card flex items-center gap-4 border-l-4 border-l-amber-500">
@@ -220,7 +220,7 @@ export default function TimesheetApproval({ user, onBack }) {
                     </div>
                     <div>
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Chờ phê duyệt</p>
-                        <h3 className="text-2xl font-black text-slate-800">{stats.pending}</h3>
+                        <h3 className="text-3xl font-black text-amber-600 stat-value">{stats.pending}</h3>
                     </div>
                 </div>
             </div>
@@ -233,13 +233,13 @@ export default function TimesheetApproval({ user, onBack }) {
                         <input
                             type="text"
                             placeholder="Mã NV, tên..."
-                            className="input !pl-10 w-64 !text-sm"
+                            className="input !pl-10 w-full md:w-64 !text-sm"
                             value={searchQuery}
                             onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
                         />
                     </div>
                     <select
-                        className="input !py-2 !text-xs font-bold w-48"
+                        className="input !py-2 !text-xs font-bold w-full md:w-48"
                         value={selectedPeriodId}
                         onChange={(e) => { setSelectedPeriodId(e.target.value); setPage(1); }}
                     >
@@ -248,7 +248,7 @@ export default function TimesheetApproval({ user, onBack }) {
                     
                     {/* Thanh filter bộ phận mới */}
                     <select
-                        className="input !py-2 !text-xs font-bold w-48 bg-indigo-50/50 text-indigo-700 border-indigo-100"
+                        className="input !py-2 !text-xs font-bold w-full md:w-48 bg-indigo-50/50 text-indigo-700 border-indigo-100"
                         value={selectedDeptId}
                         onChange={(e) => { setSelectedDeptId(e.target.value); setPage(1); }}
                     >
@@ -258,14 +258,14 @@ export default function TimesheetApproval({ user, onBack }) {
                         ))}
                     </select>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={handleFinalize} className="btn btn-ghost border-slate-200 text-slate-600 hover:bg-white !py-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={handleFinalize} className="btn btn-ghost border-slate-200 text-slate-600 hover:bg-white !py-2 text-xs flex-1 sm:flex-none whitespace-nowrap">
                         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Tổng hợp lại
                     </button>
-                    <button onClick={handleExport} className="btn btn-ghost border-slate-200 text-slate-600 hover:bg-white !py-2 text-xs">
+                    <button onClick={handleExport} className="btn btn-ghost border-slate-200 text-slate-600 hover:bg-white !py-2 text-xs flex-1 sm:flex-none whitespace-nowrap">
                         <Download size={14} /> Xuất Excel
                     </button>
-                    <button onClick={handleApproveAll} className="btn btn-primary !py-2 !px-4 text-xs">
+                    <button onClick={handleApproveAll} className="btn btn-primary !py-2 !px-4 text-xs flex-1 sm:flex-none whitespace-nowrap">
                         <Zap size={14} /> Chốt nhanh ({stats.pending})
                     </button>
                 </div>

@@ -127,7 +127,7 @@ export default function NotificationDropdown({ user, onClose }) {
         <>
             <div 
                 ref={dropdownRef}
-                className="absolute right-0 mt-2 w-[400px] bg-white rounded-none border border-[#ccc] shadow-xl z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right text-[#333]"
+                className="absolute right-[-60px] sm:right-0 mt-2 w-[calc(100vw-24px)] xs:w-[360px] sm:w-[400px] bg-white rounded-lg border border-slate-200 shadow-2xl z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right text-[#333]"
                 style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
             >
                 {/* Header */}
