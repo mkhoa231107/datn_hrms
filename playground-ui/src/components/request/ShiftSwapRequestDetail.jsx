@@ -106,21 +106,14 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
     ) && (request.status === 'PendingManager');
                       
     const myDeptId = myProfile?.departmentId;
-    const isHR = (
-        user?.roles?.includes('HR') || 
-        user?.roles?.includes('Admin') || 
-        user?.roles?.includes('CnbSpecialist') || 
-        [3, 6, 7].includes(myDeptId)
-    ) && request.status === 'PendingHR';
-
-    const canAction = isPartner || isManager || isHR;
+    const canAction = isPartner || isManager;
 
     const getStatusLabel = (status) => {
         switch(status) {
             case 'PendingPartner': return 'Chờ đối tác xác nhận';
             case 'PendingManager': return 'Chờ quản lý duyệt';
-            case 'PendingHR': return 'Chờ nhân sự xác nhận';
-            case 'Approved': return 'Đã hoàn tất';
+            case 'PendingHR': return 'Đang xử lý'; // Should not happen in new flow
+            case 'Approved': return 'Thành công';
             case 'Rejected': return 'Đã từ chối';
             case 'Cancelled': return 'Đã hủy';
             default: return status;
@@ -155,8 +148,7 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
                             <p className="font-bold text-xs uppercase">Thông báo hệ thống</p>
                             <p className="text-[11px] italic">
                                 {request.status === 'PendingPartner' ? `Đang chờ ${request.employeeB?.fullName} (Bên B) ký xác nhận.` : 
-                                 request.status === 'PendingManager' ? `Đang chờ Trưởng bộ phận phê duyệt.` : 
-                                 `Đang chờ phòng Nhân sự xác nhận.`}
+                                 `Đang chờ Trưởng bộ phận phê duyệt.`}
                                 {" "}Vui lòng đăng nhập đúng tài khoản để thực hiện ký tên.
                             </p>
                         </div>
@@ -214,17 +206,17 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
                     </div>
 
                     {/* Signatures Area */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 text-center text-[11px]">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16 text-center text-[11px]">
                         <div>
-                            <p className="font-bold mb-10 h-8">Người làm đơn</p>
-                            <div className="h-16 flex items-center justify-center mb-1">
+                            <p className="font-bold mb-10 h-8">Người làm đơn (Bên A)</p>
+                            <div className="h-20 flex items-center justify-center mb-1">
                                 {request.signatureA && <img src={request.signatureA.replace(/_/g, '/').replace(/-/g, '+')} alt="Sig A" className="max-h-full" />}
                             </div>
                             <p className="font-bold underline uppercase">{request.employeeA?.fullName}</p>
                         </div>
                         <div>
-                            <p className="font-bold mb-10 h-8">Người đồng ý đổi</p>
-                            <div className="h-16 flex items-center justify-center mb-1 text-gray-400 border border-dashed border-gray-200 rounded bg-gray-50/50">
+                            <p className="font-bold mb-10 h-8">Người đồng ý (Bên B)</p>
+                            <div className="h-20 flex items-center justify-center mb-1 text-gray-400 border border-dashed border-gray-200 rounded bg-gray-50/50">
                                 {request.signatureB ? (
                                     <img src={request.signatureB} alt="Sig B" className="max-h-full" />
                                 ) : isPartner ? (
@@ -241,8 +233,8 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
                             <p className="font-bold underline uppercase">{request.employeeB?.fullName}</p>
                         </div>
                         <div>
-                            <p className="font-bold mb-10 h-8">Trưởng bộ phận</p>
-                            <div className="h-16 flex items-center justify-center mb-1 text-gray-400 border border-dashed border-gray-200 rounded bg-gray-50/50">
+                            <p className="font-bold mb-10 h-8">Trưởng bộ phận duyệt</p>
+                            <div className="h-20 flex items-center justify-center mb-1 text-gray-400 border border-dashed border-gray-200 rounded bg-gray-50/50">
                                 {request.signatureManager ? (
                                     <img src={request.signatureManager} alt="Sig Mgr" className="max-h-full" />
                                 ) : isManager ? (
@@ -256,25 +248,7 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
                                     <em className="text-[10px]">Chờ duyệt</em>
                                 )}
                             </div>
-                            <p className="font-bold underline uppercase">{request.manager?.fullName || '....................'}</p>
-                        </div>
-                        <div>
-                            <p className="font-bold mb-10 h-8">C&B xác nhận</p>
-                            <div className="h-16 flex items-center justify-center mb-1 text-gray-400 border border-dashed border-gray-200 rounded bg-gray-50/50">
-                                {request.signatureHR ? (
-                                    <img src={request.signatureHR} alt="Sig HR" className="max-h-full" />
-                                ) : isHR ? (
-                                    <button 
-                                        onClick={() => handleAction('hr', true)}
-                                        className="text-blue-600 hover:underline flex items-center gap-1 font-bold italic text-[11px]"
-                                    >
-                                        <Signature size={14} /> Xác nhận
-                                    </button>
-                                ) : (
-                                    <em className="text-[10px]">Chờ xác nhận</em>
-                                )}
-                            </div>
-                            <p className="font-bold underline uppercase">{request.hr?.fullName || '....................'}</p>
+                            <p className="font-bold underline uppercase">{request.manager?.fullName || request.employeeA?.department?.manager?.fullName || '....................'}</p>
                         </div>
                     </div>
                 </div>
@@ -297,7 +271,7 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
                             <X size={20} /> Từ chối đơn
                         </button>
                         <button 
-                            onClick={() => handleAction(isPartner ? 'partner' : (isManager ? 'manager' : 'hr'), true)}
+                            onClick={() => handleAction(isPartner ? 'partner' : 'manager', true)}
                             disabled={submitting}
                             className="bg-blue-600 text-white px-16 py-3 font-bold uppercase text-sm hover:bg-blue-700 flex items-center gap-2 rounded shadow-lg transition-all transform hover:scale-105 active:scale-95"
                         >
@@ -318,7 +292,7 @@ const ShiftSwapRequestDetail = ({ requestId, onBack, user }) => {
                         <div className="flex justify-end gap-3">
                             <button onClick={() => setShowRejectForm(false)} className="text-xs font-bold uppercase text-gray-500 px-4">Hủy</button>
                             <button 
-                                onClick={() => handleAction(isPartner ? 'partner' : (isManager ? 'manager' : 'hr'), false)}
+                                onClick={() => handleAction(isPartner ? 'partner' : 'manager', false)}
                                 disabled={submitting || !rejectReason.trim()}
                                 className="bg-red-600 text-white px-8 py-2 font-bold uppercase text-xs hover:bg-red-700 disabled:opacity-50"
                             >

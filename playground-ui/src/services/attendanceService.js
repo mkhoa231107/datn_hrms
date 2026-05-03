@@ -136,33 +136,6 @@ const attendanceService = {
     }
   },
 
-  // Overtime Management
-  scheduleOvertime: async (data) => {
-    try {
-      const response = await api.post('/attendance/overtime', data);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  getDepartmentOvertime: async (departmentId) => {
-    try {
-      const response = await api.get(`/attendance/department/${departmentId}/overtime`);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  },
-
-  getMyOvertime: async () => {
-    try {
-      const response = await api.get('/attendance/my-overtime');
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
-  }
 };
 
 export default attendanceService;

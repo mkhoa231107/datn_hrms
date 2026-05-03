@@ -7,8 +7,9 @@ import {
     CheckCircle2, XCircle, Edit,
     User as UserIcon, Shield, Layers,
     ChevronRight, Eye, Globe, Zap,
-    MoreHorizontal, Hash, Terminal
+    MoreHorizontal, Hash, Terminal, ChevronLeft
 } from 'lucide-react';
+import TabFilter from '../ui/TabFilter';
 
 export default function DeptActivities({ user, onBack }) {
     const roles = user?.roles || [];
@@ -22,6 +23,8 @@ export default function DeptActivities({ user, onBack }) {
     const [activeDeptTab, setActiveDeptTab] = useState('All');
     const [selectedLog, setSelectedLog] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [page, setPage] = useState(1);
+    const PER_PAGE = 15;
 
     useEffect(() => { fetchLogs(); }, []);
 
@@ -91,6 +94,9 @@ export default function DeptActivities({ user, onBack }) {
             return matchesTab && matchesSearch && matchesFilter;
         });
     }, [logs, activeDeptTab, search, filter]);
+
+    const totalPages = Math.ceil(filteredLogs.length / PER_PAGE);
+    const visibleLogs = filteredLogs.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
     const stats = useMemo(() => {
         const today = new Date().toLocaleDateString();
@@ -177,33 +183,20 @@ export default function DeptActivities({ user, onBack }) {
 
             {/* ── Filter & Tabs Container ── */}
             <div className="card !p-0 !rounded-[8px] overflow-hidden border-none shadow-xl shadow-indigo-100/20">
-                {/* Tabs Bar - Show for Admin or DepartmentManager (Trưởng phòng), hide for DepartmentHead (Trưởng BP) */}
+                {/* Tabs Bar - Show for Admin or DepartmentManager (Trưởng phòng) */}
                 {(roles.includes('Admin') || roles.includes('DepartmentManager')) && (
-                    <div className="bg-slate-50/50 border-b border-slate-100 px-2 flex items-center overflow-x-auto no-scrollbar">
-                    {deptTabs.map(deptName => {
-                        const count = logs.filter(l => deptName === 'All' ? true : l.userDepartmentName?.toLowerCase().includes(deptName.toLowerCase())).length;
-                        const isActive = activeDeptTab === deptName;
-                        return (
-                            <button
-                                key={deptName}
-                                onClick={() => setActiveDeptTab(deptName)}
-                                className={`px-5 py-4 text-xs font-bold transition-all relative whitespace-nowrap ${
-                                    isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
-                                }`}
-                            >
-                                {deptName === 'All' ? 'Tất cả đơn vị' : deptName}
-                                <span className={`ml-2 px-1.5 py-0.5 rounded-md text-[10px] ${
-                                    isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200/50 text-slate-500'
-                                }`}>
-                                    {count}
-                                </span>
-                                {isActive && (
-                                    <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-indigo-600 rounded-full animate-in fade-in zoom-in duration-300" />
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+                    <TabFilter 
+                        tabs={deptTabs.map(deptName => ({
+                            id: deptName,
+                            label: (deptName === 'All' ? 'TẤT CẢ ĐƠN VỊ' : deptName.toUpperCase())
+                        }))}
+                        activeTabId={activeDeptTab}
+                        onTabChange={(id) => {
+                            setActiveDeptTab(id);
+                            setPage(1);
+                        }}
+                        className="mb-0 border-b border-slate-100"
+                    />
                 )}
 
                 {/* Filters Bar */}
@@ -214,7 +207,10 @@ export default function DeptActivities({ user, onBack }) {
                             type="text"
                             placeholder="Tìm kiếm người thực hiện, hành động hoặc mã bản ghi..."
                             value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(1);
+                            }}
                             className="input !pl-11 !py-2.5 !bg-slate-50/50 border-transparent hover:border-slate-200 focus:!bg-white"
                         />
                     </div>
@@ -225,7 +221,10 @@ export default function DeptActivities({ user, onBack }) {
                             <span className="text-[10px] font-bold text-slate-400 uppercase">Đối tượng:</span>
                             <select
                                 value={filter}
-                                onChange={(e) => setFilter(e.target.value)}
+                                onChange={(e) => {
+                                    setFilter(e.target.value);
+                                    setPage(1);
+                                }}
                                 className="bg-transparent border-none text-xs font-bold text-slate-600 outline-none cursor-pointer min-w-[120px]"
                             >
                                 {entityTypes.map(type => (
@@ -268,7 +267,7 @@ export default function DeptActivities({ user, onBack }) {
                                         </div>
                                     </td>
                                 </tr>
-                            ) : filteredLogs.map((log) => {
+                            ) : visibleLogs.map((log) => {
                                 const meta = getMethodMeta(log.action);
                                 const ActionIcon = meta.icon;
                                 return (
@@ -332,6 +331,32 @@ export default function DeptActivities({ user, onBack }) {
                             })}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+                    <p className="text-xs font-medium text-slate-400">
+                        Hiển thị {visibleLogs.length} trên {filteredLogs.length} hoạt động
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            disabled={page === 1} 
+                            onClick={() => setPage(p => p - 1)} 
+                            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-indigo-600 disabled:opacity-30 transition-all shadow-sm"
+                        >
+                            <ChevronLeft size={16} />
+                        </button>
+                        <span className="text-xs font-bold text-slate-600 px-2 min-w-[100px] text-center">
+                            Trang {page} / {totalPages || 1}
+                        </span>
+                        <button 
+                            disabled={page >= totalPages} 
+                            onClick={() => setPage(p => p + 1)} 
+                            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-indigo-600 disabled:opacity-30 transition-all shadow-sm"
+                        >
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
                 </div>
             </div>
 

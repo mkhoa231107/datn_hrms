@@ -2,11 +2,17 @@ import { useState, useEffect } from 'react';
 import { FileText, CheckCircle, XCircle, Search, Eye, Filter, Edit, Clock } from 'lucide-react';
 import { api } from '../../api';
 import toast from 'react-hot-toast';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 export default function ContractApproval({ user, scope = 'department', onBack }) {
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirm, setConfirm] = useState({ open: false, type: null, contractId: null });
+  const [rejectReason, setRejectReason] = useState('');
+  const [acting, setActing] = useState(false);
+
+  const closeConfirm = () => setConfirm({ open: false, type: null, contractId: null });
 
   const fetchPendingContracts = async () => {
     setLoading(true);
@@ -39,14 +45,27 @@ export default function ContractApproval({ user, scope = 'department', onBack })
   };
 
   const confirmReject = (id) => {
-    const reason = window.prompt("Nhập lý do từ chối hợp đồng này:");
-    if (reason) handleAction(id, 'reject', reason);
+    setRejectReason('');
+    setConfirm({ open: true, type: 'reject', contractId: id });
   };
 
   const confirmApprove = (id) => {
-    if (window.confirm("Bạn có chắc chắn muốn phê duyệt hợp đồng này?")) {
-      handleAction(id, 'approve', "Đã xem xét và đồng ý.");
+    setConfirm({ open: true, type: 'approve', contractId: id });
+  };
+
+  const executeAction = async () => {
+    if (confirm.type === 'reject' && !rejectReason.trim()) {
+      toast.error('Vui lòng nhập lý do từ chối');
+      return;
     }
+    setActing(true);
+    await handleAction(
+      confirm.contractId,
+      confirm.type,
+      confirm.type === 'approve' ? 'Đã xem xét và đồng ý.' : rejectReason
+    );
+    setActing(false);
+    closeConfirm();
   };
 
   const filteredContracts = contracts.filter(c => 
@@ -163,6 +182,44 @@ export default function ContractApproval({ user, scope = 'department', onBack })
               </tbody>
           </table>
        </div>
+
+    {/* ── Approve ConfirmDialog ── */}
+    <ConfirmDialog
+        open={confirm.open && confirm.type === 'approve'}
+        variant="success"
+        title="Phê duyệt hợp đồng"
+        message="Bạn có chắc chắn muốn phê duyệt hợp đồng này? Nhân viên sẽ được thông báo ngay sau khi phê duyệt."
+        confirmLabel="Phê duyệt"
+        cancelLabel="Hủy bỏ"
+        loading={acting}
+        onConfirm={executeAction}
+        onCancel={closeConfirm}
+    />
+
+    {/* ── Reject ConfirmDialog (with reason input) ── */}
+    <ConfirmDialog
+        open={confirm.open && confirm.type === 'reject'}
+        variant="danger"
+        title="Từ chối hợp đồng"
+        message={
+            <div className="flex flex-col gap-2 mt-1">
+                <span className="text-sm text-slate-500">Vui lòng nhập lý do từ chối để thông báo cho nhân viên.</span>
+                <textarea
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-red-300 resize-none mt-1"
+                    rows={3}
+                    placeholder="Nhập lý do từ chối..."
+                    value={rejectReason}
+                    onChange={e => setRejectReason(e.target.value)}
+                    autoFocus
+                />
+            </div>
+        }
+        confirmLabel="Từ chối hợp đồng"
+        cancelLabel="Hủy bỏ"
+        loading={acting}
+        onConfirm={executeAction}
+        onCancel={closeConfirm}
+    />
     </div>
   );
 }

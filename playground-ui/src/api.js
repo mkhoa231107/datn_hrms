@@ -255,42 +255,9 @@ export const attendanceService = {
     const res = await api.post('/attendance/scan-barcode', { employeeCode });
     return res.data;
   },
-  getMyOvertime: async () => {
-    const res = await api.get('/attendance/my-overtime');
-    return res.data;
-  }
+
 };
 
-export const overtimeService = {
-  createPlan: async (data) => {
-    const res = await api.post('/overtimemanagement/plans', data);
-    return res.data;
-  },
-  getPlans: async (params) => {
-    const res = await api.get('/overtimemanagement/plans', { params });
-    return res.data;
-  },
-  bulkAssign: async (data) => {
-    const res = await api.post('/overtimemanagement/assignments/bulk', data);
-    return res.data;
-  },
-  getAssignmentGrid: async (departmentId, month, year) => {
-    const res = await api.get(`/overtimemanagement/assignments/grid?departmentId=${departmentId}&month=${month}&year=${year}`);
-    return res.data;
-  },
-  getMySchedule: async (fromDate, toDate) => {
-    const res = await api.get(`/overtimemanagement/my-schedule?fromDate=${fromDate}&toDate=${toDate}`);
-    return res.data;
-  },
-  publishPlan: async (id) => {
-    const res = await api.post(`/overtimemanagement/plans/${id}/publish`);
-    return res.data;
-  },
-  confirmAssignment: async (id) => {
-    const res = await api.post(`/overtimemanagement/assignments/${id}/confirm`);
-    return res.data;
-  }
-};
 
 export const auditLogService = {
   getDepartmentActivities: async () => {

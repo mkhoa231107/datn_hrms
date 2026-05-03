@@ -10,6 +10,7 @@ import ShiftSwapRequestDetail from '../request/ShiftSwapRequestDetail';
 import toast from 'react-hot-toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import EmptyState from '../ui/EmptyState';
+import TabFilter from '../ui/TabFilter';
 
 export default function ShiftChangeApproval({ user, onBack }) {
     const [requests, setRequests] = useState([]);
@@ -20,6 +21,7 @@ export default function ShiftChangeApproval({ user, onBack }) {
     const [viewingSwapId, setViewingSwapId] = useState(null);
     const [confirmApproveId, setConfirmApproveId] = useState(null);
     const [approvingId, setApprovingId] = useState(null);
+    const [selectedDept, setSelectedDept] = useState('all');
 
     useEffect(() => {
         fetchRequests();
@@ -103,6 +105,14 @@ export default function ShiftChangeApproval({ user, onBack }) {
         swaps: requests.filter(r => r._type === 'swap').length,
         changes: requests.filter(r => r._type === 'change').length
     };
+
+    const deptTabs = [...new Set(requests.map(r => r.employeeDepartmentName || r.departmentName).filter(Boolean))];
+    
+    const filteredRequests = requests.filter(r => {
+        if (selectedDept === 'all') return true;
+        const dept = r.employeeDepartmentName || r.departmentName;
+        return dept === selectedDept;
+    });
 
     return (
         <div className="flex flex-col gap-6 animate-fade-up pb-10">
@@ -191,19 +201,19 @@ export default function ShiftChangeApproval({ user, onBack }) {
                                         <td colSpan={4} className="px-6 py-8"><div className="h-10 bg-slate-100 rounded-[6px] w-full" /></td>
                                     </tr>
                                 ))
-                            ) : requests.length === 0 ? (
+                            ) : filteredRequests.length === 0 ? (
                                 <tr>
                                     <td colSpan={4}>
                                         <EmptyState
                                             icon="document"
                                             title="Không có yêu cầu nào"
-                                            description={activeTab === 'pending' ? 'Tất cả các yêu cầu đã được xử lý.' : 'Chưa có lịch sử phê duyệt nào.'}
+                                            description={selectedDept === 'all' ? (activeTab === 'pending' ? 'Tất cả các yêu cầu đã được xử lý.' : 'Chưa có lịch sử phê duyệt nào.') : `Không có yêu cầu nào thuộc bộ phận ${selectedDept}`}
                                             compact
                                         />
                                     </td>
                                 </tr>
                             ) : (
-                                requests.map(r => (
+                                filteredRequests.map(r => (
                                     <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">

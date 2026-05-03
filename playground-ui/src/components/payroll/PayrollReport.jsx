@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import {
     BarChart2, Download, RefreshCw, Send,
     Users, DollarSign, ShieldCheck, TrendingUp, Calendar,
-    Building2, FileText, X, CheckCircle2, AlertCircle
+    Building2, FileText, X, CheckCircle2, AlertCircle, Wallet
 } from 'lucide-react';
 
 const fmt = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val ?? 0);
@@ -32,6 +32,26 @@ function calcPIT(taxableIncome) {
     return tax;
 }
 
+function Modal({ title, subtitle, onClose, children, footer }) {
+    return (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
+                    <div>
+                        <h3 className="font-black text-xl text-slate-800 tracking-tight">{title}</h3>
+                        {subtitle && <p className="text-sm font-bold text-slate-400 mt-1">{subtitle}</p>}
+                    </div>
+                    <button onClick={onClose} className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-rose-50 hover:text-rose-600 transition-all text-slate-400 group">
+                        <X className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                    </button>
+                </div>
+                <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">{children}</div>
+                {footer && <div className="p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-3xl flex justify-end gap-3 shrink-0">{footer}</div>}
+            </div>
+        </div>
+    );
+}
+
 // ── Detail Modal ──
 function PayslipDetailModal({ record, onClose }) {
     if (!record) return null;
@@ -41,38 +61,31 @@ function PayslipDetailModal({ record, onClose }) {
     const pit = calcPIT(taxable);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl animate-fade-up">
-                <div className="bg-violet-600 text-white p-6 rounded-t-2xl flex items-center justify-between">
-                    <div>
-                        <h3 className="text-lg font-black">{record.employeeName}</h3>
-                        <p className="text-violet-200 text-sm">{record.employeeCode} — {record.departmentName || '—'}</p>
+        <Modal 
+            title={record.employeeName} 
+            subtitle={`${record.employeeCode} — ${record.departmentName || '—'}`} 
+            onClose={onClose}
+        >
+            <div className="space-y-4">
+                {[
+                    { label: 'Ngày công thực tế', value: `${record.actualWorkingDays ?? 0} ngày` },
+                    { label: 'Lương theo công', value: fmt(record.actualWorkingSalary) },
+                    { label: 'Lương tăng ca (OT)', value: fmt(record.overtimePay) },
+                    { label: 'Tổng phụ cấp', value: fmt(record.totalAllowances) },
+                    { label: 'Lương GROSS', value: fmt(gross), bold: true },
+                    { label: '─ BHXH (8%)', value: `- ${fmt(record.socialInsurance)}`, color: 'text-rose-600' },
+                    { label: '─ BHYT (1.5%)', value: `- ${fmt(record.healthInsurance)}`, color: 'text-rose-600' },
+                    { label: '─ BHTN (1%)', value: `- ${fmt(record.unemploymentInsurance)}`, color: 'text-rose-600' },
+                    { label: '─ Thuế TNCN (ước tính)', value: `- ${fmt(pit)}`, color: 'text-rose-600' },
+                    { label: 'Lương NET thực lĩnh', value: fmt(record.netSalary), bold: true, highlight: true },
+                ].map(({ label, value, bold, color, highlight }) => (
+                    <div key={label} className={`flex justify-between items-center py-2.5 px-3 rounded-xl border border-transparent ${highlight ? 'bg-violet-50 border-violet-100' : 'hover:bg-slate-50'}`}>
+                        <span className={`text-xs ${bold ? 'font-black text-slate-700 uppercase tracking-wider' : 'font-bold text-slate-400 uppercase tracking-widest text-[10px]'}`}>{label}</span>
+                        <span className={`text-sm font-black ${color || (bold ? 'text-violet-700' : 'text-slate-700')}`}>{value}</span>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-                        <X size={16} />
-                    </button>
-                </div>
-                <div className="p-6 space-y-3">
-                    {[
-                        { label: 'Ngày công thực tế', value: `${record.actualWorkingDays ?? 0} ngày` },
-                        { label: 'Lương theo công', value: fmt(record.actualWorkingSalary) },
-                        { label: 'Lương tăng ca (OT)', value: fmt(record.overtimePay) },
-                        { label: 'Tổng phụ cấp', value: fmt(record.totalAllowances) },
-                        { label: 'Lương GROSS', value: fmt(gross), bold: true },
-                        { label: '─ BHXH (8%)', value: `- ${fmt(record.socialInsurance)}`, color: 'text-rose-600' },
-                        { label: '─ BHYT (1.5%)', value: `- ${fmt(record.healthInsurance)}`, color: 'text-rose-600' },
-                        { label: '─ BHTN (1%)', value: `- ${fmt(record.unemploymentInsurance)}`, color: 'text-rose-600' },
-                        { label: '─ Thuế TNCN (ước tính)', value: `- ${fmt(pit)}`, color: 'text-rose-600' },
-                        { label: 'Lương NET thực lĩnh', value: fmt(record.netSalary), bold: true, highlight: true },
-                    ].map(({ label, value, bold, color, highlight }) => (
-                        <div key={label} className={`flex justify-between items-center py-2 border-b border-slate-50 ${highlight ? 'bg-violet-50 -mx-2 px-2 rounded-lg border-violet-200' : ''}`}>
-                            <span className={`text-sm ${bold ? 'font-black text-slate-700' : 'text-slate-500'}`}>{label}</span>
-                            <span className={`text-sm font-bold ${color || (bold ? 'text-violet-700' : 'text-slate-700')}`}>{value}</span>
-                        </div>
-                    ))}
-                </div>
+                ))}
             </div>
-        </div>
+        </Modal>
     );
 }
 
@@ -183,9 +196,9 @@ export default function PayrollReport() {
                     employeeName: r.employeeName || '',
                     departmentName: r.departmentName || '',
                     actualWorkingDays: r.actualWorkingDays ?? 0,
-                    actualWorkingSalary: r.actualWorkingSalary ?? 0,
-                    overtimePay: r.overtimePay ?? 0,
-                    totalAllowances: r.totalAllowances ?? 0,
+                    actualWorkingSalary: r.actualWorkingSalary || 0,
+                    overtimePay: r.overtimePay || 0,
+                    totalAllowances: r.totalAllowances || 0,
                     bhxhNv: bhxh,
                     bhytNv: bhyt,
                     bhtnNv: bhtn,
@@ -252,160 +265,204 @@ export default function PayrollReport() {
             setSendResult({ success: false, message: msg });
         } finally {
             setSending(false);
-            setShowSendConfirm(false);
         }
     };
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-up pb-10">
-            {/* Header */}
-            <div className="card bg-violet-600 text-white !p-8 relative overflow-hidden">
-                <div className="relative z-10">
-                    <h2 className="text-2xl font-black mb-2 flex items-center gap-3">
-                        <DollarSign size={28} /> Báo Cáo Lương & Thuế Tổng Hợp
-                    </h2>
-                    <p className="text-violet-100 text-sm">Xem chi tiết bảng lương, bảo hiểm và thuế TNCN theo kỳ lương và phòng ban.</p>
+        <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">
+            {/* Standard Module Header */}
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                        <DollarSign className="text-violet-600" size={28} />
+                        Báo cáo Lương & Thuế
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-slate-400 text-sm">Tổng hợp chi phí nhân sự, bảo hiểm và thuế theo từng kỳ lương</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span className="text-slate-400 text-sm">{filtered.length} bản ghi</span>
+                    </div>
                 </div>
-                <BarChart2 size={120} className="absolute right-[-20px] top-[-20px] text-white/10 rotate-12" />
-            </div>
-
-            {/* Filters */}
-            <div className="card grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 border-2 border-slate-100">
-                <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Calendar size={12} /> Kỳ lương
-                    </label>
-                    <select className="input font-bold text-sm" value={selectedPeriod} onChange={e => setSelectedPeriod(e.target.value)}>
-                        <option value="">-- Chọn kỳ lương --</option>
-                        {periods.map(p => <option key={p.id} value={p.id}>{p.name || p.periodName}</option>)}
-                    </select>
-                </div>
-                <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Building2 size={12} /> Phòng ban
-                    </label>
-                    <select className="input font-bold text-sm" value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
-                        <option value="">Tất cả phòng ban</option>
-                        {departments.map(d => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
-                    </select>
-                </div>
-                <div className="flex items-end gap-2">
-                    <button onClick={fetchReport} disabled={!selectedPeriod || loading} className="btn btn-primary w-full !py-3 flex items-center justify-center gap-2">
-                        {loading ? <RefreshCw size={16} className="animate-spin" /> : <BarChart2 size={16} />}
-                        Tải báo cáo
+                <div className="flex items-center gap-3">
+                    <button onClick={fetchReport} className="btn btn-ghost shadow-sm">
+                        <RefreshCw className={loading ? 'animate-spin' : ''} size={16} /> Làm mới
+                    </button>
+                    <button 
+                        onClick={() => setShowSendConfirm(true)}
+                        disabled={!selectedPeriod || filtered.length === 0}
+                        className="btn btn-ghost border-violet-200 text-violet-700 hover:bg-violet-50 shadow-sm"
+                    >
+                        <Send size={16} /> Gửi phiếu lương
+                    </button>
+                    <button 
+                        onClick={exportExcel} 
+                        disabled={exporting || filtered.length === 0} 
+                        className="btn btn-primary shadow-lg shadow-violet-200"
+                    >
+                        {exporting ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                        Xuất Excel
                     </button>
                 </div>
             </div>
 
             {/* KPI Summary Cards */}
-            {filtered.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                        { label: 'Tổng quỹ lương (Net)', value: fmt(totals.net), icon: DollarSign, color: 'violet', sub: `${totals.count} nhân viên` },
-                        { label: 'BHXH DN đóng (~17.5%)', value: fmt(totals.bhdn), icon: ShieldCheck, color: 'emerald', sub: 'Doanh nghiệp chịu' },
-                        { label: 'Tổng BH nhân viên', value: fmt(totals.bhnv), icon: TrendingUp, color: 'rose', sub: 'NV đóng (8+1.5+1%)' },
-                        { label: 'Số nhân viên', value: `${totals.count} NV`, icon: Users, color: 'blue', sub: 'trong kỳ này' },
-                    ].map(({ label, value, icon: Icon, color, sub }) => (
-                        <div key={label} className={`card border-l-4 border-l-${color}-500`}>
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-xl bg-${color}-50 text-${color}-600 flex items-center justify-center shrink-0`}>
-                                    <Icon size={20} />
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">{label}</p>
-                                    <h3 className="text-base font-black text-slate-800 truncate">{value}</h3>
-                                    <p className="text-[10px] text-slate-400">{sub}</p>
-                                </div>
-                            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                {[
+                    { label: 'Quỹ lương Net', value: fmt(totals.net), icon: Wallet, color: 'violet', sub: 'Thực lĩnh của NV' },
+                    { label: 'BH DN đóng', value: fmt(totals.bhdn), icon: Building2, color: 'emerald', sub: 'Chi phí doanh nghiệp' },
+                    { label: 'Tổng BH NV', value: fmt(totals.bhnv), icon: ShieldCheck, color: 'rose', sub: 'Khấu trừ vào lương' },
+                    { label: 'Số nhân sự', value: totals.count, icon: Users, color: 'amber', sub: 'Có trong bảng lương' },
+                ].map(({ label, value, icon: Icon, color, sub }) => (
+                    <div key={label} className={`card !p-5 flex items-center gap-4 border-l-4 border-l-${color}-500 shadow-sm`}>
+                        <div className={`w-12 h-12 rounded-xl bg-${color}-50 text-${color}-600 flex items-center justify-center shrink-0`}>
+                            <Icon size={24} />
                         </div>
-                    ))}
-                </div>
-            )}
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate">{label}</p>
+                            <h3 className="text-lg font-black text-slate-800 stat-value truncate">{value}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 mt-0.5">{sub}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
 
-            {/* Table */}
-            {filtered.length > 0 && (
-                <div className="card !p-0 overflow-hidden border-2 border-slate-100">
-                    <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-                        <h3 className="text-sm font-black text-slate-700">
-                            Chi tiết bảng lương — {periods.find(p => p.id === parseInt(selectedPeriod))?.name || ''}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setShowSendConfirm(true)}
-                                disabled={!selectedPeriod}
-                                className="btn btn-ghost border-violet-200 text-violet-700 hover:bg-violet-50 !py-2 text-xs flex items-center gap-2"
+            {/* Standard Filter Bar */}
+            <div className="card !p-4 bg-slate-50/50 border-slate-200/60 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ tính lương</label>
+                        <div className="relative">
+                            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <select 
+                                className="input !pl-11 !py-2.5 bg-white border-slate-200 font-bold" 
+                                value={selectedPeriod} 
+                                onChange={e => setSelectedPeriod(e.target.value)}
                             >
-                                <Send size={14} /> Gửi phiếu lương
-                            </button>
-                            <button onClick={exportExcel} disabled={exporting} className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2 text-xs flex items-center gap-2">
-                                {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-                                Xuất Excel
-                            </button>
+                                <option value="">-- Chọn kỳ lương --</option>
+                                {periods.map(p => {
+                                    const rawName = p.name || p.periodName || '';
+                                    let fixedName = rawName;
+                                    try {
+                                        // Fix common UTF-8 encoding issues (Mojibake)
+                                        if (rawName.includes('Ã') || rawName.includes('º') || rawName.includes('£')) {
+                                            fixedName = decodeURIComponent(escape(rawName));
+                                        }
+                                    } catch (e) {
+                                        fixedName = rawName;
+                                    }
+                                    return <option key={p.id} value={p.id}>{fixedName}</option>;
+                                })}
+                            </select>
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full border-collapse">
-                            <thead>
-                                <tr className="bg-slate-50 border-b border-slate-100">
-                                    {['#', 'Nhân viên', 'Phòng ban', 'Ngày công', 'Lương CB', 'OT', 'Phụ cấp', 'Bảo hiểm NV', 'Thực lĩnh', 'Chi tiết'].map(h => (
-                                        <th key={h} className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider text-left whitespace-nowrap">{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {filtered.map((r, i) => {
-                                    const bh = (r.socialInsurance || 0) + (r.healthInsurance || 0) + (r.unemploymentInsurance || 0);
-                                    return (
-                                        <tr key={r.id || i} className="hover:bg-violet-50/30 transition-colors group cursor-pointer" onClick={() => setDetailRecord(r)}>
-                                            <td className="px-4 py-3 text-xs font-bold text-slate-400">{i + 1}</td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-slate-700">{r.employeeName}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">{r.employeeCode}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-sm text-slate-500">{r.departmentName || '—'}</td>
-                                            <td className="px-4 py-3 text-center font-bold text-slate-600">{r.actualWorkingDays ?? '—'}</td>
-                                            <td className="px-4 py-3 text-right text-sm text-slate-700">{fmt(r.actualWorkingSalary)}</td>
-                                            <td className="px-4 py-3 text-right text-sm text-amber-600">{fmt(r.overtimePay)}</td>
-                                            <td className="px-4 py-3 text-right text-sm text-blue-600">{fmt(r.totalAllowances)}</td>
-                                            <td className="px-4 py-3 text-right text-sm text-rose-500">({fmt(bh)})</td>
-                                            <td className="px-4 py-3 text-right font-black text-violet-700">{fmt(r.netSalary)}</td>
-                                            <td className="px-4 py-3 text-center">
-                                                <button className="w-7 h-7 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center hover:bg-violet-100 transition-colors mx-auto">
-                                                    <FileText size={14} />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {/* Total row */}
-                                <tr className="bg-violet-100 border-t-2 border-violet-300">
-                                    <td colSpan={4} className="px-4 py-3 text-xs font-black text-violet-800 uppercase">TỔNG CỘNG ({totals.count} NV)</td>
-                                    <td className="px-4 py-3 text-right font-black text-violet-800">{fmt(filtered.reduce((s, r) => s + (r.actualWorkingSalary || 0), 0))}</td>
-                                    <td className="px-4 py-3 text-right font-black text-violet-800">{fmt(filtered.reduce((s, r) => s + (r.overtimePay || 0), 0))}</td>
-                                    <td className="px-4 py-3 text-right font-black text-violet-800">{fmt(filtered.reduce((s, r) => s + (r.totalAllowances || 0), 0))}</td>
-                                    <td className="px-4 py-3 text-right font-black text-violet-800">({fmt(totals.bhnv)})</td>
-                                    <td className="px-4 py-3 text-right font-black text-violet-800">{fmt(totals.net)}</td>
-                                    <td />
-                                </tr>
-                            </tbody>
-                        </table>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Phòng ban</label>
+                        <div className="relative">
+                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <select 
+                                className="input !pl-11 !py-2.5 bg-white border-slate-200 font-bold" 
+                                value={selectedDept} 
+                                onChange={e => setSelectedDept(e.target.value)}
+                            >
+                                <option value="">Tất cả phòng ban</option>
+                                {departments.map(d => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
+                            </select>
+                        </div>
                     </div>
                 </div>
-            )}
+            </div>
 
-            {!loading && filtered.length === 0 && selectedPeriod && (
-                <div className="card flex flex-col items-center justify-center py-20 gap-4 text-center">
-                    <DollarSign size={48} className="text-slate-200" />
-                    <p className="text-slate-400 font-bold">Chưa có dữ liệu lương cho kỳ này.</p>
-                    <p className="text-slate-300 text-sm">Hãy thực hiện Tính lương trong trang "Tính lương & Thuế" trước.</p>
+            {/* Main Table */}
+            <div className="card !p-0 overflow-hidden border-slate-200/60 shadow-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12 text-center">#</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nhân viên</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Phòng ban</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Ngày công</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Lương CB</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">OT</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Phụ cấp</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Bảo hiểm NV</th>
+                                <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thực lĩnh</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center w-12">Xem</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan="10" className="px-6 py-20 text-center text-slate-400 italic">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <RefreshCw className="animate-spin text-violet-500" size={32} />
+                                            <span>Đang xử lý dữ liệu báo cáo...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan="10" className="px-6 py-20 text-center text-slate-400 italic font-medium">
+                                        {selectedPeriod ? 'Không có dữ liệu lương cho kỳ này.' : 'Vui lòng chọn kỳ lương để xem báo cáo.'}
+                                    </td>
+                                </tr>
+                            ) : (
+                                <>
+                                    {filtered.map((r, i) => {
+                                        const bh = (r.socialInsurance || 0) + (r.healthInsurance || 0) + (r.unemploymentInsurance || 0);
+                                        return (
+                                            <tr key={r.id || i} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="px-6 py-4 text-center font-bold text-slate-400">{i + 1}</td>
+                                                <td className="px-4 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-black text-slate-700">{r.employeeName}</span>
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">@{r.employeeCode}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-4 text-xs font-medium text-slate-500">{r.departmentName || '—'}</td>
+                                                <td className="px-4 py-4 text-center font-black text-slate-600">{r.actualWorkingDays ?? '—'}</td>
+                                                <td className="px-4 py-4 text-right text-xs font-bold text-slate-700">{fmt(r.actualWorkingSalary)}</td>
+                                                <td className="px-4 py-4 text-right text-xs font-bold text-amber-600">{fmt(r.overtimePay)}</td>
+                                                <td className="px-4 py-4 text-right text-xs font-bold text-blue-600">{fmt(r.totalAllowances)}</td>
+                                                <td className="px-4 py-4 text-right text-xs font-bold text-rose-500">({fmt(bh)})</td>
+                                                <td className="px-4 py-4 text-right font-black text-violet-700">{fmt(r.netSalary)}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button 
+                                                        onClick={() => setDetailRecord(r)}
+                                                        className="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center hover:bg-violet-100 transition-colors mx-auto shadow-sm"
+                                                    >
+                                                        <FileText size={16} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {/* Summary Row */}
+                                    <tr className="bg-slate-50 font-black">
+                                        <td colSpan={4} className="px-6 py-4 text-[10px] uppercase text-slate-500 tracking-widest">TỔNG CỘNG ({totals.count} NV)</td>
+                                        <td className="px-4 py-4 text-right text-xs text-slate-700">{fmt(filtered.reduce((s, r) => s + (r.actualWorkingSalary || 0), 0))}</td>
+                                        <td className="px-4 py-4 text-right text-xs text-amber-600">{fmt(filtered.reduce((s, r) => s + (r.overtimePay || 0), 0))}</td>
+                                        <td className="px-4 py-4 text-right text-xs text-blue-600">{fmt(filtered.reduce((s, r) => s + (r.totalAllowances || 0), 0))}</td>
+                                        <td className="px-4 py-4 text-right text-xs text-rose-500">({fmt(totals.bhnv)})</td>
+                                        <td className="px-4 py-4 text-right text-base text-violet-700">{fmt(totals.net)}</td>
+                                        <td></td>
+                                    </tr>
+                                </>
+                            )}
+                        </tbody>
+                    </table>
                 </div>
+            </div>
+
+            {/* Detail Modal */}
+            {detailRecord && (
+                <PayslipDetailModal 
+                    record={detailRecord} 
+                    onClose={() => setDetailRecord(null)} 
+                />
             )}
 
-            {detailRecord && <PayslipDetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />}
-
-            {/* Send payslips confirm modal */}
+            {/* Send Confirm Modal */}
             {showSendConfirm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-up">

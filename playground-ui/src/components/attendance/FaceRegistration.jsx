@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import api from '../../api';
 import { useFaceRecognition } from '../../hooks/useFaceRecognition';
 import { Upload, CheckCircle, AlertCircle, RefreshCw, User, Camera, X, Loader2, Search } from 'lucide-react';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { toast } from 'react-hot-toast';
 
 
 const BACKEND_URL = 'http://localhost:5052';
@@ -318,6 +320,7 @@ export default function FaceRegistration({ onBack }) {
     const [scanningEmployee, setScanningEmployee] = useState(null);
     const [bulkScanning, setBulkScanning] = useState(false);
     const [scanProgress, setScanProgress] = useState({ current: 0, total: 0 });
+    const [bulkConfirm, setBulkConfirm] = useState({ open: false, count: 0, toScan: [] });
 
     const { modelsLoaded, loading: modelsLoading, loadModels, detectDescriptorFromImage } = useFaceRecognition();
 
@@ -352,15 +355,18 @@ export default function FaceRegistration({ onBack }) {
         setEmployees(prev => prev.map(e => e.id === updated.id ? { ...e, ...updated } : e));
     };
 
-    const handleBulkScan = async () => {
+    const handleBulkScan = () => {
         const toScan = employees.filter(e => e.avatar && !e.hasFaceDescriptor);
         if (toScan.length === 0) {
-            alert('Không có nhân sự nào cần quét (yêu cầu có ảnh nhưng chưa có dữ liệu mặt).');
+            toast.error('Không có nhân sự nào cần quét (yêu cầu có ảnh nhưng chưa có dữ liệu mặt).');
             return;
         }
+        setBulkConfirm({ open: true, count: toScan.length, toScan });
+    };
 
-        if (!window.confirm(`Hệ thống sẽ quét tự động cho ${toScan.length} nhân sự. Tiếp tục?`)) return;
-
+    const executeBulkScan = async () => {
+        const { toScan } = bulkConfirm;
+        setBulkConfirm({ open: false, count: 0, toScan: [] });
         setBulkScanning(true);
         setScanProgress({ current: 0, total: toScan.length });
 
@@ -396,7 +402,7 @@ export default function FaceRegistration({ onBack }) {
         }
 
         setBulkScanning(false);
-        alert(`✅ Đã hoàn thành quét tự động cho ${toScan.length} nhân sự!`);
+        toast.success(`Đã hoàn thành quét tự động cho ${toScan.length} nhân sự!`);
     };
 
     const filtered = employees
@@ -523,6 +529,17 @@ export default function FaceRegistration({ onBack }) {
                     onClose={() => setScanningEmployee(null)}
                 />
             )}
+
+            <ConfirmDialog
+                open={bulkConfirm.open}
+                variant="info"
+                title="Quét khuôn mặt hàng loạt"
+                message={`Hệ thống sẽ tự động phân tích ảnh và đăng ký dữ liệu khuôn mặt cho ${bulkConfirm.count} nhân sự đang có ảnh nhưng chưa đăng ký. Quá trình có thể mất vài phút.`}
+                confirmLabel="Bắt đầu quét"
+                cancelLabel="Hủy bỏ"
+                onConfirm={executeBulkScan}
+                onCancel={() => setBulkConfirm({ open: false, count: 0, toScan: [] })}
+            />
         </div>
     );
 }

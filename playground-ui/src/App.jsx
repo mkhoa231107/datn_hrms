@@ -49,19 +49,17 @@ import BarcodeAttendancePage from './components/attendance/BarcodeAttendancePage
 import ShiftChangeRequest from './components/request/ShiftChangeRequest';
 import ShiftChangeApproval from './components/scheduling/ShiftChangeApproval';
 import UserRoles from './components/admin/UserRoles';
-import OvertimePlanList from './components/overtime/OvertimePlanList';
-import OvertimeGrid from './components/overtime/OvertimeGrid';
-import MyOvertimeSchedule from './components/overtime/MyOvertimeSchedule';
 import AccountantDashboard from './components/dashboard/AccountantDashboard';
 import AttendanceSummaryReport from './components/attendance/AttendanceSummaryReport';
-
-
+import BottomNav from './components/layout/BottomNav';
+import { useBreakpoint } from './hooks/useBreakpoint';
 // Default tab per role when first logged in
 const DEFAULT_TAB = {
   Admin: 'admin-roles',
   Accountant: 'payroll-processing',
-  CnbSpecialist: 'payroll-processing',
-  DepartmentHead: 'employees',
+  CnbSpecialist: 'employees',
+  DepartmentManager: 'me',
+  DepartmentHead: 'me',
   Employee: 'me',
 };
 
@@ -89,8 +87,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('me');
   const [viewingEmployeeId, setViewingEmployeeId] = useState(null);
   const [initializing, setInitializing] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [hasUnsignedContract, setHasUnsignedContract] = useState(false);
+  const { isMobile } = useBreakpoint();
+  const primaryRole = getPrimaryRole(user?.roles || []);
   // Default to public landing page for any unauthenticated visitor
   const [publicView, setPublicView] = useState(!localStorage.getItem('token'));
 
@@ -167,7 +167,7 @@ export default function App() {
           setActiveTab('my-contract');
           toast.error("Bạn cần ký hợp đồng để sử dụng hệ thống", { duration: 6000, icon: '📄' });
         } else {
-          setActiveTab(data.username === 'hr_rec_01' ? 'me' : (DEFAULT_TAB[primary] || 'me'));
+          setActiveTab(DEFAULT_TAB[primary] || 'me');
         }
       } catch {
         authService.logout();
@@ -186,7 +186,7 @@ export default function App() {
       setActiveTab('my-contract');
       toast.error("Bạn cần ký hợp đồng để sử dụng hệ thống", { duration: 6000, icon: '📄' });
     } else {
-      setActiveTab(userData.username === 'hr_rec_01' ? 'me' : (DEFAULT_TAB[primary] || 'me'));
+      setActiveTab(DEFAULT_TAB[primary] || 'me');
       toast.success(`Chào mừng trở lại, ${userData.fullName}!`);
     }
   };
@@ -225,7 +225,7 @@ export default function App() {
     if (hasUnsignedContract && t !== 'my-contract' && t !== 'me') return;
     setActiveTab(t);
     setViewingEmployeeId(null);
-    setSidebarOpen(false);
+    // REMOVED: setSidebarOpen(false) to persist sidebar state across tab changes
   };
 
   const commonRoles = ['Admin', 'Accountant', 'CnbSpecialist', 'DepartmentManager', 'DepartmentHead', 'Employee'];
@@ -249,7 +249,16 @@ export default function App() {
           onTabChange={handleTabChange}
         />
 
-        <main style={{ flex: 1, padding: '24px 32px', overflowY: 'auto', minWidth: 0, background: 'var(--bg-base)' }}>
+        <main
+          className="main-content"
+          style={{ 
+          flex: 1, 
+          padding: isMobile ? '16px' : '24px 32px', 
+          overflowY: 'auto', 
+          minWidth: 0, 
+          background: 'var(--bg-base)',
+          transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}>
           <div key={activeTab}>
           {/* Thông báo bắt buộc ký hợp đồng */}
           {hasUnsignedContract && (
@@ -361,18 +370,10 @@ export default function App() {
               <MyInsurance user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
-          {tab('my-ot-schedule') && (
-            <RoleGuard user={user} allowedRoles={commonRoles}>
-              <MyOvertimeSchedule user={user} onBack={() => setActiveTab('me')} />
-            </RoleGuard>
-          )}
+
 
           {/* ── Team Management (Team Leader) ── */}
-          {tab('ot-assignment') && (
-            <RoleGuard user={user} allowedRoles={['TeamLeader', 'DepartmentHead']}>
-              <OvertimeGrid user={user} onBack={() => setActiveTab('me')} />
-            </RoleGuard>
-          )}
+
           {tab('team-timesheets') && (
             <RoleGuard user={user} allowedRoles={['DepartmentManager', 'Admin']}>
               <TimesheetApproval user={user} onBack={() => setActiveTab('me')} />
@@ -384,7 +385,7 @@ export default function App() {
             </RoleGuard>
           )}
           {tab('team-shift-approvals') && (
-            <RoleGuard user={user} allowedRoles={['DepartmentHead', 'DepartmentManager', 'Admin', 'CnbSpecialist']}>
+            <RoleGuard user={user} allowedRoles={['DepartmentHead', 'DepartmentManager', 'Admin']}>
               <ShiftChangeApproval user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
@@ -395,11 +396,7 @@ export default function App() {
           )}
 
           {/* ── Department Management (Department Head) ── */}
-          {tab('ot-planning') && (
-            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'CnbSpecialist']}>
-              <OvertimePlanList user={user} onBack={() => setActiveTab('me')} />
-            </RoleGuard>
-          )}
+
           {tab('employees') && (
             <RoleGuard user={user} allowedRoles={['DepartmentHead', 'DepartmentManager', 'CnbSpecialist']}>
               <EmployeeList user={user} onViewProfile={handleViewEmployee} onBack={() => setActiveTab('me')} />
@@ -441,7 +438,7 @@ export default function App() {
           )}
           {tab('attendance-management') && (
             <RoleGuard user={user} allowedRoles={['CnbSpecialist']}>
-              <AttendanceManagement onBack={() => setActiveTab('me')} />
+              <AttendanceManagement user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
           {tab('attendance-report') && (
@@ -509,9 +506,20 @@ export default function App() {
         borderTop: '1px solid var(--border)',
         background: 'var(--bg-surface)',
         opacity: 0.7,
+        display: isMobile ? 'none' : undefined,
       }}>
         © 2026 HRMS Net • Hệ thống quản trị nhân sự
       </footer>
+
+      {/* ── Bottom Navigation (Mobile only) ── */}
+      {isMobile && user && (
+        <BottomNav
+          primaryRole={primaryRole}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          hasUnsignedContract={hasUnsignedContract}
+        />
+      )}
       <Toaster 
         position="top-center" 
         reverseOrder={false} 

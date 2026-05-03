@@ -1,7 +1,8 @@
-import { LogOut, Menu, Bell, X } from 'lucide-react';
+import { LogOut, Menu, Bell } from 'lucide-react';
 import { ROLE_META, getPrimaryRole } from './Sidebar';
 import { useState, useEffect, useRef } from 'react';
 import NotificationDropdown from './NotificationDropdown';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 const TAB_LABELS = {
     'me': 'Hồ sơ của tôi', 'attendance': 'Chấm công',
@@ -39,6 +40,7 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
     const [showNotifications, setShowNotifications] = useState(false);
     const [hasNewNotif, setHasNewNotif] = useState(true);
     const bellRef = useRef(null);
+    const { isMobile } = useBreakpoint();
 
     const roles = user?.roles || [];
     const primaryRole = getPrimaryRole(roles);
@@ -47,7 +49,6 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
     const sectionLabel = TAB_SECTION[activeTab] || 'Tổng quan';
     const initials = (user?.fullName || 'U').split(' ').slice(-2).map(w => w[0]).join('').toUpperCase();
 
-    // Close dropdown when clicking outside
     useEffect(() => {
         if (!showNotifications) return;
         const handler = (e) => {
@@ -69,61 +70,83 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
         <div className="sticky top-0 z-50">
             {/* ── Top bar ── */}
             <header
-                className="glass-surface h-14 px-4 flex items-center justify-between"
-                style={{ borderBottom: '1px solid var(--border)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
+                className="glass-surface h-14 flex items-center justify-between"
+                style={{
+                    borderBottom: '1px solid var(--border)',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    padding: isMobile ? '0 12px' : '0 16px',
+                }}
             >
-                {/* Left */}
-                <div className="flex items-center gap-3 shrink-0">
+                {/* Left: hamburger + logo + page title (mobile) */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px', flexShrink: 0 }}>
                     <button
                         onClick={onToggleSidebar}
-                        className="btn-ghost"
-                        style={{ padding: '8px', borderRadius: 'var(--r-md)', border: 'none', background: 'transparent', color: 'var(--text-secondary)' }}
-                        title="Toggle sidebar"
+                        style={{
+                            padding: '10px', borderRadius: 'var(--r-md)',
+                            border: 'none', background: 'transparent',
+                            color: 'var(--text-secondary)', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            minHeight: '44px', minWidth: '44px',
+                            transition: 'background 0.2s ease, color 0.2s ease',
+                        }}
+                        title="Bật/Tắt thanh điều hướng"
                     >
-                        <Menu className="w-5 h-5" />
+                        <Menu size={20} />
                     </button>
+
                     <span
-                        className="text-gradient hidden sm:block"
-                        style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: '15px', fontWeight: 800, letterSpacing: '-0.02em' }}
+                        className="text-gradient"
+                        style={{
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            fontSize: isMobile ? '14px' : '15px',
+                            fontWeight: 800,
+                            letterSpacing: '-0.02em',
+                        }}
                     >
                         HRMS Net
                     </span>
+
+                    {/* Page title inline — mobile only */}
+                    {isMobile && (
+                        <span style={{
+                            fontSize: '12px', fontWeight: 600,
+                            color: 'var(--text-secondary)', opacity: 0.7,
+                            maxWidth: '110px', overflow: 'hidden',
+                            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                            {activeLabel}
+                        </span>
+                    )}
                 </div>
 
-                <div className="flex-1" />
+                <div style={{ flex: 1 }} />
 
-                {/* Right */}
-                <div className="flex items-center gap-2 shrink-0">
-                    {/* Role badge */}
-                    <span
-                        className="badge badge-accent hidden md:inline-flex"
-                        style={{ fontSize: '10px' }}
-                    >
-                        {meta.label}
-                    </span>
+                {/* Right: role badge + bell + avatar + logout */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px', flexShrink: 0 }}>
+                    {!isMobile && (
+                        <span className="badge badge-accent" style={{ fontSize: '10px' }}>
+                            {meta.label}
+                        </span>
+                    )}
 
-                    {/* Bell */}
-                    <div className="relative" ref={bellRef}>
+                    <div style={{ position: 'relative' }} ref={bellRef}>
                         <button
                             onClick={() => { setShowNotifications(v => !v); setHasNewNotif(false); }}
                             style={{
-                                padding: '8px',
-                                borderRadius: 'var(--r-md)',
-                                border: 'none',
+                                padding: '10px', borderRadius: 'var(--r-md)', border: 'none',
                                 background: showNotifications ? 'var(--accent-subtle)' : 'transparent',
                                 color: showNotifications ? 'var(--accent)' : 'var(--text-secondary)',
-                                cursor: 'pointer',
-                                position: 'relative',
+                                cursor: 'pointer', position: 'relative',
+                                minHeight: '44px', minWidth: '44px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
                                 transition: 'background 0.18s ease, color 0.18s ease',
                             }}
-                            onMouseEnter={e => { if (!showNotifications) { e.currentTarget.style.background = 'var(--accent-subtle)'; e.currentTarget.style.color = 'var(--accent)'; } }}
-                            onMouseLeave={e => { if (!showNotifications) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; } }}
                             title="Thông báo"
                         >
-                            <Bell className="w-4 h-4" />
+                            <Bell size={18} />
                             {hasNewNotif && (
                                 <span style={{
-                                    position: 'absolute', top: '6px', right: '6px',
+                                    position: 'absolute', top: '8px', right: '8px',
                                     width: '7px', height: '7px',
                                     background: '#EF4444', borderRadius: '50%',
                                     border: '1.5px solid var(--bg-surface)',
@@ -136,64 +159,54 @@ export default function Header({ user, onLogout, onToggleSidebar, activeTab }) {
                         )}
                     </div>
 
-                    {/* Avatar */}
                     <div
                         style={{
-                            width: '32px', height: '32px',
-                            borderRadius: 'var(--r-md)',
+                            width: '34px', height: '34px', borderRadius: 'var(--r-md)',
                             background: accentHex,
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             fontSize: '12px', fontWeight: 700, color: '#fff',
                             boxShadow: `0 2px 8px ${accentHex}44`,
-                            cursor: 'default',
-                            letterSpacing: '0.02em',
+                            flexShrink: 0,
                         }}
                         title={user?.fullName}
                     >
                         {initials}
                     </div>
 
-                    {/* Logout */}
-                    <button
-                        onClick={onLogout}
-                        style={{
-                            padding: '8px',
-                            borderRadius: 'var(--r-md)',
-                            border: 'none',
-                            background: 'transparent',
-                            color: 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            transition: 'all 0.18s ease',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#DC2626'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                        title="Đăng xuất"
-                    >
-                        <LogOut className="w-4 h-4" />
-                    </button>
+                    {!isMobile && (
+                        <button
+                            onClick={onLogout}
+                            style={{
+                                padding: '10px', borderRadius: 'var(--r-md)', border: 'none',
+                                background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+                                minHeight: '44px', minWidth: '44px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.18s ease',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#DC2626'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                            title="Đăng xuất"
+                        >
+                            <LogOut size={18} />
+                        </button>
+                    )}
                 </div>
             </header>
 
-            {/* ── Breadcrumb sub-bar ── */}
-            <div
-                style={{
-                    background: 'var(--bg-base)',
-                    borderBottom: '1px solid var(--border)',
-                    padding: '6px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    letterSpacing: '0.02em',
-                }}
-            >
-                <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>{meta.label}</span>
-                <span style={{ color: 'var(--border-strong)' }}>›</span>
-                <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>{sectionLabel}</span>
-                <span style={{ color: 'var(--border-strong)' }}>›</span>
-                <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{activeLabel}</span>
-            </div>
+            {/* ── Breadcrumb sub-bar — hidden on mobile ── */}
+            {!isMobile && (
+                <div style={{
+                    background: 'var(--bg-base)', borderBottom: '1px solid var(--border)',
+                    padding: '6px 20px', display: 'flex', alignItems: 'center', gap: '8px',
+                    fontSize: '11px', fontWeight: 500, letterSpacing: '0.02em',
+                }}>
+                    <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>{meta.label}</span>
+                    <span style={{ color: 'var(--border-strong)' }}>›</span>
+                    <span style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>{sectionLabel}</span>
+                    <span style={{ color: 'var(--border-strong)' }}>›</span>
+                    <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{activeLabel}</span>
+                </div>
+            )}
         </div>
     );
 }

@@ -5,6 +5,7 @@ import {
     BarChart2, Download, RefreshCw, Filter, ChevronUp, ChevronDown,
     Users, Clock, CheckCircle2, AlertTriangle, Calendar, Building2
 } from 'lucide-react';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 const fmtNum = (v, d = 1) => (v == null ? '—' : Number(v).toFixed(d));
 
@@ -18,6 +19,7 @@ export default function AttendanceSummaryReport() {
     const [sortKey, setSortKey] = useState('employeeName');
     const [sortDir, setSortDir] = useState('asc');
     const [exporting, setExporting] = useState(false);
+    const { isMobile } = useBreakpoint();
 
     useEffect(() => {
         Promise.all([
@@ -207,22 +209,38 @@ export default function AttendanceSummaryReport() {
     );
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-up pb-10">
-            {/* Header */}
-            <div className="card bg-violet-600 text-white !p-8 relative overflow-hidden">
-                <div className="relative z-10">
-                    <h2 className="text-2xl font-black mb-2 flex items-center gap-3">
-                        <BarChart2 size={28} /> Báo Cáo Chấm Công Tổng Hợp
-                    </h2>
-                    <p className="text-violet-100 text-sm">Tổng hợp ngày công, giờ tăng ca và nghỉ phép theo kỳ và phòng ban.</p>
+        <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">
+            {/* Standard Module Header */}
+            <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+                        <BarChart2 className="text-violet-600" size={28} />
+                        Báo cáo chấm công tổng hợp
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1">
+                        <span className="text-slate-400 text-sm">Tổng hợp ngày công và tăng ca</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span className="text-slate-400 text-sm">Hỗ trợ xuất Excel</span>
+                    </div>
                 </div>
-                <BarChart2 size={120} className="absolute right-[-20px] top-[-20px] text-white/10 rotate-12" />
+                <div className="flex items-center gap-3">
+                    {records.length > 0 && (
+                        <button
+                            onClick={exportExcel}
+                            disabled={exporting}
+                            className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2.5 shadow-sm"
+                        >
+                            {exporting ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+                            Xuất báo cáo Excel
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* Filter bar */}
-            <div className="card grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 border-2 border-slate-100">
+            {/* Standard Filter Bar */}
+            <div className="card grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 border-slate-200/60 mb-8">
                 <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
                         <Calendar size={12} /> Kỳ lương
                     </label>
                     <select className="input font-bold text-sm" value={selectedPeriod} onChange={e => setSelectedPeriod(e.target.value)}>
@@ -231,7 +249,7 @@ export default function AttendanceSummaryReport() {
                     </select>
                 </div>
                 <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
                         <Building2 size={12} /> Phòng ban
                     </label>
                     <select className="input font-bold text-sm" value={selectedDept} onChange={e => setSelectedDept(e.target.value)}>
@@ -239,34 +257,34 @@ export default function AttendanceSummaryReport() {
                         {departments.map(d => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
                     </select>
                 </div>
-                <div className="flex items-end gap-2">
+                <div className="flex items-end">
                     <button
                         onClick={fetchReport}
                         disabled={!selectedPeriod || loading}
-                        className="btn btn-primary w-full !py-3 flex items-center justify-center gap-2"
+                        className="btn btn-primary w-full !py-3 flex items-center justify-center gap-2 shadow-lg shadow-violet-200"
                     >
-                        {loading ? <RefreshCw size={16} className="animate-spin" /> : <Filter size={16} />}
+                        {loading ? <RefreshCw size={18} className="animate-spin" /> : <Filter size={18} />}
                         Xem báo cáo
                     </button>
                 </div>
             </div>
 
-            {/* KPI Cards */}
+            {/* Standard KPI Cards */}
             {records.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className={isMobile ? 'kpi-scroll mb-8' : 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-8'}>
                     {[
-                        { label: 'Tổng nhân viên', value: records.length + ' NV', icon: Users, color: 'violet' },
-                        { label: 'Tổng ngày công TT', value: totals.actualDays + ' ngày', icon: CheckCircle2, color: 'emerald' },
-                        { label: 'Tổng giờ tăng ca', value: fmtNum(totals.overtimeHours) + ' giờ', icon: Clock, color: 'amber' },
-                        { label: 'Tổng ngày nghỉ phép', value: totals.leaveDays + ' ngày', icon: AlertTriangle, color: 'blue' },
+                        { label: 'Tổng nhân viên', value: records.length, icon: Users, color: 'violet' },
+                        { label: 'Ngày công thực tế', value: totals.actualDays, icon: CheckCircle2, color: 'emerald' },
+                        { label: 'Giờ tăng ca', value: fmtNum(totals.overtimeHours) + 'h', icon: Clock, color: 'amber' },
+                        { label: 'Nghỉ phép', value: totals.leaveDays, icon: AlertTriangle, color: 'blue' },
                     ].map(({ label, value, icon: Icon, color }) => (
-                        <div key={label} className={`card flex items-center gap-4 border-l-4 border-l-${color}-500`}>
+                        <div key={label} className={`card !p-5 flex items-center gap-4 border-l-4 border-l-${color}-500`}>
                             <div className={`w-10 h-10 rounded-xl bg-${color}-50 text-${color}-600 flex items-center justify-center shrink-0`}>
                                 <Icon size={20} />
                             </div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
-                                <h3 className="text-lg font-black text-slate-800">{value}</h3>
+                                <h3 className="text-xl font-black text-slate-800 stat-value">{value}</h3>
                             </div>
                         </div>
                     ))}
@@ -287,7 +305,7 @@ export default function AttendanceSummaryReport() {
                             Xuất Excel
                         </button>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="table-mobile-scroll">
                         <table className="w-full border-collapse">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-100">

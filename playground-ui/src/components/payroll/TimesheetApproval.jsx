@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 import { toast } from 'react-hot-toast';
 import { CheckSquare, Search, FileDown, Zap, Users, CheckCircle2, Clock, Filter, ChevronLeft, ChevronRight, Download, RefreshCw, AlertCircle } from 'lucide-react';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 export default function TimesheetApproval({ user, onBack }) {
     const [periods, setPeriods] = useState([]);
@@ -9,15 +11,45 @@ export default function TimesheetApproval({ user, onBack }) {
     const [summaries, setSummaries] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [showAll, setShowAll] = useState(false);
+    const [departments, setDepartments] = useState([]);
+    const [selectedDeptId, setSelectedDeptId] = useState('');
     const [page, setPage] = useState(1);
     const PER_PAGE = 15;
+    const [confirm, setConfirm] = useState({ open: false, type: null, pendingCount: 0 });
+    const closeConfirm = () => setConfirm({ open: false, type: null, pendingCount: 0 });
+    const { isMobile } = useBreakpoint();
 
     const roles = user?.roles || [];
-    const isAdmin = roles.includes('Admin');
-    const isManager = roles.includes('DepartmentManager') || isAdmin;
+    const isAdmin = roles.includes('Admin') || roles.includes('HrAdmin') || roles.includes('CnbSpecialist');
+    const isManager = roles.includes('DepartmentManager') || isAdmin || roles.includes('DepartmentHead');
 
-    useEffect(() => { fetchPeriods(); }, []);
+    useEffect(() => { 
+        fetchPeriods(); 
+        fetchDepartments();
+    }, []);
+
+    const fetchDepartments = async () => {
+        try {
+            const response = await api.get('/Departments');
+            let depts = response.data || [];
+            
+            // Nếu không phải admin, chỉ lấy phòng ban của user và phòng ban con
+            if (!isAdmin && user?.departmentId) {
+                depts = depts.filter(d => d.id === user.departmentId || d.parentDepartmentId === user.departmentId);
+            }
+            
+            setDepartments(depts);
+            
+            // Set default selected department
+            if (!isAdmin && user?.departmentId) {
+                setSelectedDeptId(user.departmentId.toString());
+            } else if (isAdmin) {
+                setSelectedDeptId('0'); // 0 means all
+            }
+        } catch {
+            console.error("Lỗi lấy danh sách phòng ban");
+        }
+    };
 
     const fetchPeriods = async () => {
         try {
@@ -26,21 +58,22 @@ export default function TimesheetApproval({ user, onBack }) {
             setPeriods(data);
             if (data.length > 0) {
                 setSelectedPeriodId(data[0].id);
-                fetchSummaries(data[0].id);
+                // fetchSummaries will be called by useEffect when period or dept changes
             }
         } catch {
             toast.error('Không thể tải danh sách kỳ công');
         }
     };
 
-    const fetchSummaries = async (periodId) => {
+    useEffect(() => {
+        if (selectedPeriodId && selectedDeptId !== '') {
+            fetchSummaries(selectedPeriodId, selectedDeptId);
+        }
+    }, [selectedPeriodId, selectedDeptId]);
+
+    const fetchSummaries = async (periodId, deptId) => {
         if (!periodId || !user) return;
         
-        let deptId = user.departmentId;
-        if (isAdmin) {
-            deptId = showAll ? 0 : (user.departmentId || 0);
-        }
-
         setLoading(true);
         try {
             const response = await api.get(`/Attendance/department/${deptId}/timesheets/${periodId}`);
@@ -56,7 +89,7 @@ export default function TimesheetApproval({ user, onBack }) {
         try {
             await api.post(`/Attendance/timesheet/${summaryId}/approve`);
             toast.success('Đã phê duyệt thành công');
-            fetchSummaries(selectedPeriodId);
+            fetchSummaries(selectedPeriodId, selectedDeptId);
         } catch {
             toast.error('Lỗi khi duyệt công');
         }
@@ -69,15 +102,16 @@ export default function TimesheetApproval({ user, onBack }) {
             toast.error('Không có nhân viên cần duyệt/chốt'); 
             return; 
         }
-        
-        if (!window.confirm(`Xác nhận chốt công cho ${pendingItems.length} nhân viên đang hiển thị?`)) return;
-        
+        setConfirm({ open: true, type: 'approveAll', pendingCount: pendingItems.length });
+    };
+
+    const executeApproveAll = async () => {
+        closeConfirm();
         setLoading(true);
         try {
-            const deptId = isAdmin && showAll ? 0 : (user?.departmentId || 0);
-            await api.post(`/Attendance/department/${deptId}/timesheets/${selectedPeriodId}/approve-all`);
+            await api.post(`/Attendance/department/${selectedDeptId}/timesheets/${selectedPeriodId}/approve-all`);
             toast.success('Đã chốt công hàng loạt');
-            fetchSummaries(selectedPeriodId);
+            fetchSummaries(selectedPeriodId, selectedDeptId);
         } catch {
             toast.error('Lỗi hệ thống khi duyệt nhanh');
         } finally {
@@ -87,13 +121,16 @@ export default function TimesheetApproval({ user, onBack }) {
 
     const handleFinalize = async () => {
         if (!selectedPeriodId) return;
-        if (!window.confirm("Hệ thống sẽ tái tổng hợp dữ liệu công dựa trên dữ liệu thô mới nhất. Tiếp tục?")) return;
-        
+        setConfirm({ open: true, type: 'finalize', pendingCount: 0 });
+    };
+
+    const executeFinalize = async () => {
+        closeConfirm();
         setLoading(true);
         try {
             await api.post(`/Attendance/finalize/${selectedPeriodId}`);
             toast.success('Tái tổng hợp thành công');
-            fetchSummaries(selectedPeriodId);
+            fetchSummaries(selectedPeriodId, selectedDeptId);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Lỗi khi tổng hợp dữ liệu');
         } finally {
@@ -103,11 +140,10 @@ export default function TimesheetApproval({ user, onBack }) {
 
     const handleExport = async () => {
         if (!selectedPeriodId) return;
-        const deptId = isAdmin && showAll ? 0 : (user?.departmentId || 0);
         
         setLoading(true);
         try {
-            const response = await api.get(`/Attendance/department/${deptId}/export/${selectedPeriodId}`, {
+            const response = await api.get(`/Attendance/department/${selectedDeptId}/export/${selectedPeriodId}`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -156,9 +192,10 @@ export default function TimesheetApproval({ user, onBack }) {
     const totalPages = Math.ceil(filteredSummaries.length / PER_PAGE);
 
     return (
-        <div className="flex flex-col gap-6 animate-fade-up">
+        <>
+        <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">
             {/* KPI Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className={isMobile ? 'kpi-scroll' : 'grid grid-cols-1 md:grid-cols-3 gap-6'}>
                 <div className="card flex items-center gap-4 border-l-4 border-l-indigo-500">
                     <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                         <Users size={24} />
@@ -189,7 +226,7 @@ export default function TimesheetApproval({ user, onBack }) {
             </div>
 
             {/* Toolbar */}
-            <div className="card flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
+            <div className="card flex flex-col gap-3 bg-slate-50/50">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="relative">
                         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -204,24 +241,22 @@ export default function TimesheetApproval({ user, onBack }) {
                     <select
                         className="input !py-2 !text-xs font-bold w-48"
                         value={selectedPeriodId}
-                        onChange={(e) => { setSelectedPeriodId(e.target.value); fetchSummaries(e.target.value); }}
+                        onChange={(e) => { setSelectedPeriodId(e.target.value); setPage(1); }}
                     >
                         {periods.map(p => <option key={p.id} value={p.id}>{p.periodName}</option>)}
                     </select>
-                    {isAdmin && (
-                        <label className="flex items-center gap-2 cursor-pointer group">
-                            <div className={`w-10 h-5 rounded-full transition-all relative ${showAll ? 'bg-violet-600' : 'bg-slate-200'}`}>
-                                <input
-                                    type="checkbox"
-                                    className="hidden"
-                                    checked={showAll}
-                                    onChange={(e) => { setShowAll(e.target.checked); fetchSummaries(selectedPeriodId); }}
-                                />
-                                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${showAll ? 'left-6' : 'left-1'}`} />
-                            </div>
-                            <span className="text-xs font-bold text-slate-600">Toàn công ty</span>
-                        </label>
-                    )}
+                    
+                    {/* Thanh filter bộ phận mới */}
+                    <select
+                        className="input !py-2 !text-xs font-bold w-48 bg-indigo-50/50 text-indigo-700 border-indigo-100"
+                        value={selectedDeptId}
+                        onChange={(e) => { setSelectedDeptId(e.target.value); setPage(1); }}
+                    >
+                        {isAdmin && <option value="0">Toàn công ty</option>}
+                        {departments.map(d => (
+                            <option key={d.id} value={d.id}>{d.departmentName}</option>
+                        ))}
+                    </select>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={handleFinalize} className="btn btn-ghost border-slate-200 text-slate-600 hover:bg-white !py-2 text-xs">
@@ -238,7 +273,7 @@ export default function TimesheetApproval({ user, onBack }) {
 
             {/* Table */}
             <div className="card !p-0 overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="table-mobile-scroll">
                     <table className="w-full">
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-100">
@@ -338,5 +373,32 @@ export default function TimesheetApproval({ user, onBack }) {
                 </div>
             </div>
         </div>
+
+        {/* ── ConfirmDialog: Chốt công hàng loạt ── */}
+        <ConfirmDialog
+            open={confirm.open && confirm.type === 'approveAll'}
+            variant="warning"
+            title="Xác nhận chốt công hàng loạt"
+            message={`Hành động này sẽ phê duyệt bảng công cho ${confirm.pendingCount} nhân viên đang hiển thị. Bạn có chắc chắn muốn tiếp tục?`}
+            confirmLabel="Chốt công ngay"
+            cancelLabel="Hủy bỏ"
+            loading={loading}
+            onConfirm={executeApproveAll}
+            onCancel={closeConfirm}
+        />
+
+        {/* ── ConfirmDialog: Tái tổng hợp ── */}
+        <ConfirmDialog
+            open={confirm.open && confirm.type === 'finalize'}
+            variant="info"
+            title="Tái tổng hợp dữ liệu công"
+            message="Hệ thống sẽ xóa và tính toán lại toàn bộ bảng công từ dữ liệu chấm công thô mới nhất. Các bản ghi đã duyệt sẽ bị ghi đè."
+            confirmLabel="Tái tổng hợp"
+            cancelLabel="Hủy bỏ"
+            loading={loading}
+            onConfirm={executeFinalize}
+            onCancel={closeConfirm}
+        />
+        </>
     );
 }

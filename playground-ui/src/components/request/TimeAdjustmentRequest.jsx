@@ -150,16 +150,16 @@ const TimeAdjustmentRequest = () => {
                     <form onSubmit={handleSubmit} style={{ padding: '15px' }}>
                         <div style={{ marginBottom: '10px' }}>
                             <strong style={{ display: 'block', marginBottom: '4px' }}>Ngày Điều Chỉnh:</strong>
-                            <input 
-                                type="date" 
-                                name="requestedDate" 
-                                value={formData.requestedDate} 
-                                onChange={handleInputChange} 
-                                max={new Date().toISOString().split('T')[0]} 
-                                required 
+                                <input 
+                                    type="date" 
+                                    name="requestedDate" 
+                                    value={formData.requestedDate} 
+                                    onChange={handleInputChange} 
+                                    max={new Date().toISOString().split('T')[0]} 
+                                    required 
                                 className="ef-input" 
-                            />
-                        </div>
+                                />
+                            </div>
 
                         <div style={{ marginBottom: '10px' }}>
                             <strong style={{ display: 'block', marginBottom: '4px' }}>Loại Yêu Cầu:</strong>
@@ -176,33 +176,33 @@ const TimeAdjustmentRequest = () => {
                             </select>
                         </div>
 
-                        {(formData.type === 'MissingCheckIn' || formData.type === 'WrongTime') && (
+                            {(formData.type === 'MissingCheckIn' || formData.type === 'WrongTime') && (
                             <div style={{ marginBottom: '10px' }}>
                                 <strong style={{ display: 'block', marginBottom: '4px' }}>Giờ Vào Đúng:</strong>
-                                <input 
-                                    type="time" 
-                                    name="correctedCheckIn" 
-                                    value={formData.correctedCheckIn} 
-                                    onChange={handleInputChange} 
-                                    required
+                                    <input 
+                                        type="time" 
+                                        name="correctedCheckIn" 
+                                        value={formData.correctedCheckIn} 
+                                        onChange={handleInputChange} 
+                                        required
                                     className="ef-input" 
-                                />
-                            </div>
-                        )}
+                                    />
+                                </div>
+                            )}
 
-                        {(formData.type === 'MissingCheckOut' || formData.type === 'WrongTime') && (
+                            {(formData.type === 'MissingCheckOut' || formData.type === 'WrongTime') && (
                             <div style={{ marginBottom: '10px' }}>
                                 <strong style={{ display: 'block', marginBottom: '4px' }}>Giờ Ra Đúng:</strong>
-                                <input 
-                                    type="time" 
-                                    name="correctedCheckOut" 
-                                    value={formData.correctedCheckOut} 
-                                    onChange={handleInputChange} 
-                                    required
+                                    <input 
+                                        type="time" 
+                                        name="correctedCheckOut" 
+                                        value={formData.correctedCheckOut} 
+                                        onChange={handleInputChange} 
+                                        required
                                     className="ef-input" 
-                                />
-                            </div>
-                        )}
+                                    />
+                                </div>
+                            )}
 
                         <div style={{ marginBottom: '15px' }}>
                             <strong style={{ display: 'block', marginBottom: '4px' }}>Lý Do Chi Tiết:</strong>
@@ -248,22 +248,22 @@ const TimeAdjustmentRequest = () => {
                                     myRequests.map((request) => (
                                         <tr key={request.id}>
                                             <td className="c" style={{ fontWeight: 'bold' }}>
-                                                {new Date(request.requestedDate).toLocaleDateString('vi-VN')}
-                                            </td>
+                                                            {new Date(request.requestedDate).toLocaleDateString('vi-VN')}
+                                                </td>
                                             <td>{getTypeText(request.type)}</td>
                                             <td>
                                                 <div style={{ marginBottom: '5px' }}>{request.reason}</div>
-                                                {(request.correctedCheckIn || request.correctedCheckOut) && (
+                                                    {(request.correctedCheckIn || request.correctedCheckOut) && (
                                                     <div style={{ fontSize: '11px', color: '#1a56db', fontWeight: 'bold' }}>
                                                         Cập nhật: {formatTimeOnly(request.correctedCheckIn)} - {formatTimeOnly(request.correctedCheckOut)}
-                                                    </div>
-                                                )}
-                                            </td>
+                                                        </div>
+                                                    )}
+                                                </td>
                                             <td className={`c ${getStatusStyle(request.status)}`} style={{ fontWeight: 'bold' }}>
                                                 {getStatusText(request.status)}
-                                            </td>
+                                                </td>
                                             <td>{request.approverName || '--'}</td>
-                                        </tr>
+                                            </tr>
                                     ))
                                 )}
                             </tbody>

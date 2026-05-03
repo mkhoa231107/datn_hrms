@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Search, Eye, Download, ShieldCheck, Users, Building2, RefreshCw } from 'lucide-react';
+import { FileText, Search, Eye, Download, ShieldCheck, Users, Building2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../../api';
 import ContractTemplate from './ContractTemplate';
 import toast from 'react-hot-toast';
@@ -43,6 +43,8 @@ export default function ContractManagement({ user, onBack }) {
   const [subDeptId, setSubDeptId]           = useState('');   // bộ phận cấp 2
   const [statusFilter, setStatusFilter]     = useState('');
   const [viewingContract, setViewingContract] = useState(null);
+  const [page, setPage] = useState(1);
+  const PER_PAGE = 10;
 
   /* ── effective deptId to query: prefer sub-dept, else parent ── */
   const effectiveDeptId = subDeptId || parentDeptId;
@@ -108,6 +110,14 @@ export default function ContractManagement({ user, onBack }) {
     return matchesSearch && matchesDept;
   });
 
+  const visibleContracts = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchText, parentDeptId, subDeptId, statusFilter]);
+
   /* ── export ── */
   const handleExport = async (id) => {
     try {
@@ -130,126 +140,129 @@ export default function ContractManagement({ user, onBack }) {
 
 
   return (
-    <div className="ef-wrap animate-fade-in" style={{ fontFamily: '"Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-
-      {/* ── Toolbar ── */}
-      <div className="ef-toolbar print:hidden" style={{ justifyContent: 'space-between', borderBottom: 'none' }}>
-        <div className="ef-toolbar-title">
-          <ShieldCheck size={18} style={{ color: '#4f46e5' }} />
-          <strong style={{ fontSize: '15px', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+    <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">
+      {/* Standard Module Header */}
+      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
+            <ShieldCheck className="text-violet-600" size={28} />
             Quản lý Hợp đồng lao động
-          </strong>
+          </h1>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-slate-400 text-sm">Quản lý hồ sơ pháp lý nhân sự</span>
+            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+            <span className="text-slate-400 text-sm">Hệ thống lưu trữ tập trung</span>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'nowrap' }}>
-          {/* Search */}
-          <div className="relative" style={{ minWidth: '200px' }}>
-            <Search className="absolute left-3 top-2.5 text-slate-400" size={14} />
+        <div className="flex items-center gap-3">
+          <button onClick={fetchContracts} className="btn btn-ghost shadow-sm" title="Tải lại">
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+          {onBack && <button onClick={onBack} className="btn btn-ghost font-bold">ĐÓNG</button>}
+        </div>
+      </div>
+
+      {/* Standard Filter Bar */}
+      <div className="card !p-4 bg-slate-50/50 border-slate-200/60 mb-6 flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row gap-4 items-center">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
-              placeholder="Tìm tên NV / số hợp đồng..."
+              placeholder="Tìm tên nhân viên / số hợp đồng..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm outline-none focus:border-indigo-500 transition-all"
+              className="input !pl-11 !py-2.5 bg-white border-slate-200"
             />
           </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full md:w-auto">
+            <select
+              value={parentDeptId}
+              onChange={handleParentChange}
+              className="input !py-2.5 font-bold text-sm min-w-[180px]"
+            >
+              <option value="">-- Phòng ban --</option>
+              {parentDepts.map(d => (
+                <option key={d.id} value={d.id}>{d.departmentName}</option>
+              ))}
+            </select>
 
-          {/* ── Level 1: Parent department ── */}
-          <select
-            value={parentDeptId}
-            onChange={handleParentChange}
-            className={`bg-slate-50 border ${parentDeptId ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-slate-200'} rounded-md px-3 py-2 text-sm outline-none font-bold text-slate-700 transition-all`}
-            style={{ minWidth: '180px' }}
-          >
-            <option value="">— Chọn Phòng ban —</option>
-            {parentDepts.map(d => (
-              <option key={d.id} value={d.id}>{d.departmentName}</option>
-            ))}
-          </select>
+            <select
+              value={subDeptId}
+              onChange={e => setSubDeptId(e.target.value)}
+              disabled={!parentDeptId}
+              className="input !py-2.5 font-bold text-sm min-w-[180px]"
+            >
+              <option value="">-- Bộ phận --</option>
+              {subDepts.map(d => {
+                const cleanName = d.departmentName.includes(' - ') 
+                  ? d.departmentName.split(' - ').slice(1).join(' - ') 
+                  : d.departmentName;
+                return <option key={d.id} value={d.id}>{cleanName}</option>;
+              })}
+            </select>
 
-          {/* ── Level 2: Sub-department ── */}
-          <select
-            value={subDeptId}
-            onChange={e => setSubDeptId(e.target.value)}
-            disabled={!parentDeptId}
-            className={`bg-slate-50 border ${subDeptId ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 'border-slate-200'} rounded-md px-3 py-2 text-sm outline-none font-bold ${!parentDeptId ? 'text-slate-300' : 'text-slate-700'} transition-all`}
-            style={{ minWidth: '180px' }}
-          >
-            <option value="">— Chọn Bộ phận —</option>
-            {subDepts.map(d => {
-              const cleanName = d.departmentName.includes(' - ') 
-                ? d.departmentName.split(' - ').slice(1).join(' - ') 
-                : d.departmentName;
-              return <option key={d.id} value={d.id}>{cleanName}</option>;
-            })}
-          </select>
-
-          {/* ── Status filter ── */}
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm outline-none focus:border-indigo-500 font-semibold text-slate-600"
-            style={{ minWidth: '150px' }}
-          >
-            <option value="">— Trạng thái —</option>
-            {Object.entries(STATUS_MAP).map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
-            ))}
-          </select>
-
-          <button onClick={fetchContracts} className="ef-btn" title="Tải lại">
-            <RefreshCw size={14} />
-          </button>
-
-          {onBack && <button onClick={onBack} className="ef-btn font-bold hover:bg-slate-100">ĐÓNG</button>}
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="input !py-2.5 font-bold text-sm min-w-[150px]"
+            >
+              <option value="">-- Trạng thái --</option>
+              {Object.entries(STATUS_MAP).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* ── Summary bar ── */}
-      <div style={{
-        display: 'flex', gap: '16px', padding: '10px 16px',
-        background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
-        fontSize: '12px', color: '#64748b', fontWeight: '600',
-      }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <Users size={14} /> Tổng: <strong style={{ color: '#1e293b' }}>{filtered.length}</strong> hợp đồng
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <Building2 size={14} />
-          {activeDeptLabel
-            ? <>
-                {parentDeptId && subDeptId && (
-                  <span style={{ color: '#94a3b8' }}>
-                    {departments.find(d => String(d.id) === String(parentDeptId))?.departmentName}
-                    <span style={{ margin: '0 5px' }}>›</span>
-                  </span>
-                )}
-                <strong style={{ color: '#4f46e5' }}>{activeDeptLabel}</strong>
-              </>
-            : <span>Tất cả phòng ban</span>
-          }
-        </span>
-        {statusFilter && (
-          <span style={{ color: '#6366f1' }}>
-            Trạng thái: {STATUS_MAP[statusFilter]?.label || statusFilter}
-          </span>
-        )}
+      {/* Standard KPI Cards (Summary) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="card !p-5 flex items-center gap-4 border-l-4 border-l-violet-500">
+              <div className="w-10 h-10 bg-violet-50 text-violet-600 rounded-xl flex items-center justify-center shrink-0">
+                  <FileText size={20} />
+              </div>
+              <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Tổng số hợp đồng</p>
+                  <h3 className="text-xl font-black text-slate-800 stat-value">{filtered.length}</h3>
+              </div>
+          </div>
+          <div className="card !p-5 flex items-center gap-4 border-l-4 border-l-emerald-500">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Building2 size={20} />
+              </div>
+              <div className="overflow-hidden">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Đang xem bộ phận</p>
+                  <h3 className="text-sm font-bold text-slate-800 truncate">{activeDeptLabel || 'Tất cả'}</h3>
+              </div>
+          </div>
+          <div className="card !p-5 flex items-center gap-4 border-l-4 border-l-amber-500">
+              <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Users size={20} />
+              </div>
+              <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lọc trạng thái</p>
+                  <h3 className="text-sm font-bold text-slate-800">{statusFilter ? STATUS_MAP[statusFilter]?.label : 'Tất cả'}</h3>
+              </div>
+          </div>
       </div>
 
-      {/* ── Table ── */}
-      <div className="ef-table-wrap">
-        <table className="ef-table no-top-border">
+      {/* Main Table Content */}
+      <div className="card !p-0 overflow-hidden border-slate-200/60 shadow-sm min-h-[400px]">
+        <table className="w-full text-left border-collapse">
           <thead>
-            <tr>
-              <th style={{ width: '5%'  }}>#</th>
-              <th style={{ width: '26%' }}>NHÂN VIÊN</th>
-              <th style={{ width: '20%' }}>PHÒNG BAN / BỘ PHẬN</th>
-              <th style={{ width: '16%' }}>SỐ HỢP ĐỒNG</th>
-              <th style={{ width: '14%' }}>THỜI HẠN</th>
-              <th className="c" style={{ width: '10%' }}>TRẠNG THÁI</th>
-              <th className="c" style={{ width: '9%'  }}>THAO TÁC</th>
+            <tr className="bg-slate-50/50 border-b border-slate-100">
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12">#</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nhân viên</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Bộ phận</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Số HĐ</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Thời hạn</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Trạng thái</th>
+              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Thao tác</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-50">
             {(!parentDeptId || (subDepts.length > 0 && !subDeptId)) ? (
               <tr>
                 <td colSpan="7" className="c" style={{ padding: '80px 20px', color: '#64748b' }}>
@@ -280,51 +293,78 @@ export default function ContractManagement({ user, onBack }) {
                 </td>
               </tr>
             ) : (
-              filtered.map((c, idx) => (
-                <tr key={c.id}>
-                  <td style={{ color: '#94a3b8', fontSize: '11px' }}>{idx + 1}</td>
-                  <td>
-                    <div style={{ fontWeight: '700', color: '#1e293b' }}>{c.employeeName}</div>
-                    <div style={{ fontSize: '11px', color: '#6366f1', fontWeight: '600' }}>{c.positionName || '—'}</div>
+              visibleContracts.map((c, idx) => {
+                const globalIdx = (page - 1) * PER_PAGE + idx + 1;
+                return (
+                <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                  <td className="px-6 py-4 text-[11px] font-bold text-slate-400 group-hover:text-slate-600 transition-colors">{globalIdx}</td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-black text-slate-700">{c.employeeName}</div>
+                    <div className="text-[10px] font-bold text-violet-600 uppercase">{c.positionName || '—'}</div>
                   </td>
-                  <td>
-                    <div style={{ fontSize: '12px', color: '#475569', fontWeight: '600' }}>{c.departmentName || '—'}</div>
+                  <td className="px-6 py-4">
+                    <div className="text-sm font-bold text-slate-500">{c.departmentName || '—'}</div>
                   </td>
-                  <td style={{ fontWeight: '700', color: '#1e293b', fontSize: '12px', fontFamily: 'monospace' }}>
-                    {c.contractNumber || '—'}
+                  <td className="px-6 py-4">
+                    <div className="text-xs font-bold text-slate-700 font-mono tracking-wider">{c.contractNumber || '—'}</div>
                   </td>
-                  <td style={{ fontSize: '11px', color: '#64748b' }}>
-                    {c.startDate ? new Date(c.startDate).toLocaleDateString('vi-VN') : '—'}
-                    {c.endDate ? ` → ${new Date(c.endDate).toLocaleDateString('vi-VN')}` : ' (Vô thời hạn)'}
+                  <td className="px-6 py-4">
+                    <div className="text-[11px] text-slate-500 font-medium">
+                      {c.startDate ? new Date(c.startDate).toLocaleDateString('vi-VN') : '—'}
+                      {c.endDate ? ` → ${new Date(c.endDate).toLocaleDateString('vi-VN')}` : ' (Vô thời hạn)'}
+                    </div>
                   </td>
-                  <td className="c">
+                  <td className="px-6 py-4 text-center">
                     <StatusBadge status={c.status} />
                   </td>
-                  <td className="c">
-                    <div style={{ display: 'flex', justifyContent: 'center', gap: '4px' }}>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-end gap-2">
                       <button
                         onClick={() => setViewingContract(c)}
-                        className="ef-btn"
+                        className="btn btn-ghost !p-2 text-violet-600 border-violet-100 hover:bg-violet-50"
                         title="Xem mẫu hợp đồng A4"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', padding: '4px 8px', background: '#4f46e5', color: '#fff', border: 'none' }}
                       >
-                        <Eye size={11} /> A4
+                        <Eye size={14} /> <span className="text-[10px] font-black">A4</span>
                       </button>
                       <button
                         onClick={() => handleExport(c.id)}
-                        className="ef-btn"
+                        className="btn btn-ghost !p-2 text-slate-600 border-slate-200"
                         title="Tải file Word"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', padding: '4px 8px' }}
                       >
-                        <Download size={11} />
+                        <Download size={14} /> <span className="text-[10px] font-black">DOCX</span>
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
+
+        {/* Pagination Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+            <p className="text-xs font-medium text-slate-400">
+                Hiển thị {visibleContracts.length} trên {filtered.length} hợp đồng
+            </p>
+            <div className="flex items-center gap-2">
+                <button 
+                    disabled={page === 1} 
+                    onClick={() => setPage(p => p - 1)} 
+                    className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 transition-all shadow-sm"
+                >
+                    <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs font-bold text-slate-600 px-2">Trang {page} / {totalPages || 1}</span>
+                <button 
+                    disabled={page >= totalPages} 
+                    onClick={() => setPage(p => p + 1)} 
+                    className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:bg-white hover:text-violet-600 disabled:opacity-30 transition-all shadow-sm"
+                >
+                    <ChevronRight size={16} />
+                </button>
+            </div>
+        </div>
       </div>
 
       {/* ── Contract Template Viewer Modal ── */}
