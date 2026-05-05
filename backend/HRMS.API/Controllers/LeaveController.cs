@@ -245,5 +245,22 @@ namespace HRMS.API.Controllers
                 return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
             }
         }
+        
+        /// <summary>Xuất danh sách nghỉ phép ra Excel</summary>
+        [HttpGet("export")]
+        [Authorize(Roles = "Admin,DepartmentManager,DepartmentHead,HrAdmin")]
+        public async Task<IActionResult> Export([FromQuery] int? departmentId, [FromQuery] int? year)
+        {
+            try
+            {
+                var fileContent = await _leaveService.ExportLeaveToExcelAsync(departmentId, year);
+                var fileName = $"NghiPhep_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+                return File(fileContent, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi xuất file: " + ex.Message });
+            }
+        }
     }
 }

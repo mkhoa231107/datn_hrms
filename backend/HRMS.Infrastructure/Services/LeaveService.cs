@@ -9,6 +9,7 @@ using HRMS.Domain.Enums;
 using HRMS.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using HRMS.Infrastructure.Helpers;
+using Microsoft.AspNetCore.SignalR;
 
 namespace HRMS.Infrastructure.Services
 {
@@ -17,12 +18,14 @@ namespace HRMS.Infrastructure.Services
         private readonly HRMSDbContext _context;
         private readonly INotificationService _notificationService;
         private readonly Microsoft.AspNetCore.Hosting.IWebHostEnvironment _env;
+        private readonly IHubContext<HrmsHubProxy> _hubContext;
 
-        public LeaveService(HRMSDbContext context, INotificationService notificationService, Microsoft.AspNetCore.Hosting.IWebHostEnvironment env)
+        public LeaveService(HRMSDbContext context, INotificationService notificationService, Microsoft.AspNetCore.Hosting.IWebHostEnvironment env, IHubContext<HrmsHubProxy> hubContext)
         {
             _context = context;
             _notificationService = notificationService;
             _env = env;
+            _hubContext = hubContext;
         }
 
         // ===== Reference data =====
@@ -47,20 +50,49 @@ namespace HRMS.Infrastructure.Services
 
         public async Task<IEnumerable<LeaveBalanceDto>> GetMyBalancesAsync(int employeeId, int year)
         {
-            return await _context.LeaveBalances
+            var balances = await _context.LeaveBalances
                 .Where(lb => lb.EmployeeId == employeeId && lb.Year == year)
                 .Include(lb => lb.LeaveType)
-                .Select(lb => new LeaveBalanceDto
-                {
-                    LeaveTypeId = lb.LeaveTypeId,
-                    LeaveTypeName = lb.LeaveType.Name,
-                    IsPaid = lb.LeaveType.IsPaid,
-                    Year = lb.Year,
-                    TotalDays = lb.TotalDays,
-                    UsedDays = lb.UsedDays,
-                    RemainingDays = lb.TotalDays - lb.UsedDays
-                })
                 .ToListAsync();
+
+            if (!balances.Any())
+            {
+                Console.WriteLine($"[LEAVE] Auto-seeding balances for Employee {employeeId} in year {year}");
+                var leaveTypes = await _context.LeaveTypes.Where(lt => lt.IsActive).ToListAsync();
+                if (leaveTypes.Any())
+                {
+                    foreach (var lt in leaveTypes)
+                    {
+                        _context.LeaveBalances.Add(new LeaveBalance
+                        {
+                            EmployeeId = employeeId,
+                            LeaveTypeId = lt.Id,
+                            Year = year,
+                            TotalDays = lt.DefaultDaysPerYear,
+                            UsedDays = 0,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
+                    await _context.SaveChangesAsync();
+                    
+                    // Re-query to get includes
+                    balances = await _context.LeaveBalances
+                        .Where(lb => lb.EmployeeId == employeeId && lb.Year == year)
+                        .Include(lb => lb.LeaveType)
+                        .ToListAsync();
+                }
+            }
+
+            return balances.Select(lb => new LeaveBalanceDto
+            {
+                LeaveTypeId = lb.LeaveTypeId,
+                LeaveTypeName = lb.LeaveType?.Name ?? "N/A",
+                IsPaid = lb.LeaveType?.IsPaid ?? false,
+                Year = lb.Year,
+                TotalDays = lb.TotalDays,
+                UsedDays = lb.UsedDays,
+                RemainingDays = lb.TotalDays - lb.UsedDays
+            }).ToList();
         }
 
         public async Task<IEnumerable<LeaveRequestDto>> GetMyRequestsAsync(int employeeId)
@@ -150,6 +182,27 @@ namespace HRMS.Infrastructure.Services
                 .FirstOrDefaultAsync(lb => lb.EmployeeId == employeeId
                     && lb.LeaveTypeId == dto.LeaveTypeId
                     && lb.Year == year);
+
+            if (balance == null)
+            {
+                Console.WriteLine($"[LEAVE] Auto-seeding balances for Employee {employeeId} during request creation");
+                var leaveTypes = await _context.LeaveTypes.Where(lt => lt.IsActive).ToListAsync();
+                foreach (var lt in leaveTypes)
+                {
+                    var nb = new LeaveBalance
+                    {
+                        EmployeeId = employeeId,
+                        LeaveTypeId = lt.Id,
+                        Year = year,
+                        TotalDays = lt.DefaultDaysPerYear,
+                        UsedDays = 0,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.LeaveBalances.Add(nb);
+                    if (lt.Id == dto.LeaveTypeId) balance = nb;
+                }
+                await _context.SaveChangesAsync();
+            }
 
             if (balance == null)
                 throw new InvalidOperationException($"Bạn chưa có số dư nghỉ phép cho loại '{leaveType.Name}' trong năm {year}.");
@@ -304,6 +357,9 @@ namespace HRMS.Infrastructure.Services
                 Console.WriteLine($"Error sending approver notification: {ex.Message}");
             }
 
+            // ⚡ Real-time trigger for managers to refresh their dashboard
+            await _hubContext.Clients.Group("managers").SendAsync("DashboardRefresh");
+
             // Reload with navigation properties
             await _context.Entry(request).Reference(r => r.LeaveType).LoadAsync();
             await _context.Entry(request).Reference(r => r.Employee).LoadAsync();
@@ -370,24 +426,37 @@ namespace HRMS.Infrastructure.Services
             }
             else if (isManager || isHead)
             {
-                var deptIdString = user.FindFirst("DepartmentId")?.Value;
-                if (int.TryParse(deptIdString, out int deptIdStr) && deptIdStr > 0)
-                {
-                    // Get managed departments
-                    // Managers (Trưởng phòng) see self and children
-                    // Heads (Trưởng bộ phận) ONLY see their exact department to ensure team isolation
-                    List<int> deptIds;
+                    var deptIdString = user.FindFirst("DepartmentId")?.Value;
+                    int deptIdStr = 0;
+                    
+                    if (!int.TryParse(deptIdString, out deptIdStr) || deptIdStr <= 0)
+                    {
+                        // Fallback: lookup the manager's own department if claim is missing
+                        var approver = await _context.Employees.FindAsync(approverId);
+                        deptIdStr = approver?.DepartmentId ?? 0;
+                    }
+
+                    if (deptIdStr <= 0) return Enumerable.Empty<LeaveRequestDto>();
+
+                    // Get all managed department IDs (including children)
+                    List<int> deptIds = new List<int> { deptIdStr };
                     if (isManager)
                     {
-                        deptIds = await _context.Departments
-                            .Where(d => d.Id == deptIdStr || d.ParentDepartmentId == deptIdStr)
+                        var children = await _context.Departments
+                            .Where(d => d.ParentDepartmentId == deptIdStr)
                             .Select(d => d.Id)
                             .ToListAsync();
+                        deptIds.AddRange(children);
+                        
+                        // Check one more level for deep structures
+                        var grandChildren = await _context.Departments
+                            .Where(d => d.ParentDepartmentId != null && children.Contains(d.ParentDepartmentId.Value))
+                            .Select(d => d.Id)
+                            .ToListAsync();
+                        deptIds.AddRange(grandChildren);
                     }
-                    else
-                    {
-                        deptIds = new List<int> { deptIdStr };
-                    }
+                    
+                    deptIds = deptIds.Distinct().ToList();
 
                     // Roles for filtering logic
                     bool isAnyManager = isManager;
@@ -395,31 +464,29 @@ namespace HRMS.Infrastructure.Services
 
                     if (isOnlyHead)
                     {
-                        // ONLY a Head (not a Manager): sees <= 3 days AND NOT from other Heads in their team
+                        // ONLY a Head: sees <= 3 days AND NOT from other Heads
                         query = query.Where(lr => lr.TotalDays <= 3 && 
                                             !_context.UserRoles.Any(ur => ur.UserId == lr.Employee.UserId && ur.Role.RoleName == "DepartmentHead"));
                         
-                        // Base Team filter
+                        // Only same department
                         query = query.Where(lr => lr.Employee.DepartmentId == deptIdStr);
                     }
                     else if (isAnyManager)
                     {
                         // A Manager (Trưởng phòng) sees:
-                        // 1. All requests from DepartmentHeads in their sub-depts (regardless of days)
-                        // 2. Requests >= 3 days from regular employees in their sub-depts
+                        // 1. All requests from DepartmentHeads in their domain (regardless of days)
+                        // 2. Requests > 3 days from regular employees in their domain
                         
                         var headRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName == "DepartmentHead");
                         int headRoleId = headRole?.Id ?? -1;
 
                         query = query.Where(lr => deptIds.Contains(lr.Employee.DepartmentId) && (
-                            // All requests from Heads
+                            // All requests from Heads (Managers are their direct superiors)
                             _context.UserRoles.Any(ur => ur.UserId == lr.Employee.UserId && ur.RoleId == headRoleId) ||
                             // OR Requests > 3 days from others
                             (lr.TotalDays > 3)
                         ));
-                    }
                 }
-                else return Enumerable.Empty<LeaveRequestDto>();
             }
             else
             {
@@ -522,7 +589,7 @@ namespace HRMS.Infrastructure.Services
             {
                 var deptId = int.Parse(user.FindFirst("DepartmentId")?.Value ?? "0");
                 
-                // Requirement check for Head: Same department, NOT another Head, and Short-term (< 3 days)
+                // Head: Same department, NOT another Head, and <= 3 days
                 var isRequesterHead = _context.UserRoles
                     .Include(ur => ur.Role)
                     .Any(ur => ur.UserId == request.Employee.UserId && ur.Role.RoleName == "DepartmentHead");
@@ -561,11 +628,24 @@ namespace HRMS.Infrastructure.Services
                         && lb.LeaveTypeId == request.LeaveTypeId
                         && lb.Year == year);
 
-                if (balance != null)
+                if (balance == null)
                 {
-                    balance.UsedDays += request.TotalDays;
-                    balance.UpdatedAt = DateTime.UtcNow;
+                    // Auto-init balance if it was somehow skipped
+                    var leaveType = await _context.LeaveTypes.FindAsync(request.LeaveTypeId);
+                    balance = new LeaveBalance
+                    {
+                        EmployeeId = request.EmployeeId,
+                        LeaveTypeId = request.LeaveTypeId,
+                        Year = year,
+                        TotalDays = leaveType?.DefaultDaysPerYear ?? 12,
+                        UsedDays = 0,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.LeaveBalances.Add(balance);
                 }
+
+                balance.UsedDays += request.TotalDays;
+                balance.UpdatedAt = DateTime.UtcNow;
 
                 // Update work schedule to reflect leave
                 var schedulesToUpdate = await _context.WorkSchedules
@@ -619,6 +699,11 @@ namespace HRMS.Infrastructure.Services
                     RelatedId = request.Id.ToString()
                 });
 
+                // ⚡ Real-time notify employee
+                await _hubContext.Clients.Group($"employee_{request.EmployeeId}").SendAsync("LeaveStatusUpdated", new { id = request.Id, status = "Approved" });
+                // ⚡ Real-time trigger for managers to refresh dashboard stats
+                await _hubContext.Clients.Group("managers").SendAsync("DashboardRefresh");
+
                 return true;
             }
             catch
@@ -658,6 +743,11 @@ namespace HRMS.Infrastructure.Services
                 RelatedId = request.Id.ToString()
             });
 
+            // ⚡ Real-time notify employee
+            await _hubContext.Clients.Group($"employee_{request.EmployeeId}").SendAsync("LeaveStatusUpdated", new { id = request.Id, status = "Rejected" });
+            // ⚡ Real-time trigger for managers to refresh dashboard stats
+            await _hubContext.Clients.Group("managers").SendAsync("DashboardRefresh");
+
             return true;
         }
 
@@ -670,7 +760,7 @@ namespace HRMS.Infrastructure.Services
 
             // Get schedules for this range to see actual working shifts
             var schedules = await _context.WorkSchedules
-                .Where(s => s.EmployeeId == employeeId && s.WorkingDate >= fromDate && s.WorkingDate <= toDate)
+                .Where(s => s.EmployeeId == employeeId && s.WorkingDate.Date >= fromDate && s.WorkingDate.Date <= toDate)
                 .ToListAsync();
 
             double count = 0;
@@ -691,6 +781,69 @@ namespace HRMS.Infrastructure.Services
                 }
             }
             return count;
+        }
+
+        public async Task<byte[]> ExportLeaveToExcelAsync(int? departmentId, int? year)
+        {
+            var targetYear = year ?? DateTime.Now.Year;
+            var query = _context.LeaveRequests
+                .Include(lr => lr.Employee).ThenInclude(e => e.Department)
+                .Include(lr => lr.LeaveType)
+                .Where(lr => lr.FromDate.Year == targetYear);
+
+            if (departmentId.HasValue && departmentId > 0)
+            {
+                query = query.Where(lr => lr.Employee.DepartmentId == departmentId);
+            }
+
+            var data = await query.OrderByDescending(lr => lr.CreatedAt).ToListAsync();
+
+            using (var workbook = new ClosedXML.Excel.XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Danh sách nghỉ phép");
+
+                // Headers
+                worksheet.Cell(1, 1).Value = "STT";
+                worksheet.Cell(1, 2).Value = "Mã NV";
+                worksheet.Cell(1, 3).Value = "Họ tên";
+                worksheet.Cell(1, 4).Value = "Phòng ban";
+                worksheet.Cell(1, 5).Value = "Loại nghỉ";
+                worksheet.Cell(1, 6).Value = "Từ ngày";
+                worksheet.Cell(1, 7).Value = "Đến ngày";
+                worksheet.Cell(1, 8).Value = "Số ngày";
+                worksheet.Cell(1, 9).Value = "Lý do";
+                worksheet.Cell(1, 10).Value = "Trạng thái";
+
+                // Styling header
+                var headerRange = worksheet.Range(1, 1, 1, 10);
+                headerRange.Style.Font.Bold = true;
+                headerRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
+                headerRange.Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+
+                for (int i = 0; i < data.Count; i++)
+                {
+                    var item = data[i];
+                    int row = i + 2;
+                    worksheet.Cell(row, 1).Value = i + 1;
+                    worksheet.Cell(row, 2).Value = item.Employee.EmployeeCode;
+                    worksheet.Cell(row, 3).Value = item.Employee.FullName;
+                    worksheet.Cell(row, 4).Value = item.Employee.Department?.DepartmentName;
+                    worksheet.Cell(row, 5).Value = item.LeaveType.Name;
+                    worksheet.Cell(row, 6).Value = item.FromDate.ToString("dd/MM/yyyy");
+                    worksheet.Cell(row, 7).Value = item.ToDate.ToString("dd/MM/yyyy");
+                    worksheet.Cell(row, 8).Value = item.TotalDays;
+                    worksheet.Cell(row, 9).Value = item.Reason;
+                    worksheet.Cell(row, 10).Value = item.Status.ToString();
+                }
+
+                worksheet.Columns().AdjustToContents();
+
+                using (var stream = new System.IO.MemoryStream())
+                {
+                    workbook.SaveAs(stream);
+                    return stream.ToArray();
+                }
+            }
         }
 
         private static LeaveRequestDto MapToDto(LeaveRequest lr) => new LeaveRequestDto

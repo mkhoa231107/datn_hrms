@@ -1,17 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
-import { X, User, Calendar, Info, Phone, MapPin, Signature } from 'lucide-react';
+import { X, User, Calendar, Info, Phone, MapPin, Signature, Printer, Save, Check, Clock } from 'lucide-react';
+import SignatureCanvas from 'react-signature-canvas';
 import shiftSwapService from '../../services/shiftSwapService';
-import SignatureModal from '../contracts/SignatureModal';
 import api from '../../api';
+import '../leave/LeavePaper.css';
+
+// Custom helper for trimming signature canvas
+const trimCanvasManual = (canvas) => {
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const pixels = ctx.getImageData(0, 0, width, height);
+    const data = pixels.data;
+    let minX = width, minY = height, maxX = 0, maxY = 0;
+    let found = false;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const alpha = data[(y * width + x) * 4 + 3];
+            if (alpha > 0) {
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+                found = true;
+            }
+        }
+    }
+    if (!found) return null;
+    const trimmedWidth = maxX - minX + 1;
+    const trimmedHeight = maxY - minY + 1;
+    const trimmedCanvas = document.createElement('canvas');
+    trimmedCanvas.width = trimmedWidth;
+    trimmedCanvas.height = trimmedHeight;
+    const trimmedCtx = trimmedCanvas.getContext('2d');
+    trimmedCtx.drawImage(canvas, minX, minY, trimmedWidth, trimmedHeight, 0, 0, trimmedWidth, trimmedHeight);
+    return trimmedCanvas;
+};
 
 const ShiftSwapRequestModal = ({ isOpen, onClose, onRefresh }) => {
     const [submitting, setSubmitting] = useState(false);
-    const [showSignatureModal, setShowSignatureModal] = useState(false);
     const [colleagues, setColleagues] = useState([]);
     const [myProfile, setMyProfile] = useState(null);
     const [shifts, setShifts] = useState([]);
     const [currentAssignedShiftId, setCurrentAssignedShiftId] = useState(null);
+    const sigCanvas = useRef(null);
     
     const [formData, setFormData] = useState({
         partnerId: '',
@@ -39,7 +74,6 @@ const ShiftSwapRequestModal = ({ isOpen, onClose, onRefresh }) => {
     const fetchCurrentAssignedShift = async () => {
         try {
             const res = await api.get(`/workschedules/my-schedule?date=${formData.startDate}`);
-            // Assuming the API returns a schedule object or null
             if (res.data && res.data.shiftId) {
                 setCurrentAssignedShiftId(res.data.shiftId);
             } else {
@@ -53,17 +87,16 @@ const ShiftSwapRequestModal = ({ isOpen, onClose, onRefresh }) => {
 
     const fetchInitialData = async () => {
         try {
-            // Get my profile for dept info and default phone/address
             const profile = await api.get('/employees/my-profile').then(res => res.data);
             setMyProfile(profile);
             
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
+            const defaultDate = new Date();
+            defaultDate.setDate(defaultDate.getDate() + 3);
 
             setFormData(prev => ({
                 ...prev,
-                startDate: tomorrow.toISOString().split('T')[0],
-                endDate: tomorrow.toISOString().split('T')[0],
+                startDate: defaultDate.toISOString().split('T')[0],
+                endDate: defaultDate.toISOString().split('T')[0],
                 phoneNumber: profile.phone || '',
                 address: profile.address || '',
                 signatureA: profile.signature || ''
@@ -72,27 +105,18 @@ const ShiftSwapRequestModal = ({ isOpen, onClose, onRefresh }) => {
             const deptId = profile.departmentId;
             const empList = await api.get(`/employees?departmentId=${deptId}`).then(res => res.data);
             const shiftList = await api.get('/workshifts').then(res => res.data);
-            // Chỉ lấy 4 ca chuẩn: HC, Ca 1 (C1), Ca 2 (C2), Ca 3 (C3)
             const standardCodes = ['HC', 'C1', 'C2', 'C3'];
             const filteredShifts = shiftList.filter(s => standardCodes.includes(s.shiftCode));
             setShifts(filteredShifts);
 
-            // Lọc theo tổ bộ phận (dựa trên tiền tố EmployeeCode, ví dụ HR-REC) và loại bỏ trưởng bộ phận (-MGR)
             const myCodePrefix = profile.employeeCode ? profile.employeeCode.substring(0, profile.employeeCode.lastIndexOf('-')) : '';
-            
             const filteredList = empList.filter(e => {
-                if (e.id === profile.id) return false; // Không chọn chính mình
-                
+                if (e.id === profile.id) return false;
                 if (!e.employeeCode || !profile.employeeCode) return e.departmentId === profile.departmentId;
-
-                // Loại bỏ trưởng bộ phận
                 if (e.employeeCode.toUpperCase().endsWith('-MGR')) return false;
-
-                // Kiểm tra cùng thuộc 1 tổ (ví dụ HR-REC với HR-REC)
                 const targetPrefix = e.employeeCode.substring(0, e.employeeCode.lastIndexOf('-'));
                 return targetPrefix.toUpperCase() === myCodePrefix.toUpperCase();
             });
-            
             setColleagues(filteredList);
 
         } catch (error) {
@@ -106,27 +130,41 @@ const ShiftSwapRequestModal = ({ isOpen, onClose, onRefresh }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleClearSig = () => sigCanvas.current?.clear();
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
+        let finalSignature = formData.signatureA;
+        if (!finalSignature && sigCanvas.current && !sigCanvas.current.isEmpty()) {
+            const canvas = sigCanvas.current.getCanvas();
+            const trimmed = trimCanvasManual(canvas);
+            finalSignature = trimmed ? trimmed.toDataURL('image/png') : null;
+        }
+
         if (!formData.partnerId || !formData.targetShiftId || !formData.startDate || !formData.endDate || !formData.reason) {
-            toast.error("Vui lòng điền đầy đủ thông tin bắt buộc, bao gồm cả Ca đổi sang.");
+            toast.error("Vui lòng điền đầy đủ thông tin bắt buộc.");
             return;
         }
 
-        if (new Date(formData.startDate) > new Date(formData.endDate)) {
-            toast.error('Ngày bắt đầu không thể lớn hơn ngày kết thúc');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const reqDate = new Date(formData.startDate);
+        const diffDays = Math.ceil((reqDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 3) {
+            toast.error("Đơn hoán đổi ca phải được gửi trước ít nhất 3 ngày so với ngày bắt đầu hoán đổi.");
             return;
         }
 
-        if (!formData.signatureA) {
+        if (!finalSignature) {
             toast.error("Vui lòng ký tên điện tử trước khi gửi.");
             return;
         }
 
         setSubmitting(true);
         try {
-            await shiftSwapService.createRequest(formData);
+            await shiftSwapService.createRequest({ ...formData, signatureA: finalSignature });
             toast.success("Gửi đơn hoán đổi ca thành công!");
             onRefresh && onRefresh();
             onClose();
@@ -141,238 +179,190 @@ const ShiftSwapRequestModal = ({ isOpen, onClose, onRefresh }) => {
 
     const selectedPartner = colleagues.find(c => c.id === parseInt(formData.partnerId));
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 overflow-y-auto pt-20">
-            <div className="bg-white w-full max-w-4xl shadow-2xl relative my-auto" style={{ minHeight: '80vh' }}>
-                {/* Close Button */}
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-black">
-                    <X size={24} />
-                </button>
+    return createPortal(
+        <div className="leave-paper-overlay">
+            <div className="leave-paper-container">
+                <div className="leave-paper-header">
+                    <div className="leave-paper-nation">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</div>
+                    <div className="leave-paper-motto">Độc lập – Tự do – Hạnh phúc</div>
+                    <div className="leave-paper-border"></div>
+                    <div className="leave-paper-title">ĐƠN XIN HOÁN ĐỔI CA LÀM VIỆC</div>
+                </div>
 
-                {/* Paper Content */}
-                <div className="p-8 md:p-12 font-sans text-sm text-gray-800 leading-relaxed">
-                    {/* Header */}
-                    <div className="text-center mb-8 border-b-2 border-double border-gray-300 pb-4">
-                        <h4 className="font-bold text-base uppercase">Cộng hòa xã hội chủ nghĩa Việt Nam</h4>
-                        <p className="font-medium">Độc lập - Tự do - Hạnh phúc</p>
-                        <div className="w-32 h-0.5 bg-black mx-auto mt-1"></div>
+                <div className="leave-paper-recipient">
+                    Kính gửi: Ban Giám đốc Công ty và Phòng Hành chính – Nhân sự
+                </div>
+
+                <div className="leave-paper-body">
+                    <div className="leave-paper-row">
+                        <span className="leave-paper-label">Tôi tên là:</span>
+                        <strong className="leave-paper-input" style={{ borderBottom: 'none' }}>
+                            {myProfile?.fullName}
+                        </strong>
                     </div>
 
-                    <div className="mb-8">
-                        <h1 className="text-2xl font-bold text-center uppercase tracking-widest mb-2">Đơn xin hoán đổi ca làm việc (2 chiều)</h1>
-                        <p className="text-center font-medium">Kính gửi: Ban Giám Đốc và Phòng Hành chính – Nhân sự</p>
+                    <div className="leave-paper-row">
+                        <span className="leave-paper-label">Mã nhân viên:</span>
+                        <span className="leave-paper-input">{myProfile?.employeeCode}</span>
+                        <span style={{ marginLeft: '15px', minWidth: '80px' }}>Bộ phận:</span>
+                        <span className="leave-paper-input">{myProfile?.departmentName}</span>
                     </div>
 
-                    <form onSubmit={handleSubmit}>
-                        {/* Section 1: Requester Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 bg-gray-50 p-4 border border-gray-200">
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <User size={16} className="text-blue-700" />
-                                    <span className="font-bold uppercase w-32">Người làm đơn:</span>
-                                    <span className="font-medium underline">{myProfile?.fullName}</span>
+                    <div className="leave-paper-row">
+                        <span className="leave-paper-label">Số điện thoại:</span>
+                        <input 
+                            type="text" 
+                            name="phoneNumber" 
+                            value={formData.phoneNumber} 
+                            onChange={handleInputChange} 
+                            className="leave-paper-input"
+                        />
+                        <span style={{ marginLeft: '15px', minWidth: '80px' }}>Địa chỉ:</span>
+                        <input 
+                            type="text" 
+                            name="address" 
+                            value={formData.address} 
+                            onChange={handleInputChange} 
+                            className="leave-paper-input"
+                        />
+                    </div>
+
+                    <div className="leave-paper-row" style={{ marginTop: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                        <strong className="uppercase">Nội dung hoán đổi:</strong>
+                    </div>
+
+                    <div className="leave-paper-row">
+                        <span className="leave-paper-label">Thời gian từ ngày:</span>
+                        <input 
+                            type="date" 
+                            name="startDate" 
+                            value={formData.startDate} 
+                            onChange={handleInputChange} 
+                            className="leave-paper-input"
+                        />
+                        <span style={{ margin: '0 10px' }}>đến ngày:</span>
+                        <input 
+                            type="date" 
+                            name="endDate" 
+                            value={formData.endDate} 
+                            onChange={handleInputChange} 
+                            className="leave-paper-input"
+                        />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#dc2626', marginBottom: '15px', fontStyle: 'italic', paddingLeft: '160px' }}>
+                        * Lưu ý: Đơn phải gửi trước ít nhất 3 ngày để bộ phận quản lý kịp thời xử lý.
+                    </div>
+
+                    <div className="leave-paper-row">
+                        <span className="leave-paper-label">Chọn ca đổi sang:</span>
+                        <select 
+                            name="targetShiftId" 
+                            value={formData.targetShiftId} 
+                            onChange={handleInputChange} 
+                            className="leave-paper-select"
+                            required
+                        >
+                            <option value="">-- Chọn ca đổi --</option>
+                            {shifts.map(s => (
+                                <option 
+                                    key={s.id} 
+                                    value={s.id} 
+                                    disabled={s.id === currentAssignedShiftId}
+                                >
+                                    {s.shiftName} ({s.startTime.substring(0, 5)} - {s.endTime.substring(0, 5)})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="leave-paper-row">
+                        <span className="leave-paper-label">Đối tác đổi ca (Bên B):</span>
+                        <select 
+                            name="partnerId" 
+                            value={formData.partnerId} 
+                            onChange={handleInputChange} 
+                            className="leave-paper-select"
+                            required
+                        >
+                            <option value="">-- Chọn đồng nghiệp --</option>
+                            {colleagues.map(c => <option key={c.id} value={c.id}>{c.fullName} ({c.employeeCode})</option>)}
+                        </select>
+                    </div>
+
+                    <div className="leave-paper-row">
+                        <span className="leave-paper-label">Lý do điều chỉnh:</span>
+                        <textarea 
+                            name="reason" 
+                            value={formData.reason} 
+                            onChange={handleInputChange} 
+                            className="leave-paper-textarea"
+                            placeholder="Nhập lý do chi tiết..."
+                            required
+                        />
+                    </div>
+
+                    <div className="leave-paper-row" style={{ marginTop: '20px', fontStyle: 'italic', textAlign: 'center', width: '100%', display: 'block' }}>
+                        "Tôi xin hứa sẽ cập nhật đầy đủ nội dung công tác trong thời gian vắng và thực hiện đúng ca làm việc đã đổi."
+                    </div>
+                </div>
+
+                <div className="leave-paper-signatures" style={{ gridTemplateColumns: 'repeat(3, 1fr)', fontSize: '0.8rem' }}>
+                    <div className="sig-box">
+                        <div className="sig-title">NGƯỜI LÀM ĐƠN (Bên A)</div>
+                        <div style={{ fontSize: '0.75rem', fontStyle: 'italic' }}>(Ký và ghi rõ họ tên)</div>
+                        <div className="sig-canvas-wrap">
+                            {formData.signatureA && formData.signatureA !== 'MOCK_SIGNATURE_PROMPT' ? (
+                                <div className="sig-image-wrap">
+                                    <img src={formData.signatureA} alt="Signature A" className="sig-image" />
+                                    <button type="button" onClick={() => setFormData({...formData, signatureA: ''})} style={{ fontSize: '11px', padding: '2px 5px', marginTop: '5px' }}>Ký lại</button>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <Info size={16} className="text-blue-700" />
-                                    <span className="font-bold uppercase w-32">Mã nhân viên:</span>
-                                    <span className="font-medium">{myProfile?.employeeCode}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Phone size={16} className="text-blue-700" />
-                                    <span className="font-bold uppercase w-32">Số điện thoại:</span>
-                                    <input 
-                                        type="text" 
-                                        name="phoneNumber" 
-                                        value={formData.phoneNumber} 
-                                        onChange={handleInputChange} 
-                                        className="border-b border-gray-400 bg-transparent focus:border-blue-700 outline-none flex-1"
+                            ) : (
+                                <>
+                                    <SignatureCanvas 
+                                        ref={sigCanvas}
+                                        penColor="black"
+                                        canvasProps={{ width: 200, height: 100, className: 'sigCanvas' }}
                                     />
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <MapPin size={16} className="text-blue-700" />
-                                    <span className="font-bold uppercase w-32">Địa chỉ:</span>
-                                    <input 
-                                        type="text" 
-                                        name="address" 
-                                        value={formData.address} 
-                                        onChange={handleInputChange} 
-                                        className="border-b border-gray-400 bg-transparent focus:border-blue-700 outline-none flex-1"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Section 2: Swap Details */}
-                        <div className="mb-8">
-                            <h3 className="font-bold uppercase border-b border-gray-300 pb-1 mb-4 flex items-center gap-2">
-                                <Calendar size={18} className="text-blue-700" />
-                                Nội dung hoán đổi
-                            </h3>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Time span */}
-                                <div className="border border-gray-300 p-4 bg-orange-50/50">
-                                    <p className="font-bold text-orange-800 mb-3 border-b border-orange-200 pb-1">THỜI GIAN HOÁN ĐỔI</p>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Từ ngày:</label>
-                                            <input 
-                                                type="date" 
-                                                name="startDate" 
-                                                value={formData.startDate} 
-                                                onChange={handleInputChange} 
-                                                className="w-full border border-gray-300 p-2 focus:ring-1 focus:ring-blue-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Đến ngày:</label>
-                                            <input 
-                                                type="date" 
-                                                name="endDate" 
-                                                value={formData.endDate} 
-                                                onChange={handleInputChange} 
-                                                className="w-full border border-gray-300 p-2 focus:ring-1 focus:ring-blue-500"
-                                            />
-                                        </div>
+                                    <div style={{ marginTop: '5px' }}>
+                                        <button type="button" onClick={handleClearSig} style={{ fontSize: '11px', padding: '2px 5px' }}>Xóa chữ ký</button>
                                     </div>
-                                    <div className="mt-4">
-                                        <label className="block text-xs font-bold uppercase text-gray-600 mb-1">CHỌN CA MUỐN ĐỔI SANG BÊN A LÀ:</label>
-                                        <select 
-                                            name="targetShiftId" 
-                                            value={formData.targetShiftId} 
-                                            onChange={handleInputChange} 
-                                            className="w-full border border-orange-300 p-2 focus:ring-1 focus:ring-orange-500 font-sans font-bold text-orange-800"
-                                            required
-                                        >
-                                            <option value="">-- Chọn ca đổi --</option>
-                                            {shifts.map(s => (
-                                                <option 
-                                                    key={s.id} 
-                                                    value={s.id} 
-                                                    disabled={s.id === currentAssignedShiftId}
-                                                    className={s.id === currentAssignedShiftId ? 'text-gray-400 italic' : ''}
-                                                >
-                                                    {s.shiftName} ({s.startTime.substring(0, 5)} - {s.endTime.substring(0, 5)})
-                                                    {s.id === currentAssignedShiftId ? ' - (Ca hiện tại của Bạn)' : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <p className="text-[11px] text-gray-500 mt-4 italic text-justify">
-                                        * Hệ thống sẽ đổi lịch làm việc của Bạn thành Ca đã chọn ở trên. Còn Đối tác (Bên B) sẽ chịu trách nhiệm làm Ca hiện tại của Bạn.
-                                    </p>
-                                </div>
-
-                                {/* Partner Select */}
-                                <div className="border border-gray-300 p-4 bg-green-50">
-                                    <p className="font-bold text-green-800 mb-3 border-b border-green-200 pb-1">BÊN B (ĐỐI TÁC TRÁO LỊCH)</p>
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-xs font-bold uppercase text-gray-600 mb-1">Chọn đồng nghiệp cùng phòng ban:</label>
-                                            <select 
-                                                name="partnerId" 
-                                                value={formData.partnerId} 
-                                                onChange={handleInputChange} 
-                                                className="w-full border border-gray-300 p-2 focus:ring-1 focus:ring-green-500 font-sans"
-                                                required
-                                            >
-                                                <option value="">-- Chọn đồng nghiệp --</option>
-                                                {colleagues.map(c => <option key={c.id} value={c.id}>{c.fullName} ({c.employeeCode})</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                                </>
+                            )}
                         </div>
+                        <div style={{ marginTop: '10px', fontWeight: 'bold' }}>{myProfile?.fullName}</div>
+                    </div>
 
-                        {/* Section 3: Reason & Commitment */}
-                        <div className="mb-8">
-                            <label className="block font-bold uppercase mb-2">Lý do điều chỉnh:</label>
-                            <textarea 
-                                name="reason" 
-                                value={formData.reason} 
-                                onChange={handleInputChange} 
-                                className="w-full border border-gray-300 p-3 italic bg-yellow-50 min-h-[80px]"
-                                placeholder="Nhập lý do chi tiết tại đây..."
-                                required
-                            />
-                            <p className="mt-4 text-xs italic text-gray-600 text-center">
-                                "Tôi xin hứa sẽ cập nhật đầy đủ nội dung công tác trong thời gian vắng và thực hiện đúng ca làm việc đã đổi."
-                            </p>
+                    <div className="sig-box">
+                        <div className="sig-title">ĐỐI TÁC ĐỔI CA (Bên B)</div>
+                        <div style={{ fontSize: '0.75rem', fontStyle: 'italic' }}>(Chờ xác nhận)</div>
+                        <div className="sig-canvas-wrap" style={{ border: 'none', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ color: '#999', fontStyle: 'italic' }}>— Chưa xác nhận —</span>
                         </div>
+                        <div style={{ marginTop: '10px', fontWeight: 'bold' }}>{selectedPartner?.fullName || '............................'}</div>
+                    </div>
 
-                        {/* Section 4: Signature Blocks */}
-                        <div className="grid grid-cols-4 gap-4 mt-12 border-t pt-8 text-center text-[11px]">
-                            <div className="flex flex-col items-center">
-                                <p className="font-bold mb-8 h-12">Người làm đơn<br/>(Bên A)</p>
-                                <div className="w-full h-24 border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 mb-2 overflow-hidden">
-                                    {formData.signatureA && formData.signatureA !== 'MOCK_SIGNATURE_PROMPT' ? (
-                                        <img src={formData.signatureA} alt="Signature A" className="max-h-full" />
-                                    ) : (
-                                        <button 
-                                            type="button"
-                                            onClick={() => setShowSignatureModal(true)}
-                                            className="text-blue-600 hover:underline flex items-center gap-1"
-                                        >
-                                            <Signature size={14} /> Ký tên
-                                        </button>
-                                    )}
-                                </div>
-                                <p className="font-bold">{myProfile?.fullName || '............................'}</p>
-                            </div>
-                            
-                            <div className="flex flex-col items-center opacity-50">
-                                <p className="font-bold mb-8 h-12">Người đồng ý đổi<br/>(Bên B)</p>
-                                <div className="w-full h-24 border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 mb-2">
-                                    <span className="text-gray-400">Chờ xác nhận</span>
-                                </div>
-                                <p className="font-bold">{selectedPartner?.fullName || '............................'}</p>
-                            </div>
-
-                            <div className="flex flex-col items-center opacity-50">
-                                <p className="font-bold mb-8 h-12">Trưởng bộ phận<br/>xác nhận</p>
-                                <div className="w-full h-24 border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 mb-2">
-                                    <span className="text-gray-400">Chờ duyệt</span>
-                                </div>
-                                <p className="font-bold">............................</p>
-                            </div>
-
-                            <div className="flex flex-col items-center opacity-50">
-                                <p className="font-bold mb-8 h-12">Xác nhận của<br/>phòng Nhân sự</p>
-                                <div className="w-full h-24 border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 mb-2">
-                                    <span className="text-gray-400">Chờ xác nhận</span>
-                                </div>
-                                <p className="font-bold">............................</p>
-                            </div>
+                    <div className="sig-box">
+                        <div className="sig-title">TRƯỞNG BỘ PHẬN</div>
+                        <div style={{ fontSize: '0.75rem', fontStyle: 'italic' }}>(Phê duyệt)</div>
+                        <div className="sig-canvas-wrap" style={{ border: 'none', height: '100px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <span style={{ color: '#999', fontStyle: 'italic' }}>— Chờ duyệt —</span>
                         </div>
+                        <div style={{ marginTop: '10px', fontWeight: 'bold' }}>............................</div>
+                    </div>
+                </div>
 
-                        {/* Actions */}
-                        <div className="mt-12 flex justify-end gap-3 no-print">
-                            <button type="button" onClick={onClose} className="px-6 py-2 border border-gray-300 text-gray-600 hover:bg-gray-100 font-bold uppercase text-xs">Hủy bỏ</button>
-                            <button 
-                                type="submit" 
-                                disabled={submitting}
-                                className="px-8 py-2 bg-blue-700 text-white hover:bg-blue-800 font-bold uppercase text-xs shadow-lg flex items-center gap-2"
-                            >
-                                {submitting ? 'Đang xử lý...' : 'Gửi đơn phê duyệt'}
-                            </button>
-                        </div>
-                    </form>
+                <div className="leave-paper-footer">
+                    <button className="paper-btn paper-btn-secondary" onClick={onClose}>
+                        <X size={18} /> Đóng
+                    </button>
+                    <button className="paper-btn paper-btn-primary" onClick={handleSubmit} disabled={submitting}>
+                        {submitting ? <Clock size={18} className="animate-spin" /> : <Save size={18} />}
+                        {submitting ? 'Đang gửi...' : 'Gửi Đơn'}
+                    </button>
                 </div>
             </div>
-
-            {showSignatureModal && (
-                <SignatureModal 
-                    onClose={() => setShowSignatureModal(false)}
-                    onConfirm={(signature) => {
-                        setFormData(prev => ({ ...prev, signatureA: signature }));
-                        setShowSignatureModal(false);
-                    }}
-                />
-            )}
-        </div>
+        </div>,
+        document.body
     );
 };
 

@@ -31,6 +31,7 @@ namespace HRMS.Application.DTOs.Attendance
     {
         public int Id { get; set; }
         public int EmployeeId { get; set; }
+        public string EmployeeCode { get; set; } = string.Empty;
         public string EmployeeName { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; }
         public string Type { get; set; } = string.Empty; // CheckIn/CheckOut
@@ -47,6 +48,7 @@ namespace HRMS.Application.DTOs.Attendance
     {
         public int Id { get; set; }
         public int EmployeeId { get; set; }
+        public string EmployeeCode { get; set; } = string.Empty;
         public string EmployeeName { get; set; } = string.Empty;
         public int PeriodId { get; set; }
         public string PeriodName { get; set; } = string.Empty;
@@ -61,6 +63,7 @@ namespace HRMS.Application.DTOs.Attendance
         public int? ApprovedById { get; set; }
         public string? ApproverName { get; set; }
         public DateTime? ApprovedAt { get; set; }
+        public string DepartmentName { get; set; } = string.Empty;
         public bool IsAdmin { get; set; }
     }
 

@@ -51,13 +51,14 @@ import ShiftChangeApproval from './components/scheduling/ShiftChangeApproval';
 import UserRoles from './components/admin/UserRoles';
 import AccountantDashboard from './components/dashboard/AccountantDashboard';
 import AttendanceSummaryReport from './components/attendance/AttendanceSummaryReport';
+import CnbDashboard from './components/dashboard/CnbDashboard';
 import BottomNav from './components/layout/BottomNav';
 import { useBreakpoint } from './hooks/useBreakpoint';
 // Default tab per role when first logged in
 const DEFAULT_TAB = {
   Admin: 'admin-roles',
   Accountant: 'payroll-processing',
-  CnbSpecialist: 'employees',
+  CnbSpecialist: 'cnb-dashboard',
   DepartmentManager: 'me',
   DepartmentHead: 'me',
   Employee: 'me',
@@ -376,7 +377,7 @@ export default function App() {
           {/* ── Team Management (Team Leader) ── */}
 
           {tab('team-timesheets') && (
-            <RoleGuard user={user} allowedRoles={['DepartmentManager', 'Admin']}>
+            <RoleGuard user={user} allowedRoles={['CnbSpecialist', 'Admin']}>
               <TimesheetApproval user={user} onBack={() => setActiveTab('me')} />
             </RoleGuard>
           )}
@@ -420,6 +421,13 @@ export default function App() {
           )}
 
 
+
+          {/* ── C&B Specialist Dashboard ── */}
+          {tab('cnb-dashboard') && (
+            <RoleGuard user={user} allowedRoles={['CnbSpecialist']}>
+              <CnbDashboard onNavigate={handleTabChange} />
+            </RoleGuard>
+          )}
 
           {/* ── C&B Specialist / Accountant ── */}
           {tab('payroll-processing') && (
@@ -527,15 +535,15 @@ export default function App() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(8px)',
-            color: '#1e293b',
+            background: 'var(--bg-surface)',
+            backdropFilter: 'blur(12px)',
+            color: 'var(--text-primary)',
             padding: '12px 24px',
             borderRadius: '12px',
             fontSize: '14px',
             fontWeight: '600',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: 'var(--shadow-elevated)',
+            border: '1px solid var(--border)',
           },
           success: {
             iconTheme: {
@@ -543,9 +551,9 @@ export default function App() {
               secondary: '#fff',
             },
             style: {
-              background: 'rgba(236, 253, 245, 0.9)',
-              color: '#065f46',
-              border: '1px solid rgba(167, 243, 208, 0.5)',
+              background: 'rgba(16, 185, 129, 0.1)',
+              color: '#10B981',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
             },
           },
           error: {
@@ -554,9 +562,9 @@ export default function App() {
               secondary: '#fff',
             },
             style: {
-              background: 'rgba(254, 242, 242, 0.9)',
-              color: '#991b1b',
-              border: '1px solid rgba(254, 226, 226, 0.5)',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: '#EF4444',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
             },
           },
         }}

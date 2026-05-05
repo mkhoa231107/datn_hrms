@@ -232,12 +232,37 @@ export default function PayrollSettings({ onBack }) {
                                     </div>
                                     <div className="flex flex-col gap-2">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lương tối thiểu vùng (VND)</label>
-                                        <input 
-                                            type="number" value={settings.regionBaseSalary}
-                                            onChange={e => setSettings({ ...settings, regionBaseSalary: parseInt(e.target.value) })}
-                                            className="input !py-3 !text-lg font-black text-slate-700 bg-slate-50/50 border-slate-200"
-                                        />
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter italic">Vùng 1 (Hà Nội, TP.HCM): 4,680,000đ</p>
+                                        <select
+                                            value={(() => {
+                                                const wages = { 1: 5310000, 2: 4730000, 3: 4140000, 4: 3700000 };
+                                                return Object.entries(wages).find(([, v]) => v === settings.regionBaseSalary)?.[0] ?? '1';
+                                            })()}
+                                            onChange={e => {
+                                                const wages = { 1: 5310000, 2: 4730000, 3: 4140000, 4: 3700000 };
+                                                setSettings({ ...settings, regionBaseSalary: wages[e.target.value] });
+                                            }}
+                                            className="input !py-3 !text-lg font-black text-slate-700 bg-slate-50/50 border-slate-200 cursor-pointer"
+                                        >
+                                            <option value="1">Vùng I — 5,310,000 đ</option>
+                                            <option value="2">Vùng II — 4,730,000 đ</option>
+                                            <option value="3">Vùng III — 4,140,000 đ</option>
+                                            <option value="4">Vùng IV — 3,700,000 đ</option>
+                                        </select>
+                                        {(() => {
+                                            const info = {
+                                                5310000: { region: 'I', areas: 'Hà Nội, TP.HCM, Bình Dương, Đồng Nai...', cap: '106,200,000' },
+                                                4730000: { region: 'II', areas: 'Hải Phòng, Đà Nẵng, Cần Thơ, Bà Rịa...', cap: '94,600,000' },
+                                                4140000: { region: 'III', areas: 'Các tỉnh thành còn lại (thị xã, TP tỉnh)', cap: '82,800,000' },
+                                                3700000: { region: 'IV', areas: 'Khu vực nông thôn còn lại', cap: '74,000,000' },
+                                            }[settings.regionBaseSalary];
+                                            return info ? (
+                                                <div className="bg-rose-50 border border-rose-100 rounded-lg px-3 py-2 mt-1">
+                                                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Vùng {info.region} · Nghị định 2026</p>
+                                                    <p className="text-[10px] font-bold text-slate-500 mt-0.5">{info.areas}</p>
+                                                    <p className="text-[10px] font-bold text-rose-500 mt-0.5">Trần đóng BH tối đa: {info.cap} đ (×20)</p>
+                                                </div>
+                                            ) : null;
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -245,15 +270,15 @@ export default function PayrollSettings({ onBack }) {
 
                         {/* Sidebar Actions */}
                         <div className="space-y-6">
-                            <div className="card !p-8 bg-violet-600 text-white shadow-xl shadow-violet-200 border-none">
-                                <h3 className="text-xl font-black mb-4">Lưu cấu hình</h3>
-                                <p className="text-violet-100 text-sm font-medium mb-8 leading-relaxed">
+                            <div className="card !p-8 bg-violet-50 border-violet-100 shadow-xl shadow-violet-100/50">
+                                <h3 className="text-xl font-black mb-4 text-violet-900">Lưu cấu hình</h3>
+                                <p className="text-violet-600 text-sm font-semibold mb-8 leading-relaxed opacity-80">
                                     Mọi thay đổi tham số sẽ được áp dụng trực tiếp cho các kỳ tính lương tiếp theo. Dữ liệu lương đã chốt trong quá khứ sẽ không bị ảnh hưởng.
                                 </p>
                                 <button 
                                     onClick={handleSaveOverview}
                                     disabled={saving}
-                                    className="w-full py-4 bg-white text-violet-600 font-black rounded-2xl hover:bg-violet-50 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
+                                    className="w-full py-4 bg-violet-600 text-white font-black rounded-2xl hover:bg-violet-700 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
                                 >
                                     {saving ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
                                     CẬP NHẬT THAM SỐ

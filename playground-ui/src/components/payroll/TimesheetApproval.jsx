@@ -36,6 +36,9 @@ export default function TimesheetApproval({ user, onBack }) {
             // Nếu không phải admin, chỉ lấy phòng ban của user và phòng ban con
             if (!isAdmin && user?.departmentId) {
                 depts = depts.filter(d => d.id === user.departmentId || d.parentDepartmentId === user.departmentId);
+            } else if (isAdmin) {
+                // Admin/CnbSpecialist chỉ xem phòng ban cấp cao nhất (nguyên phòng ban lớn)
+                depts = depts.filter(d => !d.parentDepartmentId);
             }
             
             setDepartments(depts);
@@ -175,6 +178,7 @@ export default function TimesheetApproval({ user, onBack }) {
         const matchesSearch = s.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) || 
                              s.employeeCode?.toLowerCase().includes(searchQuery.toLowerCase());
         if (!matchesSearch) return false;
+        if (s.employeeId == user?.employeeId) return false;
         if (!isAdmin) {
             if (s.employeeId == user?.employeeId) return false;
             if (s.isAdmin) return false;

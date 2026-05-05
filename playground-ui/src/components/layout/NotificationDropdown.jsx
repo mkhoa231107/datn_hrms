@@ -15,9 +15,11 @@ import {
     XCircle,
     DollarSign
 } from 'lucide-react';
+import { useSignalR } from '../../hooks/useSignalR';
 
 export default function NotificationDropdown({ user, onClose }) {
     const [notifications, setNotifications] = useState([]);
+
     const [loading, setLoading] = useState(true);
     const [selectedNotif, setSelectedNotif] = useState(null);
     const dropdownRef = useRef(null);
@@ -33,6 +35,18 @@ export default function NotificationDropdown({ user, onClose }) {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    // 🔔 Lắng nghe real-time từ SignalR
+    useSignalR({
+        onNotification: (newNotif) => {
+            // Thêm thông báo mới lên đầu danh sách
+            setNotifications(prev => {
+                // Tránh duplicate nếu fetch API và signalR về cùng lúc
+                if (prev.some(n => n.id === newNotif.id)) return prev;
+                return [newNotif, ...prev];
+            });
+        }
+    });
 
     const fetchNotifications = async () => {
         try {
@@ -127,26 +141,25 @@ export default function NotificationDropdown({ user, onClose }) {
         <>
             <div 
                 ref={dropdownRef}
-                className="absolute right-[-60px] sm:right-0 mt-2 w-[calc(100vw-24px)] xs:w-[360px] sm:w-[400px] bg-white rounded-lg border border-slate-200 shadow-2xl z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right text-[#333]"
-                style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
+                className="absolute right-[-60px] sm:right-0 mt-2 w-[calc(100vw-24px)] xs:w-[360px] sm:w-[400px] bg-surface rounded-lg border border-border shadow-2xl z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right text-primary"
             >
                 {/* Header */}
-                <div className="px-4 py-2 border-b border-[#ccc] flex items-center justify-between bg-[#f4f4f4]">
+                <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-elevated/50">
                     <div className="flex items-center gap-2">
-                        <Bell className="w-4 h-4 text-[#1a56db]" />
-                        <h3 className="font-bold text-[13px] text-[#333] uppercase">Thông báo</h3>
+                        <Bell className="w-4 h-4 text-accent" />
+                        <h3 className="font-bold text-[13px] text-primary uppercase">Thông báo</h3>
                     </div>
                     <div className="flex items-center gap-2">
                         {notifications.some(n => n.status === 'Unread') && (
                             <button 
                                 onClick={handleMarkAllAsRead}
-                                className="text-[11px] font-bold text-[#1a56db] hover:underline px-2 py-1 transition-colors uppercase"
+                                className="text-[11px] font-bold text-accent hover:underline px-2 py-1 transition-colors uppercase"
                             >
                                 Đọc tất cả
                             </button>
                         )}
-                        <button onClick={onClose} className="p-1 hover:bg-[#ddd] border border-transparent hover:border-[#bbb] transition-colors">
-                            <X className="w-4 h-4 text-[#666]" />
+                        <button onClick={onClose} className="p-1 hover:bg-accent/10 rounded transition-colors">
+                            <X className="w-4 h-4 text-secondary" />
                         </button>
                     </div>
                 </div>
@@ -154,54 +167,61 @@ export default function NotificationDropdown({ user, onClose }) {
                 {/* List */}
                 <div className="max-h-[420px] overflow-y-auto custom-scrollbar">
                     {loading ? (
-                        <div className="p-10 text-center bg-white">
-                            <div className="w-5 h-5 border-2 border-[#1a56db] border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                            <p className="text-[11px] text-[#999] font-bold uppercase tracking-widest">Đang tải...</p>
+                        <div className="p-10 text-center bg-surface">
+                            <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                            <p className="text-[11px] text-secondary font-bold uppercase tracking-widest">Đang tải...</p>
                         </div>
                     ) : notifications.length === 0 ? (
-                        <div className="p-12 text-center bg-white">
-                            <div className="w-12 h-12 bg-[#f4f4f4] border border-[#eee] rounded-none flex items-center justify-center mx-auto mb-4">
-                                <Bell className="w-6 h-6 text-[#ccc]" />
+                        <div className="p-12 text-center bg-surface">
+                            <div className="w-12 h-12 bg-elevated border border-border rounded-lg flex items-center justify-center mx-auto mb-4">
+                                <Bell className="w-6 h-6 text-secondary opacity-30" />
                             </div>
-                            <p className="text-[13px] font-bold text-[#aaa] uppercase tracking-widest">Không có thông báo mới</p>
+                            <p className="text-[13px] font-bold text-secondary uppercase tracking-widest">Không có thông báo mới</p>
                         </div>
                     ) : (
-                        <div className="bg-white">
+                        <div className="bg-surface">
                             {notifications.map((notif) => (
                                 <div 
                                     key={notif.id} 
-                                    className={`p-4 border-b border-[#eee] last:border-0 transition-colors group cursor-pointer ${
-                                        notif.status === 'Unread' ? 'bg-[#f0f7ff] hover:bg-[#e6effc]' : 'hover:bg-[#f5f5f5]'
+                                    className={`relative p-5 border-b border-border/40 last:border-0 transition-all duration-300 group cursor-pointer ${
+                                        notif.status === 'Unread' 
+                                        ? 'bg-accent/[0.03] hover:bg-accent/[0.06]' 
+                                        : 'hover:bg-elevated/60'
                                     }`}
                                     onClick={() => handleNotificationClick(notif)}
                                 >
-                                    <div className="flex gap-4 relative">
+                                    <div className="flex gap-5 relative z-10">
+                                        {/* Status Indicator */}
                                         {notif.status === 'Unread' && (
-                                            <div className="absolute -left-4 top-1 w-1 h-3 bg-[#1a56db]" />
+                                            <div className="absolute -left-5 top-0 w-1 h-full bg-accent shadow-[0_0_10px_rgba(167,139,250,0.5)]" />
                                         )}
-                                        <div className={`w-10 h-10 border border-[#eee] flex items-center justify-center shrink-0 ${getIconBg(notif.type, notif.title)}`}>
+                                        
+                                        {/* Icon Container */}
+                                        <div className={`w-11 h-11 rounded-2xl border border-border/50 flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105 duration-300 ${getIconBg(notif.type, notif.title)}`}>
                                             {getIcon(notif.type, notif.title)}
                                         </div>
+
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between mb-0.5">
-                                                <p className={`text-[13px] ${notif.status === 'Unread' ? 'font-bold text-[#1a56db]' : 'text-[#333]'} truncate`}>
+                                            <div className="flex items-start justify-between mb-1">
+                                                <p className={`text-[14px] leading-snug ${notif.status === 'Unread' ? 'font-bold text-primary' : 'text-primary/90'} truncate group-hover:text-accent transition-colors`}>
                                                     {notif.title}
                                                 </p>
-                                                <span className="text-[10px] text-[#999] font-bold uppercase whitespace-nowrap ml-2">
+                                                <span className="text-[10px] text-secondary font-bold uppercase tracking-tighter whitespace-nowrap ml-3 opacity-60">
                                                     {getTimeAgo(notif.createdAt)}
                                                 </span>
                                             </div>
-                                            <p className={`text-[12px] leading-relaxed line-clamp-1 ${notif.status === 'Unread' ? 'text-[#555]' : 'text-[#888]'}`}>
+                                            
+                                            <p className={`text-[12.5px] leading-relaxed line-clamp-2 mb-3 ${notif.status === 'Unread' ? 'text-primary/70' : 'text-secondary/80'}`}>
                                                 {notif.message}
                                             </p>
                                             
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <span className={`text-[10px] font-bold uppercase border px-2 py-0.5 ${
-                                                    notif.type === 'Overtime' ? 'bg-[#f0f7ff] text-[#1a56db] border-[#1a56db]/30' : 
-                                                    notif.type === 'Leave' ? 'bg-[#fef9c3] text-[#a16207] border-[#a16207]/30' : 
-                                                    notif.type === 'ShiftSwap' ? 'bg-[#f5f3ff] text-[#7c3aed] border-[#7c3aed]/30' :
-                                                    notif.type === 'Payslip' ? 'bg-[#f5f3ff] text-[#7c3aed] border-[#7c3aed]/30' :
-                                                    'bg-[#f5f3ff] text-[#4f46e5] border-[#4f46e5]/30'
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[9px] font-extrabold uppercase px-2.5 py-1 rounded-full border tracking-widest ${
+                                                    notif.type === 'Overtime' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 
+                                                    notif.type === 'Leave' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 
+                                                    notif.type === 'ShiftSwap' ? 'bg-purple-500/10 text-purple-500 border-purple-500/20' :
+                                                    notif.type === 'Payslip' ? 'bg-violet-500/10 text-violet-500 border-violet-500/20' :
+                                                    'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
                                                 }`}>
                                                     {notif.type === 'Overtime' ? 'Tăng ca' :
                                                      notif.type === 'Leave' ? 'Nghỉ phép' :
@@ -209,7 +229,15 @@ export default function NotificationDropdown({ user, onClose }) {
                                                      notif.type === 'Payslip' ? 'Phiếu lương' :
                                                      'Điều chỉnh'}
                                                 </span>
+                                                {notif.status === 'Unread' && (
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                                                )}
                                             </div>
+                                        </div>
+                                        
+                                        {/* Decorative arrow on hover */}
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute right-0 top-1/2 -translate-y-1/2 text-accent">
+                                            <ChevronRight size={16} />
                                         </div>
                                     </div>
                                 </div>
@@ -219,8 +247,8 @@ export default function NotificationDropdown({ user, onClose }) {
                 </div>
 
                 {/* Footer */}
-                <div className="p-2.5 bg-[#f9f9f9] border-t border-[#ccc] text-center">
-                    <button className="text-[11px] font-bold text-[#666] hover:text-[#1a56db] uppercase tracking-widest transition-all">
+                <div className="p-2.5 bg-elevated/50 border-t border-border text-center">
+                    <button className="text-[11px] font-bold text-secondary hover:text-accent uppercase tracking-widest transition-all">
                         Tất cả thông báo
                     </button>
                 </div>

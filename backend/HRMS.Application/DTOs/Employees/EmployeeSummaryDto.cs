@@ -20,6 +20,7 @@ namespace HRMS.Application.DTOs.Employees
         public string? Religion { get; set; }
         public string? IdentityNumber { get; set; }
         public bool IsActive { get; set; }
+        public decimal Coefficient { get; set; }
     }
 }
 

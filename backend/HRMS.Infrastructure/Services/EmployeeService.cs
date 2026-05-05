@@ -105,6 +105,7 @@ namespace HRMS.Infrastructure.Services
             employee.CurrentAddress = dto.CurrentAddress ?? employee.CurrentAddress;
             employee.Avatar = dto.Avatar ?? employee.Avatar;
             employee.PlaceOfOrigin = dto.PlaceOfOrigin ?? employee.PlaceOfOrigin;
+            employee.Nationality = dto.Nationality ?? employee.Nationality;
             employee.Ethnicity = dto.Ethnicity ?? employee.Ethnicity;
             employee.Religion = dto.Religion ?? employee.Religion;
             employee.UpdatedAt = DateTime.UtcNow;
@@ -127,6 +128,7 @@ namespace HRMS.Infrastructure.Services
             employee.DateOfBirth = dto.DateOfBirth ?? employee.DateOfBirth;
             employee.Gender = dto.Gender ?? employee.Gender;
             employee.PlaceOfOrigin = dto.PlaceOfOrigin ?? employee.PlaceOfOrigin;
+            employee.Nationality = dto.Nationality ?? employee.Nationality;
             employee.Ethnicity = dto.Ethnicity ?? employee.Ethnicity;
             employee.Religion = dto.Religion ?? employee.Religion;
             employee.IdentityNumber = dto.IdentityNumber ?? employee.IdentityNumber;
@@ -181,6 +183,7 @@ namespace HRMS.Infrastructure.Services
                     Religion = e.Religion,
                     IdentityNumber = e.IdentityNumber,
                     IsActive = e.IsActive,
+                    Coefficient = e.Coefficient,
                     HasFaceDescriptor = e.FaceDescriptor != null && e.FaceDescriptor != string.Empty
                 })
                 .ToListAsync();

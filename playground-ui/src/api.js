@@ -1,10 +1,10 @@
 import axios from 'axios';
 
 // --- CHẾ ĐỘ TEST LOCAL ---
-export const BASE_URL = "http://localhost:5052"; 
+// export const BASE_URL = "http://localhost:5052"; 
 
 // --- CHẾ ĐỘ PRODUCTION (KHI UP LÊN HOST) ---
-// export const BASE_URL = "https://api.hrms.io.vn"; 
+export const BASE_URL = "https://api.hrms.io.vn"; 
 
 const API_BASE = `${BASE_URL}/api`;
 
@@ -235,6 +235,12 @@ export const leaveService = {
   rejectRequest: async (id, note) => {
     const res = await api.post(`/leave/request/${id}/reject`, { note });
     return res.data;
+  },
+  exportExcel: async (departmentId, year) => {
+    return await api.get('/leave/export', {
+      params: { departmentId, year },
+      responseType: 'blob'
+    });
   }
 };
 
@@ -255,7 +261,16 @@ export const attendanceService = {
     const res = await api.post('/attendance/scan-barcode', { employeeCode });
     return res.data;
   },
-
+  exportDailyExcel: async (departmentId, date) => {
+    return await api.get(`/attendance/department/${departmentId}/date/${date}/export`, {
+      responseType: 'blob'
+    });
+  },
+  exportTimesheetExcel: async (departmentId, periodId) => {
+    return await api.get(`/attendance/department/${departmentId}/export/${periodId}`, {
+      responseType: 'blob'
+    });
+  }
 };
 
 

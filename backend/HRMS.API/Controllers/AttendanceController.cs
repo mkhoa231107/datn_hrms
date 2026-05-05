@@ -344,7 +344,7 @@ namespace HRMS.API.Controllers
                 var approverId = GetEmployeeId();
                 var isHead = User.IsInRole("DepartmentHead");
                 var isManager = User.IsInRole("DepartmentManager");
-                var isAdmin = User.IsInRole("Admin") || User.IsInRole("HrAdmin");
+                var isAdmin = User.IsInRole("Admin") || User.IsInRole("HrAdmin") || User.IsInRole("CnbSpecialist");
                 
                 var success = await _attendanceService.ApproveTimesheetAsync(summaryId, approverId, isHead, isManager, isAdmin);
                 if (success)
@@ -371,7 +371,7 @@ namespace HRMS.API.Controllers
                 var approverId = GetEmployeeId();
                 var isHead = User.IsInRole("DepartmentHead");
                 var isManager = User.IsInRole("DepartmentManager");
-                var isAdmin = User.IsInRole("Admin") || User.IsInRole("HrAdmin");
+                var isAdmin = User.IsInRole("Admin") || User.IsInRole("HrAdmin") || User.IsInRole("CnbSpecialist");
                 
                 var count = await _attendanceService.ApproveAllTimesheetsAsync(departmentId, periodId, approverId, isHead, isManager, isAdmin);
                 return Ok(new { success = true, count, message = $"Đã thực hiện thao tác thành công cho {count} bản ghi công!" });
@@ -437,6 +437,34 @@ namespace HRMS.API.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = "Lỗi hệ thống: " + ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// [MANAGER] Xuất chấm công ngày ra file Excel
+        /// </summary>
+        [HttpGet("department/{departmentId}/date/{date}/export")]
+        [Authorize(Roles = "Admin,DepartmentManager,CnbSpecialist")]
+        public async Task<IActionResult> ExportDaily(int departmentId, string date)
+        {
+            try
+            {
+                if (!DateTime.TryParseExact(date, new[] { "yyyy-MM-dd", "yyyy/MM/dd", "dd-MM-yyyy", "dd/MM/yyyy" },
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out DateTime parsedDate))
+                {
+                    return BadRequest(new { success = false, message = "Định dạng ngày không hợp lệ. Vui lòng dùng yyyy-MM-dd." });
+                }
+                parsedDate = DateTime.SpecifyKind(parsedDate.Date, DateTimeKind.Local);
+
+                ValidateDepartmentAccess(departmentId);
+                var excelData = await _attendanceService.ExportDailyAttendanceToExcelAsync(departmentId, parsedDate);
+                var fileName = $"ChamCongNgay_{departmentId}_{parsedDate:yyyyMMdd}.xlsx";
+                return File(excelData, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = "Lỗi khi xuất file: " + ex.Message });
             }
         }
 

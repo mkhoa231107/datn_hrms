@@ -64,7 +64,7 @@ namespace HRMS.Infrastructure.Seeders
                 return;
             }
 
-            bool workersExist = await context.Employees.AnyAsync(e => e.EmployeeCode == "PRD-ASS-001");
+            bool workersExist = await context.Employees.AnyAsync(e => e.EmployeeCode == "PRD-ASS-W-001");
             if (workersExist)
             {
                 Console.WriteLine("⏩ PRD-ASS workers already exist. Skipping employee seeding, but will regenerate schedules...");
@@ -81,8 +81,8 @@ namespace HRMS.Infrastructure.Seeders
                         
                         for (int i = 1; i <= 151; i++)
                         {
-                            string code = $"PRD-ASS-{i:D3}";
-                            string username = $"prd_ass_{i:D2}";
+                            string code = $"PRD-ASS-W-{i:D3}";
+                            string username = $"prd_ass_w_{i:D2}";
                             // Use deterministic name first to generate correct email
                             string fullName = $"{Surnames[i % Surnames.Length]} {MiddleNames[i % MiddleNames.Length]} {FirstNames[i % FirstNames.Length]}";
                             string email = DataFixSeeder.GenerateWorkEmail(fullName, code);
@@ -145,7 +145,7 @@ namespace HRMS.Infrastructure.Seeders
                                 IsActive = true,
                                 Status = Domain.Enums.ContractStatus.Active,
                                 CreatedAt = DateTime.UtcNow,
-                                ShiftId = c1,
+                                ShiftId = (i % 3 == 0) ? c1 : (i % 3 == 1 ? c2 : c3),
                                 TargetDepartmentId = deptId,
                                 TargetPositionId = currentPosId,
                                 UpdatedAt = DateTime.UtcNow

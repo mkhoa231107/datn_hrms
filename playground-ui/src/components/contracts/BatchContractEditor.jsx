@@ -19,11 +19,15 @@ export default function BatchContractEditor({ batchId, onClose, onSuccess }) {
   const [selectedSubDeptId, setSelectedSubDeptId] = useState(null);
   const [searchCode, setSearchCode] = useState('');
   const [searchName, setSearchName] = useState('');
+  const [allPositions, setAllPositions] = useState([]);
+  const [payrollSettings, setPayrollSettings] = useState(null);
 
   useEffect(() => {
     fetchBatchDetails();
     fetchEmployees();
     fetchDepartments();
+    fetchPositions();
+    fetchPayrollSettings();
   }, [batchId]);
 
   const fetchBatchDetails = async () => {
@@ -56,6 +60,24 @@ export default function BatchContractEditor({ batchId, onClose, onSuccess }) {
     }
   };
 
+  const fetchPositions = async () => {
+    try {
+      const response = await api.get('/positions');
+      setAllPositions(response.data || []);
+    } catch (error) {
+      console.error('Error fetching positions:', error);
+    }
+  };
+
+  const fetchPayrollSettings = async () => {
+    try {
+      const response = await api.get('/payroll/settings');
+      setPayrollSettings(response.data || null);
+    } catch (error) {
+      console.error('Error fetching payroll settings:', error);
+    }
+  };
+
   const addEmployeesToBatch = () => {
     const newContractsToAdd = [];
     const alreadyInBatchNames = [];
@@ -67,13 +89,22 @@ export default function BatchContractEditor({ batchId, onClose, onSuccess }) {
         if (contracts.some(c => (c.employeeId || c.employeeID || c.EmployeeId) === emp.id)) {
           alreadyInBatchNames.push(emp.fullName);
         } else {
+          // Calculate basic salary based on position and payroll settings
+          let calcSalary = 0;
+          if (payrollSettings && emp.positionId) {
+            const pos = allPositions.find(p => p.id === emp.positionId);
+            const coefficient = emp.coefficient > 0 ? emp.coefficient : (pos?.defaultCoefficient || 1.0);
+            const dailyRate = payrollSettings.regionBaseSalary / 26;
+            calcSalary = Math.round(dailyRate * coefficient * 26);
+          }
+
           newContractsToAdd.push({
             employeeId: emp.id,
             employeeName: emp.fullName,
             employeeCode: emp.employeeCode,
             departmentName: emp.departmentName,
             contractTypeId: 1,
-            basicSalary: 0,
+            basicSalary: calcSalary,
             startDate: new Date().toISOString().split('T')[0],
             endDate: null,
             jobDescription: '',

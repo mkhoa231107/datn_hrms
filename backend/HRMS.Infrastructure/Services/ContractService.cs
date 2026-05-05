@@ -470,8 +470,11 @@ namespace HRMS.Infrastructure.Services
             // Find all employees with an ACTIVE contract
             var activeContracts = await _context.EmployeeContracts
                 .Include(c => c.Employee)
+                    .ThenInclude(e => e.Position)
                 .Where(c => c.Status == ContractStatus.Active)
                 .ToListAsync();
+
+            var settings = await _context.PayrollSettings.FirstOrDefaultAsync(s => s.IsActive);
 
             var newContracts = new List<EmployeeContract>();
             foreach (var oldContract in activeContracts)
@@ -481,6 +484,17 @@ namespace HRMS.Infrastructure.Services
                     ? startDate.AddYears(1).AddDays(-1) 
                     : (DateTime?)null;
 
+                // Calculate Salary using formula if settings available
+                decimal calcSalary = oldContract.BasicSalary;
+                if (settings != null)
+                {
+                    decimal coefficient = oldContract.Employee.Coefficient > 0 
+                        ? oldContract.Employee.Coefficient 
+                        : (oldContract.Employee.Position?.DefaultCoefficient ?? 1.0m);
+                    
+                    calcSalary = Math.Round((settings.RegionBaseSalary / 26m) * coefficient * 26m);
+                }
+
                 var newContract = new EmployeeContract
                 {
                     EmployeeId = oldContract.EmployeeId,
@@ -489,7 +503,7 @@ namespace HRMS.Infrastructure.Services
                     ContractNumber = $"HĐ-{oldContract.Employee.EmployeeCode}-{nextYear}",
                     StartDate = startDate,
                     EndDate = endDate,
-                    BasicSalary = oldContract.BasicSalary,
+                    BasicSalary = calcSalary,
                     JobDescription = oldContract.JobDescription,
                     WorkLocation = oldContract.WorkLocation,
                     SignedBy = oldContract.SignedBy,

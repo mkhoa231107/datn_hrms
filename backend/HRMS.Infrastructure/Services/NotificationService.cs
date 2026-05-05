@@ -6,17 +6,25 @@ using HRMS.Application.DTOs.Notification;
 using HRMS.Application.Interfaces;
 using HRMS.Domain.Entities;
 using HRMS.Infrastructure.Data;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace HRMS.Infrastructure.Services
 {
+    /// <summary>
+    /// Marker hub interface so Infrastructure doesn't need to reference HRMS.API
+    /// </summary>
+    public interface IHrmsHubMarker { }
+
     public class NotificationService : INotificationService
     {
         private readonly HRMSDbContext _context;
+        private readonly IHubContext<HrmsHubProxy> _hubContext;
 
-        public NotificationService(HRMSDbContext context)
+        public NotificationService(HRMSDbContext context, IHubContext<HrmsHubProxy> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         public async Task<List<NotificationDto>> GetMyNotificationsAsync(int employeeId)
@@ -24,7 +32,7 @@ namespace HRMS.Infrastructure.Services
             var notifications = await _context.Notifications
                 .Where(n => n.EmployeeId == employeeId)
                 .OrderByDescending(n => n.CreatedAt)
-                .Take(50) // Limit to last 50
+                .Take(50)
                 .ToListAsync();
 
             return notifications.Select(n => new NotificationDto
@@ -57,6 +65,22 @@ namespace HRMS.Infrastructure.Services
 
                 _context.Notifications.Add(notification);
                 await _context.SaveChangesAsync();
+
+                // 🔔 Push real-time notification to specific employee's SignalR group
+                var notifDto = new NotificationDto
+                {
+                    Id = notification.Id,
+                    Title = notification.Title,
+                    Message = notification.Message,
+                    Type = notification.Type,
+                    Status = notification.Status,
+                    RelatedId = notification.RelatedId,
+                    CreatedAt = notification.CreatedAt,
+                    ReadAt = notification.ReadAt
+                };
+                await _hubContext.Clients.Group($"employee_{dto.EmployeeId}")
+                    .SendAsync("ReceiveNotification", notifDto);
+
                 return true;
             }
             catch (Exception)
@@ -95,4 +119,10 @@ namespace HRMS.Infrastructure.Services
             return true;
         }
     }
+
+    /// <summary>
+    /// Proxy Hub class in Infrastructure layer to avoid circular dependency with HRMS.API
+    /// The actual Hub in HRMS.API.Hubs.HrmsHub inherits from this
+    /// </summary>
+    public class HrmsHubProxy : Hub { }
 }

@@ -11,6 +11,23 @@ import './LeavePaper.css';
 // Register Vietnamese locale for datepicker
 registerLocale('vi', vi);
 
+const PUBLIC_HOLIDAYS_2026 = [
+    '2026-01-01', // New Year
+    '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19', '2026-02-20', '2026-02-21', '2026-02-22', // Tet
+    '2026-04-26', // Hung Kings
+    '2026-04-30', // Victory Day
+    '2026-05-01', // Labor Day
+    '2026-09-02', '2026-09-03'  // National Day
+];
+
+const isHoliday = (date) => {
+    if (!date) return false;
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const dateStr = d.toISOString().split('T')[0];
+    return PUBLIC_HOLIDAYS_2026.includes(dateStr);
+};
+
 // Custom helper as a robust workaround for react-signature-canvas bug
 const trimCanvasManual = (canvas) => {
     if (!canvas) return null;
@@ -94,7 +111,9 @@ export default function LeavePaperModal({
         let cur = new Date(start);
         while (cur <= end) {
             const dow = cur.getDay();
-            if (dow !== 0 && dow !== 6) count++; // exclude weekends
+            // User requirement: Open Saturday (6), only Sunday (0) is off
+            // Also exclude public holidays
+            if (dow !== 0 && !isHoliday(cur)) count++; 
             cur.setDate(cur.getDate() + 1);
         }
         return count;
@@ -139,6 +158,9 @@ export default function LeavePaperModal({
 
         // 3. Balance Check
         if (isOverBalance) return "Số ngày nghỉ vượt quá số dư phép hiện có.";
+
+        // 3.5 Zero working days check
+        if (requestedDays === 0) return "Khoảng thời gian đã chọn không có ngày làm việc (trùng cuối tuần/ngày lễ).";
 
         // 4. Attachment Check for SICK leave
         if (isSick && !form.attachmentBase64 && !requestData?.attachmentUrl) {
@@ -197,13 +219,21 @@ export default function LeavePaperModal({
                 return;
             }
 
+            const formatDateLocal = (date) => {
+                if (!date) return '';
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
             onSubmit({ 
                 ...form, 
                 leaveTypeId: parseInt(form.leaveTypeId, 10), 
                 requesterSignature: finalSignature,
-                // Convert Date objects to ISO strings for API
-                fromDate: form.fromDate ? form.fromDate.toISOString().split('T')[0] : '',
-                toDate: form.toDate ? form.toDate.toISOString().split('T')[0] : '',
+                // Use local date format to avoid timezone shifts
+                fromDate: formatDateLocal(form.fromDate),
+                toDate: formatDateLocal(form.toDate),
             });
         } else if (mode === 'view' && onSubmit && canApprove) {
             // Approval flow
@@ -317,7 +347,7 @@ export default function LeavePaperModal({
                                 locale="vi"
                                 dateFormat="dd/MM/yyyy"
                                 placeholderText="Chọn ngày..."
-                                filterDate={d => d.getDay() !== 0 && d.getDay() !== 6}
+                                filterDate={d => d.getDay() !== 0 && !isHoliday(d)}
                                 minDate={new Date()}
                                 className="leave-paper-input"
                                 wrapperClassName="inline-block"
@@ -334,7 +364,7 @@ export default function LeavePaperModal({
                                 locale="vi"
                                 dateFormat="dd/MM/yyyy"
                                 placeholderText="Chọn ngày..."
-                                filterDate={d => d.getDay() !== 0 && d.getDay() !== 6}
+                                filterDate={d => d.getDay() !== 0 && !isHoliday(d)}
                                 minDate={form.fromDate || new Date()}
                                 className="leave-paper-input"
                                 wrapperClassName="inline-block"

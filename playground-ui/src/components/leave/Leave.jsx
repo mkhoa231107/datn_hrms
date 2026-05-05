@@ -15,7 +15,7 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 
 export default function Leave({ user, approvalOnly = false, onBack }) {
     const roles = user?.roles || [];
-    const isApprover = roles.some(r => ['Admin', 'DepartmentHead', 'TeamLeader'].includes(r));
+    const isApprover = roles.some(r => ['Admin', 'DepartmentManager', 'DepartmentHead', 'TeamLeader'].includes(r));
 
     const [tab, setTab] = useState(approvalOnly ? 'pending' : 'overview');
     const [page, setPage] = useState(1);
@@ -123,14 +123,23 @@ export default function Leave({ user, approvalOnly = false, onBack }) {
     };
 
     const exportExcel = async () => {
-        // ... (Export logic remains same but added loading/toast)
         setExporting(true);
         try {
-             // Simulating export or using existing logic
-             toast.success('Đang khởi tạo tệp Excel...');
-             // Existing logic here...
-             toast.success('Xuất Excel thành công!');
+            // Mapping department name to ID or using current filters
+            const res = await leaveService.exportExcel(null, new Date().getFullYear());
+            
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `BaoCaoNghiPhep_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            
+            toast.success('Xuất Excel thành công!');
         } catch (err) {
+            console.error(err);
             toast.error('Lỗi khi xuất Excel');
         } finally {
             setExporting(false);

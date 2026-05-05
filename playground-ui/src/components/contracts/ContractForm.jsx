@@ -10,6 +10,7 @@ export default function ContractForm({ onClose, onSuccess, contract }) {
   const [allPositions, setAllPositions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [salaryHint, setSalaryHint] = useState('');
+  const [payrollSettings, setPayrollSettings] = useState(null);
   const [formData, setFormData] = useState({
     employeeId: '',
     contractNumber: '',
@@ -34,7 +35,8 @@ export default function ContractForm({ onClose, onSuccess, contract }) {
           employeeService.getAllEmployees(),
           api.get('/workshifts'),
           departmentService.getAll(),
-          positionService.getAll()
+          positionService.getAll(),
+          api.get('/payroll/settings')
         ]);
         setEmployees(empData || []);
         const standardCodes = ['HC', 'C1', 'C2', 'C3'];
@@ -42,6 +44,7 @@ export default function ContractForm({ onClose, onSuccess, contract }) {
         setShifts(filteredShifts);
         setDepartments(deptData || []);
         setAllPositions(posData || []);
+        setPayrollSettings(payrollSettingsData.data || null);
       } catch (error) {
         console.error('Error fetching data:', error);
         toast.error('Không thể tải một số dữ liệu cần thiết');
@@ -74,15 +77,27 @@ export default function ContractForm({ onClose, onSuccess, contract }) {
     const selectedPos = allPositions.find(p => p.id.toString() === posId);
     if (selectedPos) {
       let tempSalaryHint = '';
-      if (selectedPos.baseSalaryMin || selectedPos.baseSalaryMax) {
+      let calculatedSalary = prev => prev.basicSalary;
+
+      if (payrollSettings && selectedPos.defaultCoefficient) {
+        // Formula: Lương tối thiểu vùng * Hệ số * 26
+        // Ở đây regionBaseSalary là lương tháng, nên chia 26 để ra ngày, rồi nhân hệ số, rồi nhân 26.
+        // Thực chất là regionBaseSalary * coefficient.
+        const dailyRate = payrollSettings.regionBaseSalary / 26;
+        const result = Math.round(dailyRate * selectedPos.defaultCoefficient * 26);
+        calculatedSalary = result.toString();
+        tempSalaryHint = `Tính theo HS ${selectedPos.defaultCoefficient}: (${payrollSettings.regionBaseSalary.toLocaleString()} / 26) * ${selectedPos.defaultCoefficient} * 26 = ${result.toLocaleString()} VNĐ`;
+      } else if (selectedPos.baseSalaryMin || selectedPos.baseSalaryMax) {
         tempSalaryHint = `Lương cấu hình: ${selectedPos.baseSalaryMin ? selectedPos.baseSalaryMin.toLocaleString() : 0} - ${selectedPos.baseSalaryMax ? selectedPos.baseSalaryMax.toLocaleString() : 'Không giới hạn'} VNĐ`;
+        calculatedSalary = selectedPos.baseSalaryMin ? selectedPos.baseSalaryMin.toString() : prev => prev.basicSalary;
       }
+      
       setSalaryHint(tempSalaryHint);
 
       setFormData(prev => ({
         ...prev,
         positionId: posId,
-        basicSalary: selectedPos.baseSalaryMin ? selectedPos.baseSalaryMin.toString() : prev.basicSalary,
+        basicSalary: typeof calculatedSalary === 'function' ? calculatedSalary(prev) : calculatedSalary,
         shiftId: selectedPos.defaultShiftId ? selectedPos.defaultShiftId.toString() : prev.shiftId
       }));
     } else {

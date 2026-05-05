@@ -99,6 +99,137 @@ namespace HRMS.Infrastructure.Seeders
             await context.SaveChangesAsync();
         }
 
+        public static async Task FixPositionCoefficientsAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Standardizing Position DefaultCoefficients...");
+            
+            // 1. Update Coefficients for key positions
+            var positions = await context.Positions.ToListAsync();
+            
+            foreach (var pos in positions)
+            {
+                if (pos.PositionCode.EndsWith("-MGR")) pos.DefaultCoefficient = 1.6m;
+                else if (pos.PositionCode.EndsWith("-DIR")) pos.DefaultCoefficient = 2.0m;
+                else if (pos.PositionCode.EndsWith("-TL")) pos.DefaultCoefficient = 1.3m;
+                else if (pos.PositionCode.Contains("-W-")) pos.DefaultCoefficient = 1.0m;
+                else if (pos.PositionCode == "PRD-ASS-W") pos.DefaultCoefficient = 1.0m;
+                else if (pos.PositionCode == "HR-SPEC") pos.DefaultCoefficient = 1.2m;
+                else if (pos.DefaultCoefficient <= 0) pos.DefaultCoefficient = 1.0m;
+                
+                pos.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await context.SaveChangesAsync();
+        }
+
+        public static async Task FixContractSalariesAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Recalculating all Contract Salaries based on formula...");
+            
+            var settings = await context.PayrollSettings.FirstOrDefaultAsync(s => s.IsActive);
+            if (settings == null) {
+                Console.WriteLine("⚠️ No active PayrollSettings found. Skipping salary fix.");
+                return;
+            }
+
+            var contracts = await context.EmployeeContracts
+                .Include(c => c.Employee)
+                    .ThenInclude(e => e.Position)
+                .Where(c => c.IsActive && c.Status == HRMS.Domain.Enums.ContractStatus.Active)
+                .ToListAsync();
+
+            int updatedCount = 0;
+            foreach (var contract in contracts)
+            {
+                decimal coefficient = contract.Employee.Coefficient > 0 
+                    ? contract.Employee.Coefficient 
+                    : (contract.Employee.Position?.DefaultCoefficient ?? 1.0m);
+                
+                // Formula: (RegionBaseSalary / 26) * Coefficient * 26
+                decimal newSalary = Math.Round((settings.RegionBaseSalary / 26m) * coefficient * 26m);
+                
+                if (contract.BasicSalary != newSalary || contract.Employee.BasicSalary != newSalary)
+                {
+                    contract.BasicSalary = newSalary;
+                    contract.Employee.BasicSalary = newSalary;
+                    updatedCount++;
+                }
+            }
+
+            await context.SaveChangesAsync();
+            Console.WriteLine($"✅ Updated salaries for {updatedCount} contracts based on Region Minimum {settings.RegionBaseSalary:N0} VNĐ.");
+        }
+
+        public static async Task FixManagerPositionsAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🛠️ [FIX] Đang cập nhật chức vụ cho các Trưởng bộ phận & Tổ trưởng...");
+
+            // 1. Lấy danh sách các vị trí Lead/Manager để gán
+            var positions = await context.Positions.ToListAsync();
+            var leadPos = positions.FirstOrDefault(p => p.PositionCode == "TRUONGNHOMKINHDOANH") ?? positions.FirstOrDefault(p => p.PositionName.Contains("Trưởng nhóm"));
+            var shopMgrPos = positions.FirstOrDefault(p => p.PositionCode == "PRD-ASS-MGR") ?? positions.FirstOrDefault(p => p.PositionName.Contains("Xưởng trưởng"));
+            var deptHeadPos = positions.FirstOrDefault(p => p.PositionName.Contains("Trưởng bộ phận")) ?? positions.FirstOrDefault(p => p.PositionName.Contains("Trưởng phòng"));
+
+            if (leadPos == null || shopMgrPos == null) return;
+
+            // 2. Tìm nhân viên có ROLE là DepartmentHead hoặc DepartmentManager
+            var managerRoleIds = await context.Roles
+                .Where(r => r.RoleName == "DepartmentHead" || r.RoleName == "DepartmentManager")
+                .Select(r => r.Id)
+                .ToListAsync();
+
+            // 3. Tìm các ManagerId trong bảng Departments
+            var deptManagers = await context.Departments
+                .Where(d => d.ManagerId.HasValue)
+                .Select(d => d.ManagerId.Value)
+                .ToListAsync();
+
+            // 4. Danh sách các nhân viên THỰC SỰ cần nâng cấp chức danh
+            var employeesToUpgrade = await context.Employees
+                .Include(e => e.Position)
+                .Where(e => 
+                    // Dựa trên mã nhân viên (MGR, TL) - Loại trừ mã công nhân W
+                    (e.EmployeeCode.EndsWith("-MGR") || e.EmployeeCode.EndsWith("-TL"))
+                    // Hoặc được gán là manager của phòng ban
+                    || deptManagers.Contains(e.Id)
+                    // Hoặc có role quản lý
+                    || (e.UserId.HasValue && context.UserRoles.Any(ur => ur.UserId == e.UserId && managerRoleIds.Contains(ur.RoleId)))
+                    // Hoặc cụ thể là tài khoản SALES-N-010 của anh Hoàng đã xác nhận trước đó
+                    || e.EmployeeCode == "SALES-N-010"
+                )
+                .Where(e => e.Position == null || e.Position.DefaultCoefficient <= 1.0m)
+                .ToListAsync();
+
+            int updatedCount = 0;
+            foreach (var emp in employeesToUpgrade)
+            {
+                if (emp.DepartmentId == 10) emp.PositionId = shopMgrPos.Id;
+                else if (emp.EmployeeCode.Contains("SALES")) emp.PositionId = leadPos.Id;
+                else emp.PositionId = deptHeadPos?.Id ?? leadPos.Id;
+                updatedCount++;
+            }
+
+            // 5. ĐẶC BIỆT: Hạ cấp các nhân sự bị gán nhầm là quản lý (như PRD-ASS-W-001)
+            var workerPos = positions.FirstOrDefault(p => p.PositionCode == "PRD-ASS-W") ?? positions.FirstOrDefault(p => p.PositionName.Contains("Công nhân"));
+            var workersToRevert = await context.Employees
+                .Where(e => e.EmployeeCode.StartsWith("PRD-ASS-W-") 
+                            && e.PositionId == shopMgrPos.Id
+                            && !deptManagers.Contains(e.Id))
+                .ToListAsync();
+
+            foreach (var emp in workersToRevert)
+            {
+                emp.PositionId = workerPos?.Id ?? emp.PositionId;
+                updatedCount++;
+            }
+
+            if (updatedCount > 0)
+            {
+                await context.SaveChangesAsync();
+                Console.WriteLine($"✅ Đã điều chỉnh chức danh cho {updatedCount} nhân sự.");
+            }
+        }
+
         public static async Task FixAdminEmployeeLinkageAsync(HRMSDbContext context)
         {
             await SyncAllUserEmployeeLinkagesAsync(context);
@@ -277,6 +408,74 @@ namespace HRMS.Infrastructure.Seeders
             // 4. ESTABLISH HIERARCHY & ADDITIONAL SEEDING
             Console.WriteLine("🛠️ [HIERARCHY] Đang thiết lập cấu trúc phòng ban cha-con & nhân sự mới...");
             
+            // 5. CLEANUP JUNK EMPLOYEES (KT_01, TP_01, PRD-ASS-001..150)
+            await CleanupJunkEmployeesAsync(context);
+        }
+
+        public static async Task CleanupJunkEmployeesAsync(HRMSDbContext context)
+        {
+            Console.WriteLine("🧹 [CLEANUP] Đang xoá nhân sự rác (KT_01, TP_01, PRD-ASS-001..150)...");
+            
+            // 1. Tìm các nhân sự rác
+            var junkEmployees = await context.Employees
+                .Where(e => e.EmployeeCode == "KT_01" || e.EmployeeCode == "TP_01" || (e.EmployeeCode.StartsWith("PRD-ASS-") && !e.EmployeeCode.Contains("-W-")))
+                .Select(e => new { e.Id, e.UserId })
+                .ToListAsync();
+
+            if (!junkEmployees.Any())
+            {
+                Console.WriteLine("✅ Không tìm thấy nhân sự rác nào cần xoá.");
+                return;
+            }
+
+            Console.WriteLine($"🗑️ Phát hiện {junkEmployees.Count} nhân sự rác. Đang dọn dẹp...");
+
+            foreach (var emp in junkEmployees)
+            {
+                var eid = emp.Id;
+
+                // A. Ngắt ràng buộc
+                await context.Database.ExecuteSqlRawAsync($"UPDATE Departments SET ManagerId = NULL WHERE ManagerId = {eid}");
+                await context.Database.ExecuteSqlRawAsync($"UPDATE Employees SET ManagerId = NULL WHERE ManagerId = {eid}");
+                
+                try {
+                    await context.Database.ExecuteSqlRawAsync($@"
+                        IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('LeaveRequests') AND name = 'ApproverId')
+                        EXEC('UPDATE LeaveRequests SET ApproverId = NULL WHERE ApproverId = {eid}')");
+                } catch {}
+
+                // B. Xoá dữ liệu phụ thuộc (EmployeeId)
+                string[] empTables = { 
+                    "AttendanceDetails", "TimeAttendanceRecords", "TimeAdjustmentRequests", "OvertimeRequests", "WorkSchedules", "AttendanceSummaries",  
+                    "LeaveRequests", "LeaveBalances", "PayrollRecords", 
+                    "EmployeeContracts", "EmployeeInsurances", "EmployeeBankAccounts", 
+                    "EmployeeEmergencyContacts", "EmployeeDocuments", "Notifications",
+                    "EmployeeOvertimes"
+                };
+                foreach (var tbl in empTables) {
+                    try { await context.Database.ExecuteSqlRawAsync($"DELETE FROM {tbl} WHERE EmployeeId = {eid}"); } catch {}
+                }
+
+                // C. Xoá dữ liệu phụ thuộc (UserId)
+                if (emp.UserId.HasValue) {
+                    var uid = emp.UserId.Value;
+                    string[] userTables = { "AuditLogs", "UserRoles", "PasswordResetOTPs", "CompanyNews" };
+                    foreach (var tbl in userTables) {
+                        try { 
+                            if (tbl == "CompanyNews") await context.Database.ExecuteSqlRawAsync($"DELETE FROM CompanyNews WHERE AuthorId = {uid}");
+                            else await context.Database.ExecuteSqlRawAsync($"DELETE FROM {tbl} WHERE UserId = {uid}");
+                        } catch {}
+                    }
+                }
+
+                // D. Xoá chính chủ
+                await context.Database.ExecuteSqlRawAsync($"DELETE FROM Employees WHERE Id = {eid}");
+                if (emp.UserId.HasValue) {
+                    await context.Database.ExecuteSqlRawAsync($"DELETE FROM Users WHERE Id = {emp.UserId.Value}");
+                }
+            }
+
+            Console.WriteLine($"✅ Đã dọn dẹp xong {junkEmployees.Count} nhân sự.");
         }
 
         public static async Task ClearLeaveHistoryAsync(HRMSDbContext context)

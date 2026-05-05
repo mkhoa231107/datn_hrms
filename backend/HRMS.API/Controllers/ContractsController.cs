@@ -75,6 +75,7 @@ namespace HRMS.API.Controllers
             {
                 var userRole = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
                 var userIdStr = User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var employeeIdStr = User.Claims.FirstOrDefault(c => c.Type == "EmployeeId")?.Value;
                 var deptIdStr = User.Claims.FirstOrDefault(c => c.Type == "DepartmentId")?.Value;
                 var deptCode = User.Claims.FirstOrDefault(c => c.Type == "DepartmentCode")?.Value;
                 
@@ -85,7 +86,14 @@ namespace HRMS.API.Controllers
 
                 if (personal || userRole == "Employee")
                 {
-                    filterEmpId = userId;
+                    if (int.TryParse(employeeIdStr, out int empId) && empId > 0)
+                    {
+                        filterEmpId = empId;
+                    }
+                    else
+                    {
+                        filterEmpId = -1; // Prevent viewing others if no employee mapped
+                    }
                     filterDeptId = null; // Ignore explicit deptId for personal view
                 }
                 else if (userRole == "DepartmentHead" || userRole == "DepartmentManager")

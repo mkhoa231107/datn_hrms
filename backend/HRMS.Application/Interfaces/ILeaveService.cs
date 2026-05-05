@@ -21,5 +21,8 @@ namespace HRMS.Application.Interfaces
 
         // ===== Reference data =====
         Task<IEnumerable<LeaveTypeDto>> GetLeaveTypesAsync();
+
+        // ===== Export =====
+        Task<byte[]> ExportLeaveToExcelAsync(int? departmentId, int? year);
     }
 }

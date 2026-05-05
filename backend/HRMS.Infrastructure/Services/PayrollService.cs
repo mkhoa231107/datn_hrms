@@ -40,8 +40,8 @@ namespace HRMS.Infrastructure.Services
                     UnemploymentInsuranceRate = 1.0m,
                     PersonalDeductionAmount = 11000000m,
                     DependentDeductionAmount = 4400000m,
-                    CommonBaseSalary = 1800000m,
-                    RegionBaseSalary = 4680000m
+                    CommonBaseSalary = 2340000m,
+                    RegionBaseSalary = 5310000m  // Vùng I - 2026
                 };
             }
 
@@ -79,7 +79,7 @@ namespace HRMS.Infrastructure.Services
             var query = _context.Employees
                 .Include(e => e.Department)
                 .Include(e => e.Position)
-                .Where(e => e.IsActive)
+                .Where(e => e.IsActive && e.EmployeeCode != "CNB_01")
                 .AsQueryable();
 
             if (departmentId.HasValue)
@@ -189,7 +189,8 @@ namespace HRMS.Infrastructure.Services
                 .Include(asum => asum.Employee)
                     .ThenInclude(e => e.Position)
                 .Where(asum => asum.PeriodId == period.SchedulePeriodId 
-                    && asum.Status == TimesheetStatus.Approved)
+                    && asum.Status == TimesheetStatus.Approved
+                    && asum.Employee.EmployeeCode != "CNB_01")
                 .ToListAsync();
 
             if (!summaries.Any())
@@ -212,6 +213,7 @@ namespace HRMS.Infrastructure.Services
                     PayrollPeriodId = periodId,
                     EmployeeId = emp.Id,
                     BasicSalary = emp.BasicSalary,
+                    ActualWorkingDays = asum.AdjustedWorkingDays > 0 ? asum.AdjustedWorkingDays : asum.TotalWorkingDays,
                     CreatedAt = DateTime.UtcNow
                 };
 
@@ -362,7 +364,7 @@ namespace HRMS.Infrastructure.Services
                     .ThenInclude(e => e.Department)
                 .Include(r => r.Employee)
                     .ThenInclude(e => e.Position)
-                .Where(r => r.PayrollPeriodId == periodId)
+                .Where(r => r.PayrollPeriodId == periodId && r.Employee.EmployeeCode != "CNB_01")
                 .ToListAsync();
 
             return records.Select(r => new PayrollRecordDto {
@@ -374,7 +376,7 @@ namespace HRMS.Infrastructure.Services
                 DepartmentName = r.Employee?.Department?.DepartmentName ?? "N/A",
                 PositionName = r.Employee?.Position?.PositionName ?? "N/A",
                 Coefficient = r.Employee?.Coefficient > 0 ? r.Employee.Coefficient : (r.Employee?.Position?.DefaultCoefficient ?? 1.0m),
-                ActualWorkingDays = r.BasicSalary > 0 ? Math.Round((r.ActualWorkingSalary / r.BasicSalary) * 26m, 2) : 0,
+                ActualWorkingDays = r.ActualWorkingDays,
                 BasicSalary = r.BasicSalary,
                 ActualWorkingSalary = r.ActualWorkingSalary,
                 OvertimePay = r.OvertimePay,
@@ -555,7 +557,7 @@ namespace HRMS.Infrastructure.Services
             var employees = await _context.Employees
                 .Include(e => e.Department)
                 .Include(e => e.Position)
-                .Where(e => deptIds.Contains(e.DepartmentId) && e.IsActive)
+                .Where(e => deptIds.Contains(e.DepartmentId) && e.IsActive && e.EmployeeCode != "CNB_01")
                 .ToListAsync();
 
             var empIds = employees.Select(e => e.Id).ToList();
@@ -624,7 +626,7 @@ namespace HRMS.Infrastructure.Services
 
             var employees = await _context.Employees
                 .Include(e => e.Position)
-                .Where(e => employeeIds.Contains(e.Id))
+                .Where(e => employeeIds.Contains(e.Id) && e.EmployeeCode != "CNB_01")
                 .ToListAsync();
 
             foreach (var emp in employees)
@@ -694,6 +696,7 @@ namespace HRMS.Infrastructure.Services
                     PayrollPeriodId = periodId,
                     EmployeeId = emp.Id,
                     BasicSalary = theoreticalSalary,
+                    ActualWorkingDays = adjustedWorkingDays,
                     ActualWorkingSalary = actualWorkingSalary,
                     OvertimePay = overtimePay,
                     SocialInsurance = socialInsurance,

@@ -60,14 +60,14 @@ namespace HRMS.Infrastructure.Services
                 // Accept all SSL certificates (for troubleshooting local dev issues)
                 client.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
-                Console.WriteLine($"[EMAIL] Connecting to {emailSettings["SmtpServer"]}:{emailSettings["SmtpPort"]}...");
+                Console.WriteLine($"[EMAIL] Connecting to {emailSettings["SmtpServer"] ?? "localhost"}:{emailSettings["SmtpPort"] ?? "587"}...");
                 await client.ConnectAsync(
-                    emailSettings["SmtpServer"], 
+                    emailSettings["SmtpServer"] ?? "localhost", 
                     int.Parse(emailSettings["SmtpPort"] ?? "587"), 
                     SecureSocketOptions.StartTls); // Explicitly use StartTls for port 587
 
-                Console.WriteLine($"[EMAIL] Authenticating as {emailSettings["SenderEmail"]}...");
-                await client.AuthenticateAsync(emailSettings["SenderEmail"], emailSettings["SenderPassword"]);
+                Console.WriteLine($"[EMAIL] Authenticating as {emailSettings["SenderEmail"] ?? "unknown"}...");
+                await client.AuthenticateAsync(emailSettings["SenderEmail"] ?? "", emailSettings["SenderPassword"] ?? "");
                 
                 Console.WriteLine($"[EMAIL] Sending email to {to}...");
                 await client.SendAsync(message);

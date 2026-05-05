@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../../api';
 import { toast } from 'react-hot-toast';
 import {
@@ -33,8 +34,8 @@ function calcPIT(taxableIncome) {
 }
 
 function Modal({ title, subtitle, onClose, children, footer }) {
-    return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    return createPortal(
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                 <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
                     <div>
@@ -48,7 +49,8 @@ function Modal({ title, subtitle, onClose, children, footer }) {
                 <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">{children}</div>
                 {footer && <div className="p-6 border-t border-slate-100 bg-slate-50/50 rounded-b-3xl flex justify-end gap-3 shrink-0">{footer}</div>}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 
@@ -137,9 +139,24 @@ export default function PayrollReport() {
 
     const filtered = useMemo(() => {
         if (!selectedDept) return records;
-        const dept = departments.find(d => d.id === parseInt(selectedDept));
+        const selectedId = parseInt(selectedDept);
+        const dept = departments.find(d => d.id === selectedId);
         if (!dept) return records;
-        return records.filter(r => r.departmentName?.includes(dept.departmentName) || dept.departmentName?.includes(r.departmentName));
+
+        // Collect the selected department and all its child departments
+        const validDeptNames = departments
+            .filter(d => d.id === selectedId || d.parentDepartmentId === selectedId)
+            .map(d => d.departmentName);
+
+        return records.filter(r => {
+            // Check if record's department name is exactly one of the valid names
+            if (validDeptNames.includes(r.departmentName)) return true;
+            
+            // Fallback for partial matching just in case
+            return validDeptNames.some(name => 
+                r.departmentName?.includes(name) || name.includes(r.departmentName)
+            );
+        });
     }, [records, selectedDept, departments]);
 
     const totals = useMemo(() => ({
@@ -365,7 +382,9 @@ export default function PayrollReport() {
                                 onChange={e => setSelectedDept(e.target.value)}
                             >
                                 <option value="">Tất cả phòng ban</option>
-                                {departments.map(d => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
+                                {departments
+                                    .filter(d => ["Phòng Kinh doanh", "Phòng Marketing", "Phòng Sản xuất"].includes(d.departmentName))
+                                    .map(d => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
                             </select>
                         </div>
                     </div>
@@ -463,8 +482,8 @@ export default function PayrollReport() {
             )}
 
             {/* Send Confirm Modal */}
-            {showSendConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            {showSendConfirm && createPortal(
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-up">
                         <div className="bg-violet-600 text-white p-6 rounded-t-2xl">
                             <h3 className="text-lg font-black flex items-center gap-2"><Send size={20} /> Gửi phiếu lương</h3>
@@ -505,7 +524,8 @@ export default function PayrollReport() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

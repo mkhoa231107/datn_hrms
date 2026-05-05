@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using ClosedXML.Excel;
 using System.IO;
+using Microsoft.AspNetCore.SignalR;
 
 namespace HRMS.Infrastructure.Services
 {
@@ -20,13 +21,15 @@ namespace HRMS.Infrastructure.Services
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
         private readonly IEmailService _emailService;
+        private readonly IHubContext<HrmsHubProxy> _hubContext;
 
-        public AttendanceService(HRMSDbContext context, IMapper mapper, INotificationService notificationService, IEmailService emailService)
+        public AttendanceService(HRMSDbContext context, IMapper mapper, INotificationService notificationService, IEmailService emailService, IHubContext<HrmsHubProxy> hubContext)
         {
             _context = context;
             _mapper = mapper;
             _notificationService = notificationService;
             _emailService = emailService;
+            _hubContext = hubContext;
         }
 
         public async Task<AttendanceRecordDto> CheckInAsync(CheckInDto dto)
@@ -123,10 +126,11 @@ namespace HRMS.Infrastructure.Services
             // Map sang DTO để trả về
             var shiftInfo = workSchedule?.WorkShift ?? employee.Shift;
 
-            return new AttendanceRecordDto
+            var resultDto = new AttendanceRecordDto
             {
                 Id = record.Id,
                 EmployeeId = record.EmployeeId,
+                EmployeeCode = employee?.EmployeeCode ?? "",
                 EmployeeName = employee?.FullName ?? "",
                 Timestamp = record.Timestamp,
                 Type = record.Type,
@@ -136,6 +140,11 @@ namespace HRMS.Infrastructure.Services
                 ShiftStartTime = shiftInfo?.StartTime,
                 ShiftEndTime = shiftInfo?.EndTime
             };
+
+            // ⚡ Real-time broadcast to managers
+            await _hubContext.Clients.Group("managers").SendAsync("AttendanceUpdated", resultDto);
+
+            return resultDto;
         }
 
         public async Task<AttendanceRecordDto> CheckOutAsync(CheckOutDto dto)
@@ -237,10 +246,11 @@ namespace HRMS.Infrastructure.Services
             var employee = checkInRecord.Employee;
             var shiftInfo = checkInRecord.WorkSchedule?.WorkShift ?? employee?.Shift;
 
-            return new AttendanceRecordDto
+            var resultDto = new AttendanceRecordDto
             {
                 Id = record.Id,
                 EmployeeId = record.EmployeeId,
+                EmployeeCode = employee?.EmployeeCode ?? "",
                 EmployeeName = employee?.FullName ?? "",
                 Timestamp = record.Timestamp,
                 Type = record.Type,
@@ -250,6 +260,11 @@ namespace HRMS.Infrastructure.Services
                 ShiftStartTime = shiftInfo?.StartTime,
                 ShiftEndTime = shiftInfo?.EndTime
             };
+
+            // ⚡ Real-time broadcast to managers
+            await _hubContext.Clients.Group("managers").SendAsync("AttendanceUpdated", resultDto);
+
+            return resultDto;
         }
 
         public async Task<List<AttendanceRecordDto>> GetMyAttendanceRecordsAsync(int employeeId, DateTime? fromDate = null, DateTime? toDate = null)
@@ -283,6 +298,7 @@ namespace HRMS.Infrastructure.Services
                 {
                     Id = r.Id,
                     EmployeeId = r.EmployeeId,
+                    EmployeeCode = r.Employee?.EmployeeCode ?? "",
                     EmployeeName = r.Employee?.FullName ?? "",
                     Timestamp = r.Timestamp,
                     Type = r.Type,
@@ -455,6 +471,7 @@ namespace HRMS.Infrastructure.Services
             {
                 Id = r.Id,
                 EmployeeId = r.EmployeeId,
+                EmployeeCode = r.Employee?.EmployeeCode ?? "",
                 EmployeeName = r.Employee?.FullName ?? "",
                 Timestamp = r.Timestamp,
                 Type = r.Type,
@@ -535,13 +552,18 @@ namespace HRMS.Infrastructure.Services
                 query = query.Where(s => targetIds.Contains(s.Employee.DepartmentId));
             }
 
-            var summaries = await query.ToListAsync();
+            var summaries = await query
+                .OrderBy(s => s.Employee.Department.DepartmentName)
+                .ThenBy(s => s.Employee.FullName)
+                .ToListAsync();
 
             return summaries.Select(s => new AttendanceSummaryDto
             {
                 Id = s.Id,
                 EmployeeId = s.EmployeeId,
                 EmployeeName = s.Employee?.FullName ?? "",
+                EmployeeCode = s.Employee?.EmployeeCode ?? "",
+                DepartmentName = s.Employee?.Department?.DepartmentName ?? "",
                 IsAdmin = s.Employee?.User?.UserRoles?.Any(ur => ur.Role?.RoleName == "Admin" || ur.Role?.RoleName == "HrAdmin") ?? false,
                 PeriodId = s.PeriodId,
                 PeriodName = s.Period?.PeriodName ?? "",
@@ -804,7 +826,10 @@ namespace HRMS.Infrastructure.Services
                 .ToListAsync();
             _context.AttendanceSummaries.RemoveRange(existingSummaries);
 
-            var employees = await _context.Employees.Include(e => e.Shift).ToListAsync();
+            var employees = await _context.Employees
+                .Include(e => e.Shift)
+                .Where(e => e.IsActive)
+                .ToListAsync();
             int count = 0;
 
             // Grace Period constants
@@ -843,7 +868,7 @@ namespace HRMS.Infrastructure.Services
                     .Where(r => r.EmployeeId == emp.Id && r.Date >= period.StartDate && r.Date <= period.EndDate)
                     .ToListAsync();
 
-                if (!records.Any()) continue;
+
 
                 decimal totalWorkingHours = 0;
                 decimal totalOtHours = 0;
@@ -1234,12 +1259,6 @@ namespace HRMS.Infrastructure.Services
             }
         }
 
-        public async Task<string> ExportAndCleanupOldAttendanceAsync(int month, int year)
-        {
-            // Placeholder for data retention logic
-            return await Task.FromResult($"Đã thực hiện lưu trữ và dọn dẹp dữ liệu chấm công tháng {month}/{year}.");
-        }
-
 
         private async Task<List<int>> GetDepartmentHierarchyIdsAsync(int departmentId)
         {
@@ -1312,5 +1331,69 @@ namespace HRMS.Infrastructure.Services
             }
         }
 
+        public async Task<byte[]> ExportDailyAttendanceToExcelAsync(int departmentId, DateTime date)
+        {
+            var records = await GetAttendanceRecordsByDepartmentAsync(departmentId, date);
+            var department = await _context.Departments.FindAsync(departmentId);
+
+            using (var workbook = new XLWorkbook())
+            {
+                var worksheet = workbook.Worksheets.Add("Chấm công ngày");
+
+                worksheet.Cell(1, 1).Value = $"BÁO CÁO CHẤM CÔNG NGÀY {date:dd/MM/yyyy}";
+                worksheet.Range(1, 1, 1, 6).Merge().Style.Font.Bold = true;
+                worksheet.Cell(2, 1).Value = $"Bộ phận: {department?.DepartmentName ?? "Tất cả"}";
+
+                // Headers
+                int headerRow = 4;
+                worksheet.Cell(headerRow, 1).Value = "STT";
+                worksheet.Cell(headerRow, 2).Value = "Mã NV";
+                worksheet.Cell(headerRow, 3).Value = "Họ tên";
+                worksheet.Cell(headerRow, 4).Value = "Vào ca";
+                worksheet.Cell(headerRow, 5).Value = "Tan ca";
+                worksheet.Cell(headerRow, 6).Value = "Địa điểm/Thiết bị";
+
+                var headerRange = worksheet.Range(headerRow, 1, headerRow, 6);
+                headerRange.Style.Font.Bold = true;
+                headerRange.Style.Fill.BackgroundColor = XLColor.LightGray;
+
+                var groupedRecords = records
+                    .GroupBy(r => r.EmployeeId)
+                    .Select(g => new {
+                        EmployeeCode = g.First().EmployeeCode,
+                        EmployeeName = g.First().EmployeeName,
+                        CheckIn = g.Where(r => r.Type == "CheckIn").OrderBy(r => r.Timestamp).FirstOrDefault()?.Timestamp,
+                        CheckOut = g.Where(r => r.Type == "CheckOut").OrderByDescending(r => r.Timestamp).FirstOrDefault()?.Timestamp,
+                        Location = string.Join(", ", g.Select(r => r.Location).Distinct())
+                    })
+                    .ToList();
+
+                for (int i = 0; i < groupedRecords.Count; i++)
+                {
+                    var item = groupedRecords[i];
+                    int row = i + 5;
+                    worksheet.Cell(row, 1).Value = i + 1;
+                    worksheet.Cell(row, 2).Value = item.EmployeeCode;
+                    worksheet.Cell(row, 3).Value = item.EmployeeName;
+                    worksheet.Cell(row, 4).Value = item.CheckIn?.ToString("HH:mm:ss") ?? "--";
+                    worksheet.Cell(row, 5).Value = item.CheckOut?.ToString("HH:mm:ss") ?? "--";
+                    worksheet.Cell(row, 6).Value = item.Location;
+                }
+
+                worksheet.Columns().AdjustToContents();
+
+                using (var stream = new MemoryStream())
+                {
+                    workbook.SaveAs(stream);
+                    return stream.ToArray();
+                }
+            }
+        }
+
+        public Task<string> ExportAndCleanupOldAttendanceAsync(int month, int year)
+        {
+            // Placeholder implementation
+            return Task.FromResult("archived_attendance.csv");
+        }
     }
 }

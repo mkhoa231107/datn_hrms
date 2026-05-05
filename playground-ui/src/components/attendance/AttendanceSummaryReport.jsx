@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { api } from '../../api';
+import { api, attendanceService } from '../../api';
 import { toast } from 'react-hot-toast';
 import {
     BarChart2, Download, RefreshCw, Filter, ChevronUp, ChevronDown,
@@ -35,7 +35,6 @@ export default function AttendanceSummaryReport() {
         if (!selectedPeriod) { toast.error('Vui lòng chọn kỳ lương'); return; }
         setLoading(true);
         try {
-            // Fetch timesheets for selected dept or dept=0 (all)
             const deptId = selectedDept || 0;
             const res = await api.get(`/attendance/department/${deptId}/timesheets/${selectedPeriod}`);
             const data = res.data?.data || res.data || [];
@@ -48,7 +47,6 @@ export default function AttendanceSummaryReport() {
         }
     };
 
-    // Sort logic
     const sorted = useMemo(() => {
         return [...records].sort((a, b) => {
             let av = a[sortKey] ?? 0;
@@ -61,11 +59,10 @@ export default function AttendanceSummaryReport() {
         });
     }, [records, sortKey, sortDir]);
 
-    // Group by department
     const grouped = useMemo(() => {
         const groups = {};
         sorted.forEach(r => {
-            const key = r.departmentName || 'Không xác định';
+            const key = r.departmentName || 'Phòng ban khác';
             if (!groups[key]) groups[key] = [];
             groups[key].push(r);
         });
@@ -73,10 +70,10 @@ export default function AttendanceSummaryReport() {
     }, [sorted]);
 
     const totals = useMemo(() => ({
-        standardDays: records.reduce((s, r) => s + (r.standardWorkingDays || 0), 0),
-        actualDays: records.reduce((s, r) => s + (r.actualWorkingDays || 0), 0),
-        overtimeHours: records.reduce((s, r) => s + (r.totalOvertimeHours || 0), 0),
-        leaveDays: records.reduce((s, r) => s + (r.approvedLeaveDays || 0), 0),
+        standardDays: records.reduce((s, r) => s + (r.totalWorkingDays || 0), 0),
+        actualDays: records.reduce((s, r) => s + (r.adjustedWorkingDays || 0), 0),
+        overtimeHours: records.reduce((s, r) => s + (r.overtimeHours || 0), 0),
+        leaveDays: records.reduce((s, r) => s + (r.absentDays || 0), 0),
     }), [records]);
 
     const handleSort = (key) => {
@@ -89,128 +86,45 @@ export default function AttendanceSummaryReport() {
         return sortDir === 'asc' ? <ChevronUp size={12} className="text-violet-600" /> : <ChevronDown size={12} className="text-violet-600" />;
     };
 
-    const exportExcel = async () => {
-        if (records.length === 0) { toast.error('Không có dữ liệu để xuất'); return; }
+    const handleExport = async () => {
+        if (!selectedPeriod) {
+            toast.error('Vui lòng chọn kỳ công');
+            return;
+        }
         setExporting(true);
         try {
-            const ExcelJS = (await import('exceljs')).default;
-            const wb = new ExcelJS.Workbook();
-
-            const periodObj = periods.find(p => p.id === parseInt(selectedPeriod));
-            const periodName = periodObj?.periodName || selectedPeriod;
-
-            // ── Sheet 1: Chi tiết ──
-            const ws = wb.addWorksheet('Chi tiết chấm công');
-            ws.columns = [
-                { header: 'STT', key: 'stt', width: 6 },
-                { header: 'Mã NV', key: 'employeeCode', width: 12 },
-                { header: 'Họ tên', key: 'employeeName', width: 24 },
-                { header: 'Phòng ban', key: 'departmentName', width: 20 },
-                { header: 'Ngày công chuẩn', key: 'standardWorkingDays', width: 16 },
-                { header: 'Ngày công thực tế', key: 'actualWorkingDays', width: 18 },
-                { header: 'Giờ tăng ca', key: 'totalOvertimeHours', width: 14 },
-                { header: 'Ngày nghỉ phép', key: 'approvedLeaveDays', width: 16 },
-                { header: 'Tỷ lệ đúng giờ (%)', key: 'onTimeRate', width: 20 },
-                { header: 'Trạng thái', key: 'status', width: 14 },
-            ];
-
-            // Header style
-            ws.getRow(1).eachCell(cell => {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
-                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-                cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            });
-            ws.getRow(1).height = 24;
-
-            sorted.forEach((r, i) => {
-                const row = ws.addRow({
-                    stt: i + 1,
-                    employeeCode: r.employeeCode || '',
-                    employeeName: r.employeeName || '',
-                    departmentName: r.departmentName || '',
-                    standardWorkingDays: r.standardWorkingDays ?? 0,
-                    actualWorkingDays: r.actualWorkingDays ?? 0,
-                    totalOvertimeHours: fmtNum(r.totalOvertimeHours),
-                    approvedLeaveDays: r.approvedLeaveDays ?? 0,
-                    onTimeRate: r.onTimeRate != null ? fmtNum(r.onTimeRate) + '%' : '—',
-                    status: r.status === 2 ? 'Đã duyệt' : r.status === 1 ? 'Bộ phận duyệt' : 'Chưa duyệt',
-                });
-                if (i % 2 === 1) {
-                    row.eachCell(cell => {
-                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F3FF' } };
-                    });
-                }
-            });
-
-            // Total row
-            const totalRow = ws.addRow({
-                stt: '', employeeCode: '', employeeName: 'TỔNG CỘNG', departmentName: '',
-                standardWorkingDays: totals.standardDays,
-                actualWorkingDays: totals.actualDays,
-                totalOvertimeHours: fmtNum(totals.overtimeHours),
-                approvedLeaveDays: totals.leaveDays,
-                onTimeRate: '', status: ''
-            });
-            totalRow.eachCell(cell => {
-                cell.font = { bold: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDD6FE' } };
-            });
-
-            // ── Sheet 2: Tổng hợp theo phòng ban ──
-            const ws2 = wb.addWorksheet('Tổng hợp phòng ban');
-            ws2.columns = [
-                { header: 'Phòng ban', key: 'dept', width: 24 },
-                { header: 'Số NV', key: 'count', width: 10 },
-                { header: 'Tổng ngày công TT', key: 'actualDays', width: 20 },
-                { header: 'Tổng giờ OT', key: 'otHours', width: 16 },
-                { header: 'Tổng ngày nghỉ', key: 'leaveDays', width: 16 },
-            ];
-            ws2.getRow(1).eachCell(cell => {
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0D9488' } };
-                cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
-                cell.alignment = { horizontal: 'center', vertical: 'middle' };
-            });
-            ws2.getRow(1).height = 24;
-
-            Object.entries(grouped).forEach(([dept, rows]) => {
-                ws2.addRow({
-                    dept,
-                    count: rows.length,
-                    actualDays: rows.reduce((s, r) => s + (r.actualWorkingDays || 0), 0),
-                    otHours: fmtNum(rows.reduce((s, r) => s + (r.totalOvertimeHours || 0), 0)),
-                    leaveDays: rows.reduce((s, r) => s + (r.approvedLeaveDays || 0), 0),
-                });
-            });
-
-            const buf = await wb.xlsx.writeBuffer();
-            const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-            const url = URL.createObjectURL(blob);
+            const deptId = selectedDept || 0;
+            const res = await attendanceService.exportTimesheetExcel(deptId, selectedPeriod);
+            const url = window.URL.createObjectURL(new Blob([res.data]));
             const a = document.createElement('a');
             a.href = url;
-            a.download = `BaoCaoChamCong_${periodName}.xlsx`;
+            const periodObj = periods.find(p => p.id === parseInt(selectedPeriod));
+            const periodName = periodObj?.periodName || selectedPeriod;
+            a.download = `BangCong_${deptId}_${periodName}.xlsx`;
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
-            toast.success('Xuất Excel thành công!');
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success('Xuất file Excel thành công');
         } catch (err) {
-            console.error(err);
-            toast.error('Lỗi khi xuất Excel');
+            console.error('Error exporting timesheet:', err);
+            toast.error('Lỗi khi xuất file Excel');
         } finally {
             setExporting(false);
         }
     };
 
-    const TH = ({ label, k }) => (
+    const TH = ({ label, k, center, className }) => (
         <th
             onClick={() => handleSort(k)}
-            className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider cursor-pointer hover:text-violet-600 select-none whitespace-nowrap"
+            className={`px-2 py-3 text-[10px] font-black text-slate-400 uppercase tracking-wider cursor-pointer hover:text-violet-600 select-none whitespace-nowrap ${center ? 'text-center' : 'text-left'} ${className || ''}`}
         >
-            <div className="flex items-center gap-1">{label}<SortIcon k={k} /></div>
+            <div className={`flex items-center gap-1 ${center ? 'justify-center' : ''}`}>{label}<SortIcon k={k} /></div>
         </th>
     );
 
     return (
         <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">
-            {/* Standard Module Header */}
             <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3">
@@ -233,7 +147,7 @@ export default function AttendanceSummaryReport() {
                     </button>
                     {records.length > 0 && (
                         <button
-                            onClick={exportExcel}
+                            onClick={handleExport}
                             disabled={exporting}
                             className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2.5 shadow-sm flex-1 md:flex-none whitespace-nowrap"
                         >
@@ -244,7 +158,6 @@ export default function AttendanceSummaryReport() {
                 </div>
             </div>
 
-            {/* Standard Filter Bar */}
             <div className="card grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-50/50 border-slate-200/60 mb-8">
                 <div className="flex flex-col gap-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 px-1">
@@ -276,7 +189,6 @@ export default function AttendanceSummaryReport() {
                 </div>
             </div>
 
-            {/* Standard KPI Cards */}
             {records.length > 0 && (
                 <div className={isMobile ? 'kpi-scroll mb-8' : 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-8'}>
                     {[
@@ -298,13 +210,12 @@ export default function AttendanceSummaryReport() {
                 </div>
             )}
 
-            {/* Table + Export */}
             {records.length > 0 && (
                 <div className="card !p-0 overflow-hidden border-2 border-slate-100">
                     <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
                         <h3 className="text-sm font-black text-slate-700">Danh sách nhân viên ({records.length})</h3>
                         <button
-                            onClick={exportExcel}
+                            onClick={handleExport}
                             disabled={exporting}
                             className="btn btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50 !py-2 text-xs flex items-center gap-2"
                         >
@@ -316,21 +227,18 @@ export default function AttendanceSummaryReport() {
                         <table className="w-full border-collapse">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-100">
-                                    <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider w-10">#</th>
-                                    <TH label="Họ tên" k="employeeName" />
-                                    <TH label="Phòng ban" k="departmentName" />
-                                    <TH label="Ngày công chuẩn" k="standardWorkingDays" />
-                                    <TH label="Ngày công TT" k="actualWorkingDays" />
-                                    <TH label="Giờ OT" k="totalOvertimeHours" />
-                                    <TH label="Nghỉ phép" k="approvedLeaveDays" />
-                                    <TH label="Tỷ lệ đúng giờ" k="onTimeRate" />
-                                    <th className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Trạng thái</th>
+                                    <TH label="Nhân viên" k="employeeName" className="!pl-8" />
+                                    <TH label="Công chuẩn" k="totalWorkingDays" center />
+                                    <TH label="Công TT" k="adjustedWorkingDays" center />
+                                    <TH label="Giờ OT" k="overtimeHours" center />
+                                    <TH label="Vắng" k="absentDays" center />
+                                    <TH label="Tỷ lệ" k="onTimeRate" center />
+                                    <th className="px-2 py-3 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider">Trạng thái</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {Object.entries(grouped).map(([dept, rows]) => (
                                     <React.Fragment key={dept}>
-                                        {/* Dept sub-header */}
                                         <tr className="bg-violet-50">
                                             <td colSpan={9} className="px-4 py-2 text-[11px] font-black text-violet-700 uppercase tracking-wider">
                                                 🏢 {dept} — {rows.length} nhân viên
@@ -338,68 +246,53 @@ export default function AttendanceSummaryReport() {
                                         </tr>
                                         {rows.map((r, i) => (
                                             <tr key={r.employeeId || i} className="hover:bg-slate-50/80 transition-colors">
-                                                <td className="px-4 py-3 text-xs text-slate-400 font-bold">{i + 1}</td>
-                                                <td className="px-4 py-3">
-                                                    <div className="flex flex-col">
+                                                <td className="pl-8 pr-2 py-3 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
                                                         <span className="text-sm font-bold text-slate-700">{r.employeeName}</span>
-                                                        <span className="text-[10px] text-slate-400 font-bold uppercase">{r.employeeCode}</span>
+                                                        <span className="text-[10px] text-slate-400">({r.employeeCode})</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-slate-600">{r.departmentName}</td>
-                                                <td className="px-4 py-3 text-center font-bold text-slate-600">{r.standardWorkingDays ?? '—'}</td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className={`font-black text-sm ${(r.actualWorkingDays ?? 0) < (r.standardWorkingDays ?? 0) ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                                        {r.actualWorkingDays ?? '—'}
+                                                <td className="px-2 py-3 text-center font-bold text-slate-600 text-sm">{r.totalWorkingDays ?? '—'}</td>
+                                                <td className="px-2 py-3 text-center">
+                                                    <span className={`font-black text-sm ${(r.adjustedWorkingDays ?? 0) < (r.totalWorkingDays ?? 0) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                        {r.adjustedWorkingDays ?? '—'}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-center font-medium text-amber-600">
-                                                    {fmtNum(r.totalOvertimeHours)}h
+                                                <td className="px-2 py-3 text-center font-bold text-amber-600 text-sm">
+                                                    {fmtNum(r.overtimeHours)}h
                                                 </td>
-                                                <td className="px-4 py-3 text-center font-medium text-blue-600">{r.approvedLeaveDays ?? 0}</td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {r.onTimeRate != null ? (
-                                                        <span className={`font-bold text-sm ${r.onTimeRate >= 90 ? 'text-emerald-600' : r.onTimeRate >= 70 ? 'text-amber-600' : 'text-rose-600'}`}>
-                                                            {fmtNum(r.onTimeRate)}%
-                                                        </span>
-                                                    ) : '—'}
+                                                <td className="px-2 py-3 text-center font-bold text-blue-600 text-sm">{r.absentDays ?? 0}</td>
+                                                <td className="px-2 py-3 text-center">
+                                                    {(() => {
+                                                        const total = r.totalWorkingDays || 1;
+                                                        const onTime = 100 * (1 - ((r.lateDays + r.earlyLeaveDays) / total));
+                                                        const rate = Math.max(0, Math.min(100, onTime));
+                                                        return (
+                                                            <span className={`font-black text-sm ${rate >= 90 ? 'text-emerald-600' : rate >= 70 ? 'text-amber-600' : 'text-rose-600'}`}>
+                                                                {fmtNum(rate, 0)}%
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    {r.status === 2 ? (
-                                                        <span className="badge badge-success">Đã duyệt</span>
-                                                    ) : r.status === 1 ? (
-                                                        <span className="badge badge-warning">BP duyệt</span>
+                                                <td className="px-2 py-3 text-center whitespace-nowrap">
+                                                    {r.status === 'Approved' ? (
+                                                        <span className="px-2 py-1 rounded-lg bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-emerald-100">ĐÃ CHỐT</span>
+                                                    ) : r.status === 'PendingManagerApproval' ? (
+                                                        <span className="px-2 py-1 rounded-lg bg-amber-500 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-amber-100">CHỜ CHỐT</span>
                                                     ) : (
-                                                        <span className="badge badge-accent">Chưa duyệt</span>
+                                                        <span className="px-2 py-1 rounded-lg bg-slate-400 text-white text-[9px] font-black uppercase tracking-wider shadow-sm shadow-slate-100">NHÁP</span>
                                                     )}
                                                 </td>
                                             </tr>
                                         ))}
-                                        {/* Dept subtotal */}
-                                        <tr className="bg-slate-50 border-t border-violet-100">
-                                            <td colSpan={3} className="px-4 py-2 text-xs font-black text-slate-500 text-right">Tổng {dept}:</td>
-                                            <td className="px-4 py-2 text-center font-black text-slate-700">
-                                                {rows.reduce((s, r) => s + (r.standardWorkingDays || 0), 0)}
-                                            </td>
-                                            <td className="px-4 py-2 text-center font-black text-emerald-700">
-                                                {rows.reduce((s, r) => s + (r.actualWorkingDays || 0), 0)}
-                                            </td>
-                                            <td className="px-4 py-2 text-center font-black text-amber-700">
-                                                {fmtNum(rows.reduce((s, r) => s + (r.totalOvertimeHours || 0), 0))}h
-                                            </td>
-                                            <td className="px-4 py-2 text-center font-black text-blue-700">
-                                                {rows.reduce((s, r) => s + (r.approvedLeaveDays || 0), 0)}
-                                            </td>
-                                            <td colSpan={2} />
-                                        </tr>
                                     </React.Fragment>
                                 ))}
-                                {/* Grand total */}
                                 <tr className="bg-violet-100 border-t-2 border-violet-300">
-                                    <td colSpan={3} className="px-4 py-3 text-xs font-black text-violet-800 text-right uppercase tracking-wider">TỔNG CỘNG</td>
-                                    <td className="px-4 py-3 text-center font-black text-violet-800">{totals.standardDays}</td>
-                                    <td className="px-4 py-3 text-center font-black text-violet-800">{totals.actualDays}</td>
-                                    <td className="px-4 py-3 text-center font-black text-violet-800">{fmtNum(totals.overtimeHours)}h</td>
-                                    <td className="px-4 py-3 text-center font-black text-violet-800">{totals.leaveDays}</td>
+                                    <td className="pl-8 pr-2 py-3 text-[10px] font-black text-violet-800 text-right uppercase tracking-wider">TỔNG CỘNG</td>
+                                    <td className="px-2 py-3 text-center font-black text-violet-800 text-sm">{totals.standardDays}</td>
+                                    <td className="px-2 py-3 text-center font-black text-violet-800 text-sm">{totals.actualDays}</td>
+                                    <td className="px-2 py-3 text-center font-black text-violet-800 text-sm">{fmtNum(totals.overtimeHours)}h</td>
+                                    <td className="px-2 py-3 text-center font-black text-violet-800 text-sm">{totals.leaveDays}</td>
                                     <td colSpan={2} />
                                 </tr>
                             </tbody>

@@ -35,7 +35,22 @@ namespace HRMS.Infrastructure.Helpers
             new DateTime(2025, 4, 30),  // Victory Day
             new DateTime(2025, 5, 1),   // Labor Day
             new DateTime(2025, 9, 2),   // National Day
-            new DateTime(2025, 9, 3)
+            new DateTime(2025, 9, 3),
+
+            // 2026 Holidays
+            new DateTime(2026, 1, 1),   // New Year
+            new DateTime(2026, 2, 16),  // Tet Starts (tentative)
+            new DateTime(2026, 2, 17),
+            new DateTime(2026, 2, 18),
+            new DateTime(2026, 2, 19),
+            new DateTime(2026, 2, 20),
+            new DateTime(2026, 2, 21),
+            new DateTime(2026, 2, 22),  // Tet Ends
+            new DateTime(2026, 4, 26),  // Hung Kings (approx)
+            new DateTime(2026, 4, 30),  // Victory Day
+            new DateTime(2026, 5, 1),   // Labor Day
+            new DateTime(2026, 9, 2),   // National Day
+            new DateTime(2026, 9, 3)
         };
 
         public static bool IsPublicHoliday(DateTime date)

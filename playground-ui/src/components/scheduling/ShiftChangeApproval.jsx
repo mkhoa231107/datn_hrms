@@ -100,6 +100,11 @@ export default function ShiftChangeApproval({ user, onBack }) {
         }
     };
 
+    // Reset page when filters change
+    useEffect(() => {
+        setPage(1);
+    }, [activeTab, selectedDept]);
+
     if (viewingSwapId) {
         return <ShiftSwapRequestDetail requestId={viewingSwapId} user={user} onBack={() => { setViewingSwapId(null); fetchRequests(); }} />;
     }
@@ -121,10 +126,6 @@ export default function ShiftChangeApproval({ user, onBack }) {
     const visibleRequests = filteredRequests.slice((page - 1) * PER_PAGE, page * PER_PAGE);
     const totalPages = Math.ceil(filteredRequests.length / PER_PAGE);
 
-    // Reset page when filters change
-    useEffect(() => {
-        setPage(1);
-    }, [activeTab, selectedDept]);
 
     return (
         <div className="p-6 max-w-[1400px] mx-auto animate-fade-up">

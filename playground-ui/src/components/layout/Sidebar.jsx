@@ -2,7 +2,7 @@ import React from 'react';
 import {
     UserCircle, Clock, Umbrella, Calendar, ArrowLeftRight,
     DollarSign, FileSpreadsheet, Shield, Users, BarChart2,
-    UserPlus, Settings, Activity, X, CheckSquare, LogOut
+    UserPlus, Settings, Activity, X, CheckSquare, LogOut, LayoutDashboard
 } from 'lucide-react';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 
@@ -32,30 +32,48 @@ const ROLE_MENUS = {
         { id: 'my-insurance', label: 'Bảo hiểm',            icon: Shield },
     ],
     DepartmentHead: [
+        { isHeader: true, label: 'CÁ NHÂN' },
         { id: 'me',              label: 'Hồ sơ',        icon: UserCircle },
+        { id: 'attendance',   label: 'Chấm công',           icon: Clock },
+        { id: 'leave',        label: 'Nghỉ phép',          icon: Umbrella },
+        { id: 'my-schedule',  label: 'Lịch ca',             icon: Calendar },
+        { id: 'my-payslip',   label: 'Bảng lương',          icon: DollarSign },
+        { id: 'my-contract',  label: 'Hợp đồng',            icon: FileSpreadsheet },
+        { isHeader: true, label: 'QUẢN LÝ BỘ PHẬN' },
         { id: 'employees',       label: 'Nhân viên',    icon: Users },
         { id: 'dept-leaves',     label: 'Duyệt đơn BP', icon: CheckSquare },
         { id: 'team-shift-approvals', label: 'Duyệt đổi ca', icon: ArrowLeftRight },
         { id: 'dept-activities', label: 'Hoạt động PB', icon: Activity },
     ],
     DepartmentManager: [
+        { isHeader: true, label: 'CÁ NHÂN' },
         { id: 'me',              label: 'Hồ sơ',        icon: UserCircle },
+        { id: 'attendance',   label: 'Chấm công',           icon: Clock },
+        { id: 'leave',        label: 'Nghỉ phép',          icon: Umbrella },
+        { id: 'my-schedule',  label: 'Lịch ca',             icon: Calendar },
+        { id: 'my-payslip',   label: 'Bảng lương',          icon: DollarSign },
+        { id: 'my-contract',  label: 'Hợp đồng',            icon: FileSpreadsheet },
+        { isHeader: true, label: 'QUẢN LÝ BỘ PHẬN' },
         { id: 'employees',       label: 'Nhân viên',    icon: Users },
         { id: 'dept-leaves',     label: 'Duyệt đơn BP', icon: CheckSquare },
         { id: 'team-shift-approvals', label: 'Duyệt đổi ca', icon: ArrowLeftRight },
         { id: 'dept-activities', label: 'Hoạt động PB', icon: Activity },
-        { id: 'team-timesheets', label: 'Chốt công',    icon: Activity },
     ],
     CnbSpecialist: [
+        { id: 'cnb-dashboard',         label: 'Dashboard C&B',     icon: LayoutDashboard },
+        { isHeader: true, label: 'NHÂN SỰ' },
         { id: 'employees',             label: 'Nhân viên',         icon: Users },
-        { id: 'attendance-management', label: 'Quản lý chấm công', icon: Clock },
-        { id: 'attendance-report',     label: 'BC chấm công',      icon: BarChart2 },
-        { id: 'insurance-management',  label: 'Bảo hiểm xã hội',  icon: Shield },
         { id: 'admin-contracts',       label: 'Quản lý hợp đồng', icon: FileSpreadsheet },
         { id: 'admin-roles',           label: 'Quản lý tài khoản',icon: UserPlus },
+        { isHeader: true, label: 'CHẤM CÔNG' },
+        { id: 'attendance-management', label: 'Quản lý chấm công', icon: Clock },
+        { id: 'team-timesheets',       label: 'Chốt công',         icon: CheckSquare },
+        { id: 'attendance-report',     label: 'BC chấm công',      icon: BarChart2 },
+        { isHeader: true, label: 'TIỀN LƯƠNG' },
         { id: 'payroll-processing',    label: 'Tính lương & Thuế',icon: DollarSign },
         { id: 'payroll-settings',      label: 'Cấu hình lương',   icon: Settings },
         { id: 'payroll-report',        label: 'Báo cáo lương',    icon: BarChart2 },
+        { id: 'insurance-management',  label: 'Bảo hiểm xã hội',  icon: Shield },
     ],
     Accountant: [
         { id: 'payroll-processing', label: 'Tính lương & Thuế', icon: DollarSign },
@@ -175,13 +193,20 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
                         if (activeIndex === -1) return null;
 
                         // Dimensions matching CSS/Inline styles
-                        // Dimensions matching CSS/Inline styles
                         const itemHeight = isMobile ? 48 : (isIconOnly ? 48 : 38);
                         const itemGap = isIconOnly ? 4 : 0; 
                         const containerPadding = 8;
                         
-                        const indicatorTop = containerPadding;
-                        const step = itemHeight + itemGap;
+                        let offset = 0;
+                        for (let i = 0; i < activeIndex; i++) {
+                            if (menuItems[i].isHeader) {
+                                offset += isIconOnly ? 16 : 32;
+                            } else {
+                                offset += itemHeight + itemGap;
+                            }
+                        }
+                        
+                        const indicatorTop = containerPadding + offset;
 
                         return (
                             <>
@@ -194,7 +219,6 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
                                     background: 'var(--accent-subtle)',
                                     borderRadius: 'var(--r-md)',
                                     transition: 'all 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-                                    transform: `translateY(${activeIndex * step}px)`,
                                     opacity: 1,
                                     pointerEvents: 'none', zIndex: 0,
                                 }} />
@@ -205,7 +229,6 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
                                         background: 'var(--accent)', borderRadius: '0 4px 4px 0',
                                         boxShadow: '0 0 10px var(--accent-light)',
                                         transition: 'transform 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-                                        transform: `translateY(${activeIndex * step}px)`,
                                         opacity: 1,
                                         pointerEvents: 'none', zIndex: 1,
                                     }} />
@@ -214,7 +237,28 @@ export default function Sidebar({ user, activeTab, onTabChange, sidebarOpen, onC
                         );
                     })()}
 
-                    {menuItems.map((item) => {
+                    {menuItems.map((item, index) => {
+                        if (item.isHeader) {
+                            return !isIconOnly ? (
+                                <div key={`header-${index}`} style={{
+                                    height: '32px',
+                                    padding: '12px 16px 4px 16px',
+                                    fontSize: '10px',
+                                    fontWeight: 800,
+                                    color: 'var(--text-secondary)',
+                                    opacity: 0.6,
+                                    letterSpacing: '0.05em',
+                                    display: 'flex',
+                                    alignItems: 'flex-end',
+                                    textTransform: 'uppercase'
+                                }}>
+                                    {item.label}
+                                </div>
+                            ) : (
+                                <div key={`header-${index}`} style={{ height: '16px' }} />
+                            );
+                        }
+
                         const active = activeTab === item.id;
                         const isBlocked = hasUnsignedContract
                             && primaryRole === 'Employee'

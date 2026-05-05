@@ -139,6 +139,25 @@ export default function AttendanceManagement({ user }) {
         return { label: 'Thiếu dữ liệu', cls: 'text-amber-600 bg-amber-50' };
     };
 
+    const exportDailyExcel = async () => {
+        try {
+            const deptId = selectedDept === 'all' ? 0 : selectedDept;
+            const res = await attendanceService.exportDailyExcel(deptId, selectedDate);
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ChamCongNgay_${selectedDate}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast.success('Xuất file Excel thành công');
+        } catch (err) {
+            console.error('Error exporting daily attendance:', err);
+            toast.error('Lỗi khi xuất file Excel');
+        }
+    };
+
     const getTimes = (empId) => {
         const safeAttendance = Array.isArray(attendance) ? attendance : [];
         const records = safeAttendance.filter(r => r?.employeeId === empId);
@@ -180,6 +199,12 @@ export default function AttendanceManagement({ user }) {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <button 
+                        onClick={exportDailyExcel}
+                        className="btn btn-ghost !py-2.5 !px-4 shadow-sm border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-2"
+                    >
+                        <FileDown size={18} /> Xuất Excel
+                    </button>
                     <div className="flex items-center bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
                         <Calendar size={16} className="text-slate-400 mr-2" />
                         <input 

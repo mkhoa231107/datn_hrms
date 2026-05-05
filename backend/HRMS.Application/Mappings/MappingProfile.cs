@@ -57,6 +57,7 @@ namespace HRMS.Application.Mappings
                 .ForMember(dest => dest.PositionDefaultShiftId, opt => opt.MapFrom(src => src.Position.DefaultShiftId))
                 .ForMember(dest => dest.ShiftName, opt => opt.MapFrom(src => src.Shift != null ? src.Shift.ShiftName : null))
                 .ForMember(dest => dest.Signature, opt => opt.MapFrom(src => src.Signature))
+                .ForMember(dest => dest.Nationality, opt => opt.MapFrom(src => src.Nationality))
                 .ForMember(dest => dest.CurrentContract, opt => opt.Ignore()); // Sẽ được xử lý trong Service nếu cần
 
             CreateMap<EmployeeContract, EmployeeContractDto>()

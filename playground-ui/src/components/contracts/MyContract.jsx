@@ -33,7 +33,7 @@ export default function MyContract({ user, onSignSuccess, onBack }) {
     const fetchMyContract = async () => {
         setLoading(true);
         try {
-            const response = await api.get('/contracts');
+            const response = await api.get('/contracts?personal=true');
             if (response.data?.length > 0) {
                 const sorted = [...response.data].sort((a, b) => b.id - a.id);
                 setContract(sorted[0]);

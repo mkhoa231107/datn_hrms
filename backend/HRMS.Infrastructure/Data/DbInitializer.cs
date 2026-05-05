@@ -48,6 +48,11 @@ namespace HRMS.Infrastructure.Data
             Console.WriteLine("🛠️ DataFixSeeder: Populating Missing Info...");
             await DataFixSeeder.FixMissingEmployeeInfoAsync(context);
 
+            Console.WriteLine("🛠️ DataFixSeeder: Fixing Coefficients and Salaries...");
+            await DataFixSeeder.FixManagerPositionsAsync(context);
+            await DataFixSeeder.FixPositionCoefficientsAsync(context);
+            await DataFixSeeder.FixContractSalariesAsync(context);
+
             // 8. Mass Seed 151 PRD-ASS Workers with 2026 Rotating Schedules
             // Force running once to apply new rotation logic for the whole year
             Console.WriteLine("🏭 MassWorkerSeeder: Starting...");

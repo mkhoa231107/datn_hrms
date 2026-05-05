@@ -40,6 +40,7 @@ namespace HRMS.Application.Interfaces
 
         // Export Excel
         Task<byte[]> ExportTimesheetToExcelAsync(int departmentId, int periodId);
+        Task<byte[]> ExportDailyAttendanceToExcelAsync(int departmentId, DateTime date);
 
         // Report
         Task<AttendanceReportSummaryDto> GetAttendanceSummaryReportAsync(string month, int? departmentId, int page, int limit);

@@ -19,8 +19,8 @@ namespace HRMS.Domain.Entities
         public decimal DependentDeductionAmount { get; set; } = 4400000m;  // 4.4tr
         
         // Base Salaries for Insurance Caps
-        public decimal CommonBaseSalary { get; set; } = 1800000m; // Lương cơ sở
-        public decimal RegionBaseSalary { get; set; } = 4680000m; // Lương tối thiểu vùng (Vùng 1)
+        public decimal CommonBaseSalary { get; set; } = 2340000m; // Lương cơ sở nhà nước (từ 07/2024)
+        public decimal RegionBaseSalary { get; set; } = 5310000m; // Lương tối thiểu vùng I (2026)
         
         public bool IsActive { get; set; } = true;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

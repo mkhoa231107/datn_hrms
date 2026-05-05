@@ -12,6 +12,7 @@ namespace HRMS.Application.DTOs.Employees
         public DateTime DateOfBirth { get; set; }
         public string? Gender { get; set; }
         public string? PlaceOfOrigin { get; set; }
+        public string? Nationality { get; set; }
         public string? Ethnicity { get; set; }
         public string? Religion { get; set; }
         public string? Email { get; set; }

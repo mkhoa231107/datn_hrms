@@ -18,6 +18,7 @@ namespace HRMS.Domain.Entities
         public DateTime DateOfBirth { get; set; }   // Ngày sinh
         public string Gender { get; set; }          // Giới tính: "Nam", "Nữ", "Khác"
         public string? PlaceOfOrigin { get; set; }  // Quê quán
+        public string? Nationality { get; set; } = "Việt Nam"; // Quốc tịch
         public string? PlaceOfBirth { get; set; }   // Nơi sinh
         public string? Ethnicity { get; set; }      // Dân tộc
         public string? Religion { get; set; }       // Tôn giáo

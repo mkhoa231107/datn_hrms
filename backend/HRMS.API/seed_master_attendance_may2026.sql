@@ -101,14 +101,14 @@ SELECT
     SUM(CASE WHEN IsEarlyLeave = 1 THEN 1 ELSE 0 END),
     GREATEST(0, 26 - COUNT(*)),
     SUM(WorkingHours), SUM(OTHours),
-    0, 0, 1, GETUTCDATE() -- 1 = Approved
+    0, 0, 0, GETUTCDATE() -- 0 = Draft (TimesheetStatus.Draft)
 FROM AttendanceDetails
 WHERE [Date] >= @StartDate AND [Date] <= @EndDate
 GROUP BY EmployeeId;
 
-PRINT '4. Generated AttendanceSummaries (Approved Status).';
+PRINT '4. Generated AttendanceSummaries (Draft Status).';
 PRINT '=========================================================================';
 PRINT 'SUCCESS: All attendance data for May 2026 has been reset and re-seeded.';
-PRINT 'Total Working Days: 26. Status: Approved.';
+PRINT 'Total Working Days: 26. Status: Draft.';
 PRINT '=========================================================================';
 GO

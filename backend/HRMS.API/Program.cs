@@ -6,6 +6,7 @@ using HRMS.Infrastructure.Services;
 using HRMS.API.Middleware;
 using HRMS.API.Authorization;
 using HRMS.API.Workers;
+using HRMS.API.Hubs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -56,6 +57,20 @@ builder.Services.AddAuthentication(options =>
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
         ClockSkew = TimeSpan.Zero 
     };
+    // SignalR needs token from query string because WS can't send headers
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        }
+    };
 });
 
 builder.Services.AddHttpContextAccessor();
@@ -93,6 +108,16 @@ builder.Services.AddScoped<IShiftSwapRequestService, ShiftSwapRequestService>();
 // ========================================
 builder.Services.AddHostedService<ContractStatusWorker>();
 builder.Services.AddHostedService<ShiftRestoreWorker>();
+
+// ========================================
+// SIGNALR
+// ========================================
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
 
 // ========================================
 // CORS CONFIGURATION
@@ -195,5 +220,6 @@ app.UseAuthorization();
 app.UseMiddleware<AuditLogMiddleware>();
 
 app.MapControllers();
+app.MapHub<HrmsHub>("/hubs/hrms");
 
 app.Run();

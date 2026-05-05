@@ -16,8 +16,9 @@ namespace HRMS.Domain.Entities
         public int EmployeeId { get; set; }
         public Employee Employee { get; set; }
         
-         // Income components
+        // Income components
         public decimal BasicSalary { get; set; }    // Lương trong hợp đồng
+        public decimal ActualWorkingDays { get; set; } // Ngày công thực tế
         public decimal ActualWorkingSalary { get; set; } // Lương tính theo công thực tế
         public decimal OvertimePay { get; set; }
         
