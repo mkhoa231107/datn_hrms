@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../../api';
 import { useSignalR } from '../../hooks/useSignalR';
 import {
@@ -6,7 +6,8 @@ import {
     CheckSquare, AlertTriangle, TrendingUp, RefreshCw,
     UserPlus, Settings, BarChart2, ChevronRight,
     Calendar, ArrowRight, Building2, UserCheck,
-    Hourglass, FileSignature, Activity, Zap, Sparkles, TrendingDown, Clock3, Info, AlertCircle
+    Hourglass, FileSignature, Activity, Zap, Sparkles, TrendingDown, Clock3, Info, AlertCircle,
+    TrendingDown as TrendingDownIcon, PieChart, BarChart3, PlusCircle, MinusCircle
 } from 'lucide-react';
 
 const fmt = (val) =>
@@ -23,24 +24,28 @@ const monthLabel = `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`;
 
 /* ── Reusable KPI Card ── */
 function KpiCard({ icon: Icon, label, value, sub, color, onClick, loading, trend, isAlert }) {
+    const [kpiHovered, setKpiHovered] = React.useState(false);
+    
     return (
         <div
             onClick={onClick}
+            onMouseEnter={() => setKpiHovered(true)}
+            onMouseLeave={() => setKpiHovered(false)}
             style={{
-                background: isAlert ? '#FEF2F2' : 'var(--bg-surface)',
-                border: isAlert ? '2px solid #EF4444' : '1px solid var(--border)',
+                background: isAlert ? '#FEF2F2' : (kpiHovered ? `${color}04` : 'var(--bg-surface)'),
+                border: isAlert ? '2px solid #EF4444' : (kpiHovered ? `1.5px solid ${color}50` : '1px solid var(--border)'),
                 borderRadius: '16px',
                 padding: '20px 22px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',
                 cursor: onClick ? 'pointer' : 'default',
-                transition: 'box-shadow 0.2s, transform 0.2s',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 position: 'relative',
                 overflow: 'hidden',
+                boxShadow: kpiHovered && onClick ? `0 12px 32px ${color}20` : 'none',
+                transform: kpiHovered && onClick ? 'translateY(-4px)' : 'translateY(0)',
             }}
-            onMouseEnter={e => { if (onClick) { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}}
-            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}
         >
             {!isAlert && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: color, borderRadius: '16px 16px 0 0' }} />}
 
@@ -131,10 +136,134 @@ function Section({ title, children, action }) {
     );
 }
 
+/* ── Payroll Metric Card ── */
+function PayrollMetricCard({ label, value, icon: Icon, color, subtext, trend }) {
+    const [hovered, setHovered] = React.useState(false);
+    
+    return (
+        <div 
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            style={{
+                background: hovered ? `${color}06` : 'var(--bg-surface)',
+                border: hovered ? `2px solid ${color}40` : '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '16px',
+                display: 'flex', flexDirection: 'column', gap: '8px',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer',
+                transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+                boxShadow: hovered ? `0 8px 24px ${color}15` : '0 0 0 transparent'
+            }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {label}
+                </p>
+                {trend && <span style={{
+                    fontSize: '11px', fontWeight: 600, color: trend > 0 ? '#059669' : '#E11D48',
+                    display: 'flex', alignItems: 'center', gap: '4px'
+                }}>
+                    {trend > 0 ? <TrendingUp size={12} /> : <TrendingDownIcon size={12} />}
+                    {Math.abs(trend)}%
+                </span>}
+            </div>
+            <p style={{ fontSize: '18px', fontWeight: 800, color: color, letterSpacing: '-0.02em' }}>
+                {value}
+            </p>
+            {subtext && <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{subtext}</p>}
+        </div>
+    );
+}
+
+/* ── Simple Trend Chart (CSS-based) ── */
+function TrendChart({ data, label }) {
+    const maxValue = Math.max(...data.map(d => d.salary || 0));
+    const avgValue = data.reduce((s, d) => s + (d.salary || 0), 0) / data.length;
+    
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</p>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '120px', justifyContent: 'space-around' }}>
+                {data.map((d, i) => {
+                    const height = (d.salary / maxValue) * 100;
+                    const isAboveAvg = d.salary > avgValue;
+                    return (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, gap: '4px' }}>
+                            <div style={{
+                                width: '100%', height: `${height}%`, minHeight: '4px',
+                                background: isAboveAvg ? '#8B5CF6' : '#94A3B8',
+                                borderRadius: '4px 4px 0 0',
+                                transition: 'background 0.3s',
+                                cursor: 'pointer',
+                            }}
+                                onMouseEnter={e => e.currentTarget.style.background = isAboveAvg ? '#A78BFA' : '#CBD5E1'}
+                                onMouseLeave={e => e.currentTarget.style.background = isAboveAvg ? '#8B5CF6' : '#94A3B8'}
+                            />
+                            <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center' }}>
+                                {d.month}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+/* ── Payroll Breakdown Pie Chart (CSS circles) ── */
+function PayrollPieChart({ data }) {
+    const total = data.reduce((s, d) => s + d.value, 0);
+    const slices = [];
+    let cumulativePercent = 0;
+
+    data.forEach(item => {
+        const percent = (item.value / total) * 100;
+        slices.push({ ...item, percent, start: cumulativePercent });
+        cumulativePercent += percent;
+    });
+
+    const coneGradient = slices.map(s => {
+        const start = s.start;
+        const end = start + s.percent;
+        return `${s.color} ${start}% ${end}%`;
+    }).join(', ');
+
+    return (
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+            <div style={{
+                width: '140px', height: '140px',
+                borderRadius: '50%',
+                background: `conic-gradient(${coneGradient})`,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                {data.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: item.color }} />
+                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500, flex: 1 }}>
+                            {item.label}
+                        </span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                            {Math.round((item.value / total) * 100)}%
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 /* ── Main Component ── */
 export default function CnbDashboard({ onNavigate }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [expandedSections, setExpandedSections] = useState({
+        payroll: true,
+        deptBreakdown: true,
+        anomalies: true,
+    });
+    const [payrollView, setPayrollView] = useState('comprehensive'); // 'comprehensive' or 'details'
+    const [selectedDept, setSelectedDept] = useState(null);
 
     // ⚡ Real-time updates
     useSignalR({
@@ -151,6 +280,19 @@ export default function CnbDashboard({ onNavigate }) {
         pendingContracts: 0,
         totalInsured: 0,
         estimatedPayroll: 0,
+    });
+    const [payrollData, setPayrollData] = useState({
+        grossSalary: 0,
+        allowances: 0,
+        deductions: 0,
+        netSalary: 0,
+        insuranceCost: 0,
+        overtimeHours: 0,
+        overtimeCost: 0,
+        deptBreakdown: [],
+        monthlyTrend: [],
+        payrollVariance: 0,
+        coverage: 92,
     });
     const [deptBreakdown, setDeptBreakdown] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
@@ -227,6 +369,42 @@ export default function CnbDashboard({ onNavigate }) {
                 trend: Math.floor(Math.random() * 5) - 1 // -1 to +3
             }));
             setDeptBreakdown(breakdownWithTrend);
+
+            // Calculate payroll data (simulated)
+            const totalAllowances = estimated * 0.15; // 15% of salary as allowances
+            const totalDeductions = estimated * 0.25; // 25% for tax, insurance, etc
+            const netSalary = estimated - totalDeductions;
+            const insuranceCost = employees.length * 500_000; // ~500k per employee
+            const overtimeHours = Math.floor(employees.length * 2.5); // Avg 2.5 hours per employee
+            const overtimeCost = overtimeHours * 150_000; // 150k per overtime hour
+            
+            // Monthly trend (last 3 months)
+            const monthlyTrend = [
+                { month: 'T-2', salary: estimated * 0.98, variance: -2 },
+                { month: 'T-1', salary: estimated * 1.01, variance: 1 },
+                { month: 'T', salary: estimated, variance: 0 },
+            ];
+
+            // Dept-wise payroll breakdown
+            const deptPayrollBreakdown = breakdown.map(({ dept, count }) => ({
+                dept,
+                salary: (estimated / employees.length) * count,
+                allowances: totalAllowances / employees.length * count,
+            }));
+
+            setPayrollData({
+                grossSalary: estimated,
+                allowances: totalAllowances,
+                deductions: totalDeductions,
+                netSalary: netSalary,
+                insuranceCost: insuranceCost,
+                overtimeHours: overtimeHours,
+                overtimeCost: overtimeCost,
+                deptBreakdown: deptPayrollBreakdown,
+                monthlyTrend: monthlyTrend,
+                payrollVariance: 0,
+                coverage: 92,
+            });
 
             // Compute real anomalies based on today's attendance records
             const detectedAnomalies = [];
@@ -394,16 +572,8 @@ export default function CnbDashboard({ onNavigate }) {
                 </div>
             )}
 
-            {/* ── KPI Cards Row 1 ── */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-                <KpiCard
-                    icon={CheckSquare} label="Chốt công tháng này" color="#EF4444"
-                    value={`${stats.missingTimesheets} NV`}
-                    sub="Thiếu/sai dữ liệu công"
-                    loading={loading}
-                    isAlert={stats.missingTimesheets > 0}
-                    onClick={() => nav('attendance-management')}
-                />
+            {/* ── KPI Cards Row 1 (Primary Metrics) ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '14px' }}>
                 <KpiCard
                     icon={Users} label="Tổng nhân sự" color="#0D9488"
                     value={stats.totalEmployees}
@@ -413,7 +583,7 @@ export default function CnbDashboard({ onNavigate }) {
                     onClick={() => nav('employees')}
                 />
                 <KpiCard
-                    icon={DollarSign} label="Dự chi lương" color="#8B5CF6"
+                    icon={DollarSign} label="Tổng lương Gross" color="#8B5CF6"
                     value={loading ? '—' : fmtShort(stats.estimatedPayroll)}
                     sub="Ước tính tháng này"
                     trend={{ value: '+1.5%', isPositive: true }}
@@ -421,10 +591,34 @@ export default function CnbDashboard({ onNavigate }) {
                     onClick={() => nav('payroll-processing')}
                 />
                 <KpiCard
+                    icon={PlusCircle} label="Phụ cấp & Trợ cấp" color="#10B981"
+                    value={loading ? '—' : fmtShort(payrollData.allowances)}
+                    sub="Lương cơ bản + 15%"
+                    trend={{ value: '+0.5%', isPositive: true }}
+                    loading={loading}
+                    onClick={() => nav('payroll-processing')}
+                />
+                <KpiCard
+                    icon={MinusCircle} label="Khấu trừ & Thuế" color="#F59E0B"
+                    value={loading ? '—' : fmtShort(payrollData.deductions)}
+                    sub="~25% lương Gross"
+                    trend={{ value: '+2%', isNeutral: true }}
+                    loading={loading}
+                    onClick={() => nav('payroll-processing')}
+                />
+                <KpiCard
+                    icon={CheckSquare} label="Chốt công tháng này" color="#EF4444"
+                    value={`${stats.missingTimesheets} NV`}
+                    sub="Thiếu/sai dữ liệu công"
+                    loading={loading}
+                    isAlert={stats.missingTimesheets > 0}
+                    onClick={() => nav('attendance-management')}
+                />
+                <KpiCard
                     icon={Calendar} label="Đơn nghỉ chờ duyệt" color="#F59E0B"
                     value={stats.pendingLeaves}
                     sub="Cần xử lý trong tuần"
-                    trend={{ value: '-3', isPositive: true }} // Less leaves is good
+                    trend={{ value: '-3', isPositive: true }}
                     loading={loading}
                     onClick={() => nav('team-leaves')}
                 />
@@ -443,6 +637,207 @@ export default function CnbDashboard({ onNavigate }) {
                     loading={loading}
                     onClick={() => nav('admin-contracts')}
                 />
+            </div>
+
+            {/* ── Enhanced Payroll Section ── */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                <Section
+                    title="Phân tích Lương & Phúc lợi (Payroll Analytics)"
+                    action={
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{
+                                display: 'flex', gap: '4px',
+                                padding: '4px', borderRadius: '8px',
+                                background: 'var(--border)', border: '1px solid var(--border)'
+                            }}>
+                                <button
+                                    onClick={() => setPayrollView('comprehensive')}
+                                    style={{
+                                        padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+                                        border: 'none', cursor: 'pointer',
+                                        background: payrollView === 'comprehensive' ? '#8B5CF6' : 'transparent',
+                                        color: payrollView === 'comprehensive' ? '#fff' : 'var(--text-secondary)',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Tổng quan
+                                </button>
+                                <button
+                                    onClick={() => setPayrollView('details')}
+                                    style={{
+                                        padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+                                        border: 'none', cursor: 'pointer',
+                                        background: payrollView === 'details' ? '#8B5CF6' : 'transparent',
+                                        color: payrollView === 'details' ? '#fff' : 'var(--text-secondary)',
+                                        transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Chi tiết
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => nav('payroll-processing')}
+                                style={{ fontSize: '11px', color: '#8B5CF6', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            >
+                                Xử lý <ArrowRight size={11} />
+                            </button>
+                        </div>
+                    }
+                >
+                    {payrollView === 'comprehensive' ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+                            <PayrollMetricCard
+                                label="Lương Gross"
+                                value={loading ? '—' : fmtShort(payrollData.grossSalary)}
+                                color="#8B5CF6"
+                                subtext={`${stats.totalEmployees} nhân viên`}
+                                trend={1.5}
+                            />
+                            <PayrollMetricCard
+                                label="Lương Net"
+                                value={loading ? '—' : fmtShort(payrollData.netSalary)}
+                                color="#10B981"
+                                subtext="Sau thuế & khấu trừ"
+                                trend={1.2}
+                            />
+                            <PayrollMetricCard
+                                label="Phụ cấp"
+                                value={loading ? '—' : fmtShort(payrollData.allowances)}
+                                color="#06B6D4"
+                                subtext="15% lương cơ bản"
+                            />
+                            <PayrollMetricCard
+                                label="Chi phí Bảo hiểm"
+                                value={loading ? '—' : fmtShort(payrollData.insuranceCost)}
+                                color="#3B82F6"
+                                subtext={`Cho ${payrollData.coverage}% nhân viên`}
+                            />
+                            <PayrollMetricCard
+                                label="Giờ Tăng ca"
+                                value={loading ? '—' : `${payrollData.overtimeHours}h`}
+                                color="#F59E0B"
+                                subtext={`Chi phí: ${fmtShort(payrollData.overtimeCost)}`}
+                            />
+                            <PayrollMetricCard
+                                label="Độ lệch Lương"
+                                value={loading ? '—' : `${payrollData.payrollVariance}%`}
+                                color={payrollData.payrollVariance > 0 ? '#F59E0B' : '#10B981'}
+                                subtext="So với ngân sách"
+                                trend={payrollData.payrollVariance}
+                            />
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px', padding: '16px', background: 'var(--bg-surface)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Chi tiết Lương - {monthLabel}</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div style={{ padding: '12px', background: '#8B5CF608', borderRadius: '8px', border: '1px solid #8B5CF620' }}>
+                                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Lương Cơ bản</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 800, color: '#8B5CF6', marginTop: '4px' }}>
+                                        {loading ? '—' : fmtShort(payrollData.grossSalary * 0.8)}
+                                    </p>
+                                </div>
+                                <div style={{ padding: '12px', background: '#06B6D408', borderRadius: '8px', border: '1px solid #06B6D420' }}>
+                                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Phụ cấp</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 800, color: '#06B6D4', marginTop: '4px' }}>
+                                        {loading ? '—' : fmtShort(payrollData.allowances)}
+                                    </p>
+                                </div>
+                                <div style={{ padding: '12px', background: '#F59E0B08', borderRadius: '8px', border: '1px solid #F59E0B20' }}>
+                                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Khấu trừ</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 800, color: '#F59E0B', marginTop: '4px' }}>
+                                        {loading ? '—' : fmtShort(payrollData.deductions)}
+                                    </p>
+                                </div>
+                                <div style={{ padding: '12px', background: '#10B98108', borderRadius: '8px', border: '1px solid #10B98120' }}>
+                                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Lương Ròng</p>
+                                    <p style={{ fontSize: '18px', fontWeight: 800, color: '#10B981', marginTop: '4px' }}>
+                                        {loading ? '—' : fmtShort(payrollData.netSalary)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Trend Chart */}
+                    {!loading && payrollData.monthlyTrend.length > 0 && (
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px', marginBottom: '20px' }}>
+                            <TrendChart data={payrollData.monthlyTrend} label="Xu hướng Lương (3 tháng gần nhất)" />
+                        </div>
+                    )}
+
+                    {/* Payroll Pie Chart */}
+                    {!loading && payrollData.grossSalary > 0 && (
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
+                                Cấu trúc Lương & Khấu trừ
+                            </p>
+                            <PayrollPieChart
+                                data={[
+                                    { label: 'Lương Gross', value: payrollData.grossSalary, color: '#8B5CF6' },
+                                    { label: 'Phụ cấp', value: payrollData.allowances, color: '#06B6D4' },
+                                    { label: 'Khấu trừ', value: payrollData.deductions, color: '#F59E0B' },
+                                    { label: 'Bảo hiểm', value: payrollData.insuranceCost, color: '#3B82F6' },
+                                ]}
+                            />
+                        </div>
+                    )}
+
+                    {/* Dept-wise Payroll Breakdown (Drill-down) */}
+                    {!loading && payrollData.deptBreakdown.length > 0 && (
+                        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                            <button
+                                onClick={() => setExpandedSections({ ...expandedSections, deptPayroll: !expandedSections.deptPayroll })}
+                                style={{
+                                    width: '100%', padding: '12px 0',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)'
+                                }}
+                            >
+                                Phân bổ Lương theo Phòng/Ban
+                                <span style={{ 
+                                    fontSize: '12px', 
+                                    transform: expandedSections.deptPayroll ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.3s',
+                                    display: 'inline-block'
+                                }}>
+                                    ▼
+                                </span>
+                            </button>
+                            {expandedSections.deptPayroll && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                                    {payrollData.deptBreakdown.slice(0, 5).map((dept, i) => (
+                                        <div key={i} style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                            padding: '12px', borderRadius: '10px',
+                                            background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                                            cursor: 'pointer', transition: 'all 0.2s'
+                                        }}
+                                            onMouseEnter={e => {
+                                                e.currentTarget.style.borderColor = '#8B5CF6';
+                                                e.currentTarget.style.boxShadow = '0 0 0 2px rgba(139, 92, 246, 0.1)';
+                                            }}
+                                            onMouseLeave={e => {
+                                                e.currentTarget.style.borderColor = 'var(--border)';
+                                                e.currentTarget.style.boxShadow = 'none';
+                                            }}
+                                        >
+                                            <div>
+                                                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                                    {dept.dept}
+                                                </p>
+                                                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                    Lương: {fmtShort(dept.salary)} + Phụ cấp: {fmtShort(dept.allowances)}
+                                                </p>
+                                            </div>
+                                            <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </Section>
             </div>
 
             {/* ── Row 2: Dept Breakdown + Anomalies + Quick Actions ── */}
@@ -660,6 +1055,17 @@ export default function CnbDashboard({ onNavigate }) {
             <style>{`
                 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
                 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+                @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                @keyframes glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.3); } 50% { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); } }
+                
+                div[style*="pageEnter"] { animation: slideUp 0.4s ease; }
+                
+                @media (max-width: 768px) {
+                    [style*="gridTemplateColumns: '1fr 300px 240px'"] { grid-template-columns: 1fr !important; }
+                    [style*="gridTemplateColumns: '1fr 1fr'"] { grid-template-columns: 1fr !important; }
+                    [style*="gridTemplateColumns: 'repeat(auto-fill'"] { grid-template-columns: 1fr !important; }
+                }
             `}</style>
         </div>
     );
